@@ -17,12 +17,17 @@ async function fetchProfile(authUser) {
     .select('*')
     .eq('id', authUser.id)
     .maybeSingle();
+  const meta = authUser.user_metadata || {};
   return {
     id: authUser.id,
     email: authUser.email,
-    full_name: profile?.full_name || authUser.user_metadata?.full_name || authUser.email,
+    full_name: profile?.full_name || meta.full_name || authUser.email,
     role: profile?.role || 'user',
     organization_id: profile?.organization_id || null,
+    phone: meta.phone || '',
+    position: meta.position || '',
+    bio: meta.bio || '',
+    preferences: meta.preferences || null,
   };
 }
 
@@ -103,15 +108,33 @@ const auth = {
     if (error) throw error;
     return data; // new organization id
   },
+
+  // Stores free-form profile fields (phone, position, bio, preferences) in
+  // the Supabase auth user's metadata, and mirrors full_name onto `profiles`
+  // if given (that column drives name display elsewhere in the app).
+  async updateMe(fields) {
+    const { full_name, ...rest } = fields;
+    const { data: userData } = await supabase.auth.getUser();
+    const currentMeta = userData?.user?.user_metadata || {};
+    const { error } = await supabase.auth.updateUser({ data: { ...currentMeta, full_name, ...rest } });
+    if (error) throw error;
+    if (full_name && userData?.user?.id) {
+      await supabase.from('profiles').update({ full_name }).eq('id', userData.user.id);
+    }
+  },
 };
+
+async function currentOrgId() {
+  const { data: userData } = await supabase.auth.getUser();
+  return (await fetchProfile(userData?.user))?.organization_id || 'misc';
+}
 
 const integrations = {
   Core: {
     // Uploads to the public-files Storage bucket (created by 0001_init.sql)
     // and returns a permanent public URL, matching Base44's UploadPublicFile shape.
     async UploadPublicFile({ file }) {
-      const { data: userData } = await supabase.auth.getUser();
-      const orgId = (await fetchProfile(userData?.user))?.organization_id || 'misc';
+      const orgId = await currentOrgId();
       const ext = file.name.split('.').pop();
       const path = `${orgId}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage.from('public-files').upload(path, file);
@@ -119,7 +142,35 @@ const integrations = {
       const { data } = supabase.storage.from('public-files').getPublicUrl(path);
       return { file_url: data.publicUrl };
     },
+
+    // Uploads to the private-files bucket (0003_private_storage.sql). Only
+    // org members can read it, and only via a short-lived signed URL.
+    async UploadPrivateFile({ file }) {
+      const orgId = await currentOrgId();
+      const ext = file.name.split('.').pop();
+      const path = `${orgId}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from('private-files').upload(path, file);
+      if (error) throw error;
+      return { file_uri: path };
+    },
+
+    async CreateFileSignedUrl({ file_uri }) {
+      const { data, error } = await supabase.storage.from('private-files').createSignedUrl(file_uri, 300);
+      if (error) throw error;
+      return { signed_url: data.signedUrl };
+    },
   },
 };
 
-export const base44 = { entities, auth, integrations };
+const users = {
+  // Base44 could send a real invite email + provision access in one call.
+  // Supabase's equivalent (auth.admin.inviteUserByEmail) needs the service-role
+  // key, which must never ship to the browser — it has to run server-side
+  // (a Supabase Edge Function). That function isn't built yet, so this is a
+  // clear placeholder rather than a silent no-op.
+  async inviteUser() {
+    throw new Error('Invitar miembros requiere una Edge Function de Supabase con la service role key (todavía no está implementada).');
+  },
+};
+
+export const base44 = { entities, auth, integrations, users };
