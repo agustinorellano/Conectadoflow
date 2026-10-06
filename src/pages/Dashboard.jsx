@@ -197,7 +197,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.revenue} formatValue={amount} />
-        <CurrencyConverterCard amountArs={stats.revenue} />
+        <CurrencyConverterCard amountArs={stats.revenue} baseCurrency={currency} />
         <div className="bg-card rounded-2xl border border-border card-shadow p-4 h-full flex flex-col justify-center">
           <div className="flex items-center gap-2 mb-2.5">
             <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
