@@ -22,6 +22,7 @@ async function fetchProfile(authUser) {
     email: authUser.email,
     full_name: profile?.full_name || authUser.user_metadata?.full_name || authUser.email,
     role: profile?.role || 'user',
+    organization_id: profile?.organization_id || null,
   };
 }
 
@@ -92,6 +93,15 @@ const auth = {
 
   redirectToLogin(returnTo) {
     window.location.href = '/login' + (returnTo && returnTo !== '/' ? '?returnTo=' + encodeURIComponent(returnTo) : '');
+  },
+
+  // Multi-tenant signup: creates a new organization and makes the current
+  // user its admin. Call once, right after registration, before creating
+  // any AppConfig/Commerce rows (those need organization_id to already be set).
+  async createOrganization(name) {
+    const { data, error } = await supabase.rpc('create_organization', { org_name: name });
+    if (error) throw error;
+    return data; // new organization id
   },
 };
 
