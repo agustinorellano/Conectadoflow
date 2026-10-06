@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 export default function Profile() {
   const { user, checkUserAuth } = useAuth();
-  const [form, setForm] = useState({ phone: '', position: '', bio: '' });
+  const [form, setForm] = useState({ full_name: '', phone: '', position: '', bio: '' });
   const [prefs, setPrefs] = useState({
     email_leads: true, email_meetings: true, email_payments: true,
     push_notifications: false, weekly_summary: true, payment_reminders: true,
@@ -19,7 +19,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (user) {
-      setForm({ phone: user.phone || '', position: user.position || '', bio: user.bio || '' });
+      setForm({ full_name: user.full_name || '', phone: user.phone || '', position: user.position || '', bio: user.bio || '' });
       if (user.preferences) setPrefs(p => ({ ...p, ...user.preferences }));
     }
   }, [user]);
@@ -27,7 +27,7 @@ export default function Profile() {
   const saveProfile = async () => {
     setSavingProfile(true);
     try {
-      await base44.auth.updateMe({ phone: form.phone, position: form.position, bio: form.bio });
+      await base44.auth.updateMe({ full_name: form.full_name, phone: form.phone, position: form.position, bio: form.bio });
       await checkUserAuth();
       setSavedProfile(true);
       setTimeout(() => setSavedProfile(false), 2000);
@@ -73,8 +73,7 @@ export default function Profile() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Nombre completo</label>
-            <input value={user.full_name || ''} disabled className="inp opacity-60 cursor-not-allowed" />
-            <p className="text-xs text-muted-foreground mt-1">El nombre se asigna al crear la cuenta</p>
+            <input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Tu nombre y apellido" className="inp" />
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Email</label>

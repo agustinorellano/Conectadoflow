@@ -55,8 +55,8 @@ const auth = {
     if (error) throw error;
   },
 
-  async register({ email, password }) {
-    const { error } = await supabase.auth.signUp({ email, password });
+  async register({ email, password, full_name }) {
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name } } });
     if (error) throw error;
   },
 
