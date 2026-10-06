@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon } from 'lucide-react';
+import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import KpiCard from '@/components/KpiCard';
 import { Image as UIImage } from '@/components/ui/image';
 import { formatCurrency } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
+
+const LOW_STOCK_THRESHOLD = 5;
 
 export default function Products() {
   const { config } = useData();
@@ -27,6 +30,16 @@ export default function Products() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const stockStats = useMemo(() => {
+    const physical = products.filter(p => p.kind === 'Producto');
+    return {
+      total: products.length,
+      totalStock: physical.reduce((s, p) => s + (Number(p.stock) || 0), 0),
+      lowStock: physical.filter(p => Number(p.stock) > 0 && Number(p.stock) <= LOW_STOCK_THRESHOLD).length,
+      outOfStock: physical.filter(p => (Number(p.stock) || 0) <= 0).length,
+    };
+  }, [products]);
 
   const filtered = products.filter(p => {
     const q = search.toLowerCase();
@@ -52,6 +65,13 @@ export default function Products() {
         <button onClick={handleNew} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
           <Plus className="w-4 h-4" /> Nuevo producto
         </button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+        <KpiCard label="Productos y servicios" value={stockStats.total} icon={Package} accent="#465BE8" />
+        <KpiCard label="Stock total" value={stockStats.totalStock} icon={Layers} accent="#22c55e" sublabel="Unidades" />
+        <KpiCard label="Stock bajo" value={stockStats.lowStock} icon={AlertTriangle} accent="#f59e0b" sublabel={`≤ ${LOW_STOCK_THRESHOLD} unidades`} />
+        <KpiCard label="Sin stock" value={stockStats.outOfStock} icon={XCircle} accent="#ef4444" />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
@@ -90,6 +110,13 @@ export default function Products() {
                   <Badge variant={p.is_active ? 'success' : 'muted'}>{p.is_active ? 'Activo' : 'Inactivo'}</Badge>
                 </div>
                 {p.description && <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{p.description}</p>}
+                {p.kind === 'Producto' && (
+                  <div className="mb-3">
+                    <Badge variant={(Number(p.stock) || 0) <= 0 ? 'destructive' : Number(p.stock) <= LOW_STOCK_THRESHOLD ? 'warning' : 'success'} dot>
+                      {(Number(p.stock) || 0) <= 0 ? 'Sin stock' : `${p.stock} en stock`}
+                    </Badge>
+                  </div>
+                )}
                 <div className="flex items-center justify-between pt-3 border-t border-border">
                   <div>
                     <p className="text-xs text-muted-foreground">Precio unitario</p>
