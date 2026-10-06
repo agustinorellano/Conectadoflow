@@ -105,4 +105,21 @@ const auth = {
   },
 };
 
-export const base44 = { entities, auth };
+const integrations = {
+  Core: {
+    // Uploads to the public-files Storage bucket (created by 0001_init.sql)
+    // and returns a permanent public URL, matching Base44's UploadPublicFile shape.
+    async UploadPublicFile({ file }) {
+      const { data: userData } = await supabase.auth.getUser();
+      const orgId = (await fetchProfile(userData?.user))?.organization_id || 'misc';
+      const ext = file.name.split('.').pop();
+      const path = `${orgId}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from('public-files').upload(path, file);
+      if (error) throw error;
+      const { data } = supabase.storage.from('public-files').getPublicUrl(path);
+      return { file_url: data.publicUrl };
+    },
+  },
+};
+
+export const base44 = { entities, auth, integrations };
