@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  DollarSign, ShoppingCart, UserPlus, Wallet,
+  ShoppingCart, UserPlus, Wallet,
   ChevronDown, ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -14,7 +14,7 @@ import Badge from '@/components/Badge';
 import SalesByEntityChart from '@/components/SalesByEntityChart';
 import DashboardPills from '@/components/DashboardPills';
 import MonthlyGoalCard from '@/components/MonthlyGoalCard';
-import CurrencyConverterCard from '@/components/CurrencyConverterCard';
+import IncomeCard from '@/components/IncomeCard';
 import DateWeatherWidget from '@/components/DateWeatherWidget';
 import ProgressBar from '@/components/ProgressBar';
 import {
@@ -183,21 +183,22 @@ export default function Dashboard() {
         <DashboardPills view={view} setView={setView} />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <div className="relative">
-          <KpiCard label="Ingresos" value={amount(stats.revenue)} variation={variation(stats.revenue, stats.prevRevenue)} icon={DollarSign} accent="#465BE8" />
-          <button onClick={() => setHideAmounts(!hideAmounts)} className="absolute top-5 right-14 w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent">
-            {hideAmounts ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+        <IncomeCard
+          className="col-span-2"
+          revenue={stats.revenue}
+          variationPct={variation(stats.revenue, stats.prevRevenue)}
+          baseCurrency={currency}
+          hidden={hideAmounts}
+          onToggleHidden={() => setHideAmounts(!hideAmounts)}
+        />
         <KpiCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" sublabel={`Ticket ${amount(stats.avgTicket)}`} />
         <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" />
         <KpiCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" sublabel={stats.overdue > 0 ? `${amount(stats.overdue)} vencido` : 'Al día'} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
         <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.revenue} formatValue={amount} />
-        <CurrencyConverterCard amountArs={stats.revenue} baseCurrency={currency} />
         <div className="bg-card rounded-2xl border border-border card-shadow p-4 h-full flex flex-col justify-center">
           <div className="flex items-center gap-2 mb-2.5">
             <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
