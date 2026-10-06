@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
+import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Login() {
@@ -13,6 +14,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const returnTo = safeReturnTo();
 
   const handleSubmit = async (e) => {
@@ -26,6 +28,17 @@ export default function Login() {
       setError(err.message || "Invalid email or password");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      await base44.auth.loginWithProvider("google", returnTo);
+    } catch (err) {
+      setError(err.message || "No se pudo iniciar sesión con Google");
+      setGoogleLoading(false);
     }
   };
 
@@ -102,6 +115,20 @@ export default function Login() {
           )}
         </Button>
       </form>
+
+      <div className="relative my-5">
+        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+        <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">o</span></div>
+      </div>
+
+      <Button type="button" variant="outline" className="w-full h-12 font-medium" disabled={googleLoading} onClick={handleGoogle}>
+        {googleLoading ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <GoogleIcon className="w-4 h-4 mr-2" />
+        )}
+        Continuar con Google
+      </Button>
     </AuthLayout>
   );
 }

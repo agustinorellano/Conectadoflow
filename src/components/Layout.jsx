@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, UserPlus, KanbanSquare, ShoppingCart,
   Wallet, Calendar, MessageCircle, FileText, BarChart3, Users2,
   Settings, Search, Bell, Plus, ChevronLeft, LogOut, X, Sparkles,
-  User, ClipboardList, Package,
+  User, ClipboardList, Package, ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
@@ -59,6 +59,23 @@ export default function Layout() {
     logout(false);
     navigate('/login');
   };
+
+  if (user && user.organization_id && user.organization_active === false) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-sm w-full bg-card rounded-2xl border border-border card-shadow p-6 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <h1 className="font-semibold text-lg mb-1">Cuenta suspendida</h1>
+          <p className="text-sm text-muted-foreground mb-5">Tu organización fue suspendida. Contactá al soporte de Conectado Flow para más información.</p>
+          <button onClick={handleLogout} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+            <LogOut className="w-4 h-4" /> Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -126,7 +143,17 @@ export default function Layout() {
         </nav>
 
         {/* User */}
-        <div className="p-2.5 border-t border-border">
+        <div className="p-2.5 border-t border-border space-y-0.5">
+          {user?.is_platform_admin && (
+            <NavLink to="/super-admin"
+              className={({ isActive }) => cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-colors',
+                isActive ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent'
+              )}>
+              <ShieldAlert className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
+              {!collapsed && <span className="truncate">Admin plataforma</span>}
+            </NavLink>
+          )}
           <div className={cn('flex items-center gap-3 px-2.5 py-2 rounded-xl', !collapsed && 'hover:bg-sidebar-accent transition-colors')}>
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-xs font-semibold shrink-0">
               {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}

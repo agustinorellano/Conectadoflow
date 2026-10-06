@@ -32,6 +32,7 @@ import SettingsPage from '@/pages/Settings';
 import Profile from '@/pages/Profile';
 import Reports from '@/pages/Reports';
 import Products from '@/pages/Products';
+import SuperAdmin from '@/pages/SuperAdmin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth } = useAuth();
@@ -66,6 +67,7 @@ const AuthenticatedApp = () => {
           <Route path="/perfil" element={<Profile />} />
           <Route path="/reportes" element={<Reports />} />
           <Route path="/productos" element={<Products />} />
+          <Route path="/super-admin" element={<SuperAdmin />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>

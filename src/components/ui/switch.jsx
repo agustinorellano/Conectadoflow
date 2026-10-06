@@ -11,9 +11,9 @@ const Switch = React.forwardRef(({ checked, onCheckedChange, onLabel = "ON", off
     disabled={disabled}
     onClick={() => !disabled && onCheckedChange?.(!checked)}
     className={cn(
-      "relative inline-flex items-center h-8 w-[84px] gap-1 rounded-full p-1 transition-colors duration-200 shrink-0",
+      "relative inline-flex items-center h-8 gap-1.5 rounded-full p-1 pr-3 transition-colors duration-200 shrink-0",
       "disabled:opacity-50 disabled:cursor-not-allowed",
-      checked ? "bg-primary flex-row-reverse" : "bg-secondary border border-border flex-row",
+      checked ? "bg-primary flex-row-reverse pl-3 pr-1" : "bg-secondary border border-border flex-row",
       className
     )}
   >
@@ -21,7 +21,7 @@ const Switch = React.forwardRef(({ checked, onCheckedChange, onLabel = "ON", off
       {checked ? <Check className="w-3.5 h-3.5 text-primary" /> : <X className="w-3.5 h-3.5 text-muted-foreground" />}
     </span>
     <span className={cn(
-      "flex-1 text-center text-[11px] font-bold tracking-wide uppercase",
+      "text-center text-[11px] font-bold tracking-wide uppercase whitespace-nowrap",
       checked ? "text-primary-foreground" : "text-muted-foreground"
     )}>
       {checked ? onLabel : offLabel}

@@ -18,12 +18,22 @@ async function fetchProfile(authUser) {
     .eq('id', authUser.id)
     .maybeSingle();
   const meta = authUser.user_metadata || {};
+
+  let organizationActive = true;
+  if (profile?.organization_id) {
+    const { data: org } = await supabase.from('organizations').select('is_active').eq('id', profile.organization_id).maybeSingle();
+    if (org && org.is_active === false) organizationActive = false;
+  }
+  const { data: isPlatformAdmin } = await supabase.rpc('is_platform_admin').catch(() => ({ data: false }));
+
   return {
     id: authUser.id,
     email: authUser.email,
     full_name: profile?.full_name || meta.full_name || authUser.email,
     role: profile?.role || 'user',
     organization_id: profile?.organization_id || null,
+    organization_active: organizationActive,
+    is_platform_admin: !!isPlatformAdmin,
     phone: meta.phone || '',
     position: meta.position || '',
     bio: meta.bio || '',
@@ -162,6 +172,26 @@ const integrations = {
   },
 };
 
+// Platform-level admin API — only works for emails listed in
+// public.platform_admins (see 0006_platform_admin.sql); every RPC call
+// re-checks that server-side and throws for anyone else.
+const admin = {
+  async listOrganizations() {
+    const { data, error } = await supabase.rpc('admin_list_organizations');
+    if (error) throw error;
+    return data || [];
+  },
+  async listUsers() {
+    const { data, error } = await supabase.rpc('admin_list_users');
+    if (error) throw error;
+    return data || [];
+  },
+  async setOrganizationActive(orgId, active) {
+    const { error } = await supabase.rpc('admin_set_organization_active', { org_id: orgId, active });
+    if (error) throw error;
+  },
+};
+
 const users = {
   // Base44 could send a real invite email + provision access in one call.
   // Supabase's equivalent (auth.admin.inviteUserByEmail) needs the service-role
@@ -173,4 +203,4 @@ const users = {
   },
 };
 
-export const base44 = { entities, auth, integrations, users };
+export const base44 = { entities, auth, integrations, users, admin };
