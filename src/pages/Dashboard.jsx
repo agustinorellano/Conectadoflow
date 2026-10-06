@@ -229,7 +229,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-3 sm:gap-4 mb-6">
         <KpiCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" sublabel={`Ticket ${amount(stats.avgTicket)}`} onClick={() => navigate('/ventas')} sparkline={stats.salesSparkline} />
         <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} sparkline={stats.leadsSparkline} />
         <KpiCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" sublabel={stats.overdue > 0 ? `${amount(stats.overdue)} vencido` : 'Al día'} onClick={() => navigate('/cobros')} sparkline={stats.collectedSparkline} />

@@ -53,7 +53,7 @@ export default function IncomeCard({ revenue, variationPct, baseCurrency = 'ARS'
       className={cn('bg-card rounded-2xl border border-border p-5 card-shadow relative overflow-hidden', className)}
     >
       <div className="absolute top-0 left-0 right-0 h-1" style={{ background: '#465BE8' }} />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-6 xl:gap-10">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#465BE81a', color: '#465BE8' }}>
@@ -81,7 +81,7 @@ export default function IncomeCard({ revenue, variationPct, baseCurrency = 'ARS'
         </div>
 
         {hasSparkline && (
-          <div className="hidden lg:block h-14 flex-1 max-w-[220px] min-w-[120px]">
+          <div className="hidden lg:block h-14 w-[180px] shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={sparkline.map(val => ({ val }))} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
                 <defs>
