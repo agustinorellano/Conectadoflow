@@ -13,7 +13,9 @@ import KpiCard from '@/components/KpiCard';
 import Badge from '@/components/Badge';
 import SalesByEntityChart from '@/components/SalesByEntityChart';
 import DashboardPills from '@/components/DashboardPills';
-import StarMetric from '@/components/StarMetric';
+import MonthlyGoalCard from '@/components/MonthlyGoalCard';
+import CurrencyConverterCard from '@/components/CurrencyConverterCard';
+import DateWeatherWidget from '@/components/DateWeatherWidget';
 import ProgressBar from '@/components/ProgressBar';
 import {
   formatCurrency, formatDateTime, inPeriod, previousPeriodAmount,
@@ -118,12 +120,13 @@ export default function Dashboard() {
     const sellerBreakdown = Object.values(sellerMap).sort((a, b) => b.revenue - a.revenue);
     const topSeller = sellerBreakdown[0] || null;
 
-    const monthlyGoal = Number(config?.monthly_goal) || Math.max(revenue, 1) * 1.2;
+    const monthlyGoal = config?.monthly_goal ? Number(config.monthly_goal) : Math.max(revenue, 1) * 1.2;
+    const monthlyGoalIsEstimated = !config?.monthly_goal;
 
     return {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
-      commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, fSales,
+      commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, fSales,
     };
   }, [data, period, filterByCommerce, commerces, config]);
 
@@ -143,7 +146,6 @@ export default function Dashboard() {
     .slice(0, 5), [data.payments, filterByCommerce]);
 
   const maxFunnel = Math.max(...stats.funnel.map(f => f.count), 1);
-  const goalPct = Math.min(100, Math.round((stats.revenue / stats.monthlyGoal) * 100));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
@@ -152,25 +154,28 @@ export default function Dashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Hola, {user?.full_name?.split(' ')[0] || '👋'}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{isAllCommerces ? 'Vista consolidada de todos tus comercios' : 'Del primer contacto al cobro — esto es lo que está pasando.'}</p>
         </div>
-        <div className="relative">
-          <button onClick={() => setPeriodOpen(!periodOpen)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border text-sm font-medium hover:bg-accent transition-colors">
-            {PERIODS.find(p => p.key === period)?.label}
-            <ChevronDown className="w-4 h-4" />
-          </button>
-          {periodOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setPeriodOpen(false)} />
-              <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-lg z-20 py-1">
-                {PERIODS.map(p => (
-                  <button key={p.key} onClick={() => { setPeriod(p.key); setPeriodOpen(false); }}
-                    className={cn('w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors', p.key === period && 'text-primary font-medium')}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+        <div className="flex items-center gap-2.5">
+          <DateWeatherWidget />
+          <div className="relative">
+            <button onClick={() => setPeriodOpen(!periodOpen)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border text-sm font-medium hover:bg-accent transition-colors">
+              {PERIODS.find(p => p.key === period)?.label}
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {periodOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setPeriodOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-lg z-20 py-1">
+                  {PERIODS.map(p => (
+                    <button key={p.key} onClick={() => { setPeriod(p.key); setPeriodOpen(false); }}
+                      className={cn('w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors', p.key === period && 'text-primary font-medium')}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -190,19 +195,24 @@ export default function Dashboard() {
         <KpiCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" sublabel={stats.overdue > 0 ? `${amount(stats.overdue)} vencido` : 'Al día'} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-        <StarMetric
-          icon={Trophy}
-          label={stats.topSeller ? `Mejor vendedor: ${stats.topSeller.name}` : 'Meta mensual'}
-          value={stats.topSeller ? amount(stats.topSeller.revenue) : `${goalPct}%`}
-          sublabel={stats.topSeller ? `${stats.topSeller.count} ventas en el período` : `${amount(stats.revenue)} de ${amount(stats.monthlyGoal)}`}
-        />
-        <div className="lg:col-span-2 bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 flex flex-col justify-center">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold">Meta del mes</h2>
-            <span className="text-sm font-semibold text-primary">{goalPct}%</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.revenue} formatValue={amount} />
+        <CurrencyConverterCard amountArs={stats.revenue} />
+        <div className="bg-card rounded-2xl border border-border card-shadow p-4 h-full flex flex-col justify-center">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Trophy className="w-3.5 h-3.5" />
+            </span>
+            <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Mejor vendedor</p>
           </div>
-          <ProgressBar value={stats.revenue} max={stats.monthlyGoal} formatValue={amount} color="hsl(var(--primary))" />
+          {stats.topSeller ? (
+            <>
+              <p className="text-lg font-bold tracking-tight truncate">{stats.topSeller.name}</p>
+              <p className="text-xs text-muted-foreground mt-1">{amount(stats.topSeller.revenue)} · {stats.topSeller.count} ventas</p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sin ventas en el período</p>
+          )}
         </div>
       </div>
 
@@ -264,7 +274,14 @@ export default function Dashboard() {
               <div key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-accent/50 transition-colors">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{p.client_name}</p>
-                  <p className="text-xs text-muted-foreground">{amount(p.amount)} · {isOverdue(p.due_date) ? 'Vencido' : 'Vence ' + new Date(p.due_date).toLocaleDateString('es-AR')}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xs text-muted-foreground">{amount(p.amount)}</span>
+                    {isOverdue(p.due_date) ? (
+                      <Badge variant="destructive" dot>Vencido</Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">· Vence {new Date(p.due_date).toLocaleDateString('es-AR')}</span>
+                    )}
+                  </div>
                 </div>
                 <button onClick={() => markPaid(p)} className="shrink-0 px-2.5 py-1.5 rounded-lg bg-success text-white text-xs font-medium hover:opacity-90">Cobrado</button>
               </div>

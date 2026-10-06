@@ -14,7 +14,7 @@ import GlobalSearch from '@/components/GlobalSearch';
 import CommerceSelector from '@/components/CommerceSelector';
 import NotificationBell from '@/components/NotificationBell';
 import FAB from '@/components/FAB';
-import { NAV_ITEMS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
+import { NAV_ITEMS, NAV_SECTIONS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
 
 const MOBILE_NAV = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
@@ -95,23 +95,34 @@ export default function Layout() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto thin-scrollbar py-3 px-2.5 space-y-0.5">
-          {visibleNav.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) => cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 group relative',
-                isActive
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <item.icon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
-            </NavLink>
-          ))}
+        <nav className="flex-1 overflow-y-auto thin-scrollbar py-3 px-2.5 space-y-3">
+          {NAV_SECTIONS.map(section => {
+            const items = visibleNav.filter(item => item.section === section);
+            if (items.length === 0) return null;
+            return (
+              <div key={section} className="space-y-0.5">
+                {!collapsed && (
+                  <p className="px-3 pt-1 pb-1 text-[11px] font-semibold text-sidebar-foreground/40 tracking-wide uppercase">{section}</p>
+                )}
+                {items.map(item => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) => cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 group relative',
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    )}
+                  >
+                    <item.icon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </NavLink>
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         {/* User */}
@@ -163,17 +174,26 @@ export default function Layout() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-0.5">
-                {visibleNav.map(item => (
-                  <NavLink key={item.to} to={item.to} end={item.end}
-                    className={({ isActive }) => cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-colors',
-                      isActive ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent'
-                    )}>
-                    <item.icon className="w-[18px] h-[18px]" />
-                    <span>{item.label}</span>
-                  </NavLink>
-                ))}
+              <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-3">
+                {NAV_SECTIONS.map(section => {
+                  const items = visibleNav.filter(item => item.section === section);
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={section} className="space-y-0.5">
+                      <p className="px-3 pt-1 pb-1 text-[11px] font-semibold text-sidebar-foreground/40 tracking-wide uppercase">{section}</p>
+                      {items.map(item => (
+                        <NavLink key={item.to} to={item.to} end={item.end}
+                          className={({ isActive }) => cn(
+                            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-colors',
+                            isActive ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent'
+                          )}>
+                          <item.icon className="w-[18px] h-[18px]" />
+                          <span>{item.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  );
+                })}
               </nav>
             </motion.aside>
           </>

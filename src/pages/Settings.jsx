@@ -43,6 +43,7 @@ export default function SettingsPage() {
         billing_address: form.billing_address, billing_phone: form.billing_phone,
         billing_email: form.billing_email, billing_type: form.billing_type,
         hidden_nav: form.hidden_nav || [],
+        monthly_goal: form.monthly_goal === '' || form.monthly_goal === undefined ? null : Number(form.monthly_goal),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -141,7 +142,11 @@ export default function SettingsPage() {
               </Field>
               <Field label="Símbolo"><input value={form.currency_symbol || '$'} onChange={e => setForm({ ...form, currency_symbol: e.target.value })} className="inp" /></Field>
               <Field label="Tasa de impuesto (%)"><input type="number" value={form.tax_rate || 0} onChange={e => setForm({ ...form, tax_rate: e.target.value })} className="inp" /></Field>
-              <p className="text-sm text-muted-foreground">Las conversiones entre monedas no se calculan automáticamente en esta versión.</p>
+              <div className="border-t border-border pt-4" />
+              <Field label="Meta mensual de ventas">
+                <input type="number" value={form.monthly_goal ?? ''} onChange={e => setForm({ ...form, monthly_goal: e.target.value })} placeholder="Ej: 10000000" className="inp" />
+              </Field>
+              <p className="text-xs text-muted-foreground">Se usa en el widget de Meta Mensual del Dashboard. Dejalo vacío para que se estime automáticamente.</p>
               <SaveBar saving={saving} saved={saved} onSave={save} />
             </div>
           )}
