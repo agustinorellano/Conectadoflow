@@ -183,15 +183,17 @@ export default function Dashboard() {
         <DashboardPills view={view} setView={setView} />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+      <div className="mb-3 sm:mb-4">
         <IncomeCard
-          className="col-span-2"
           revenue={stats.revenue}
           variationPct={variation(stats.revenue, stats.prevRevenue)}
           baseCurrency={currency}
           hidden={hideAmounts}
           onToggleHidden={() => setHideAmounts(!hideAmounts)}
         />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <KpiCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" sublabel={`Ticket ${amount(stats.avgTicket)}`} />
         <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" />
         <KpiCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" sublabel={stats.overdue > 0 ? `${amount(stats.overdue)} vencido` : 'Al día'} />
