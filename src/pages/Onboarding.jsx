@@ -57,6 +57,8 @@ export default function Onboarding() {
         await updateConfig(currentConfig.id, {
           company_name: companyName || 'Conectado Flow',
           mode,
+          team_name: mode === 'Equipo' ? teamName : null,
+          sellers_count: mode === 'Equipo' ? sellers : null,
           sale_type: saleType,
           sell_to: sellTo,
           channels,
