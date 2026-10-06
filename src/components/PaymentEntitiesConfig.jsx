@@ -5,6 +5,7 @@ import { useCommerce } from '@/lib/CommerceContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import { ENTITY_TYPES, DEFAULT_BANKS, DEFAULT_WALLETS, CARD_TYPES } from '@/lib/flowUtils';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
 export default function PaymentEntitiesConfig() {
@@ -120,7 +121,7 @@ function EntityForm({ open, onClose, onSaved, commerceId }) {
       <div className="space-y-3">
         <div><label className="text-sm font-medium mb-1.5 block">Nombre *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="inp" /></div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium mb-1.5 block">Tipo</label><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="inp">{ENTITY_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
+          <div><label className="text-sm font-medium mb-1.5 block">Tipo</label><StyledSelect value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="inp">{ENTITY_TYPES.map(t => <option key={t}>{t}</option>)}</StyledSelect></div>
           <div><label className="text-sm font-medium mb-1.5 block">Subtipo</label><input value={form.subtype} onChange={e => setForm({ ...form, subtype: e.target.value })} placeholder="ej: Visa" className="inp" /></div>
         </div>
         <label className="flex items-center gap-2 cursor-pointer">

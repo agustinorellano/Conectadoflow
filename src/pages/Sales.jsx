@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Plus, Search, Trash2, ChevronRight, ChevronDown, ChevronDown as StatusChevron } from 'lucide-react';
+import { ShoppingCart, Plus, Search, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate, PAYMENT_METHODS, SALE_STATUS, isOverdue, CARD_TYPES, CARD_BRANDS, INSTALLMENT_OPTIONS } from '@/lib/flowUtils';
 import { useCommerce } from '@/lib/CommerceContext';
 import { cn } from '@/lib/utils';
@@ -114,15 +115,14 @@ export default function Sales() {
                             {/* Status changer */}
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50">
                               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Estado de situación</span>
-                              <div className="relative ml-auto">
-                                <select
+                              <div className="ml-auto">
+                                <StyledSelect
                                   value={s.status}
                                   onChange={e => changeStatus(s.id, e.target.value)}
-                                  className="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-border bg-card text-sm font-medium cursor-pointer hover:bg-accent"
+                                  className="pl-3 pr-3 py-1.5 h-auto rounded-lg border border-border bg-card text-sm font-medium"
                                 >
                                   {SALE_STATUS.map(st => <option key={st} value={st}>{st}</option>)}
-                                </select>
-                                <StatusChevron className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                                </StyledSelect>
                               </div>
                             </div>
                             {/* Items */}
@@ -283,10 +283,10 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Cliente *</label>
-            <select value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className="inp">
+            <StyledSelect value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className="inp">
               <option value="">Seleccionar…</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </StyledSelect>
           </div>
           <Inp label="Fecha" type="date" value={form.date} onChange={v => setForm({ ...form, date: v })} />
         </div>
@@ -316,17 +316,17 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config }) {
           <Inp label="Impuestos" type="number" value={form.tax} onChange={v => setForm({ ...form, tax: v })} placeholder={`Auto ${config?.tax_rate || 0}%`} />
           <div>
             <label className="text-sm font-medium mb-1.5 block">Cuotas</label>
-            <select value={form.installments_count} onChange={e => setForm({ ...form, installments_count: e.target.value, installments: e.target.value })} className="inp">{INSTALLMENT_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}</select>
+            <StyledSelect value={form.installments_count} onChange={e => setForm({ ...form, installments_count: e.target.value, installments: e.target.value })} className="inp">{INSTALLMENT_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}</StyledSelect>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Medio de pago</label>
-            <select value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} className="inp">{PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}</select>
+            <StyledSelect value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} className="inp">{PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}</StyledSelect>
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Estado</label>
-            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="inp">{SALE_STATUS.map(s => <option key={s}>{s}</option>)}</select>
+            <StyledSelect value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="inp">{SALE_STATUS.map(s => <option key={s}>{s}</option>)}</StyledSelect>
           </div>
         </div>
         {(form.payment_method === 'Tarjeta' || form.payment_method === 'Crédito' || form.payment_method === 'Débito') && (
@@ -337,11 +337,11 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config }) {
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">Tipo de tarjeta</label>
-              <select value={form.card_type} onChange={e => setForm({ ...form, card_type: e.target.value })} className="inp"><option value="">—</option>{CARD_TYPES.map(t => <option key={t}>{t}</option>)}</select>
+              <StyledSelect value={form.card_type} onChange={e => setForm({ ...form, card_type: e.target.value })} className="inp"><option value="">—</option>{CARD_TYPES.map(t => <option key={t}>{t}</option>)}</StyledSelect>
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">Marca</label>
-              <select value={form.card_brand} onChange={e => setForm({ ...form, card_brand: e.target.value })} className="inp"><option value="">—</option>{CARD_BRANDS.map(t => <option key={t}>{t}</option>)}</select>
+              <StyledSelect value={form.card_brand} onChange={e => setForm({ ...form, card_brand: e.target.value })} className="inp"><option value="">—</option>{CARD_BRANDS.map(t => <option key={t}>{t}</option>)}</StyledSelect>
             </div>
           </div>
         )}

@@ -10,6 +10,7 @@ import { NAV_ITEMS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
 import CommerceConfig from '@/components/CommerceConfig';
 import PaymentEntitiesConfig from '@/components/PaymentEntitiesConfig';
 import { Switch } from '@/components/ui/switch';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
 const TABS = [
@@ -99,14 +100,14 @@ export default function SettingsPage() {
               <Field label="Rubro / industria"><input value={form.industry || ''} onChange={e => setForm({ ...form, industry: e.target.value })} placeholder="Ej: Gastronomía, Indumentaria, Automotriz…" className="inp" /></Field>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Tipo de venta">
-                  <select value={form.sale_type || ''} onChange={e => setForm({ ...form, sale_type: e.target.value })} className="inp">
+                  <StyledSelect value={form.sale_type || ''} onChange={e => setForm({ ...form, sale_type: e.target.value })} className="inp">
                     <option>Productos</option><option>Servicios</option><option>Productos y servicios</option>
-                  </select>
+                  </StyledSelect>
                 </Field>
                 <Field label="A quién vendés">
-                  <select value={form.sell_to || ''} onChange={e => setForm({ ...form, sell_to: e.target.value })} className="inp">
+                  <StyledSelect value={form.sell_to || ''} onChange={e => setForm({ ...form, sell_to: e.target.value })} className="inp">
                     <option>Consumidores</option><option>Empresas</option><option>Ambos</option>
-                  </select>
+                  </StyledSelect>
                 </Field>
               </div>
               <Field label="Canales de venta">
@@ -135,11 +136,11 @@ export default function SettingsPage() {
             <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 space-y-4">
               <h2 className="font-semibold">Moneda e impuestos</h2>
               <Field label="Moneda principal">
-                <select value={form.currency || 'ARS'} onChange={e => setForm({ ...form, currency: e.target.value, currency_symbol: { ARS: '$', USD: 'US$', EUR: '€' }[e.target.value] })} className="inp">
+                <StyledSelect value={form.currency || 'ARS'} onChange={e => setForm({ ...form, currency: e.target.value, currency_symbol: { ARS: '$', USD: 'US$', EUR: '€' }[e.target.value] })} className="inp">
                   <option value="ARS">ARS — Peso argentino</option>
                   <option value="USD">USD — Dólar</option>
                   <option value="EUR">EUR — Euro</option>
-                </select>
+                </StyledSelect>
               </Field>
               <Field label="Símbolo"><input value={form.currency_symbol || '$'} onChange={e => setForm({ ...form, currency_symbol: e.target.value })} className="inp" /></Field>
               <Field label="Tasa de impuesto (%)"><input type="number" value={form.tax_rate || 0} onChange={e => setForm({ ...form, tax_rate: e.target.value })} className="inp" /></Field>
@@ -159,9 +160,9 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="CUIT / CUIL"><input value={form.billing_tax_id || ''} onChange={e => setForm({ ...form, billing_tax_id: e.target.value })} className="inp" /></Field>
                 <Field label="Condición fiscal">
-                  <select value={form.billing_type || ''} onChange={e => setForm({ ...form, billing_type: e.target.value })} className="inp">
+                  <StyledSelect value={form.billing_type || ''} onChange={e => setForm({ ...form, billing_type: e.target.value })} className="inp">
                     <option>Responsable Inscripto</option><option>Monotributista</option><option>Exento</option><option>Consumidor Final</option><option>Otro</option>
-                  </select>
+                  </StyledSelect>
                 </Field>
               </div>
               <Field label="Dirección fiscal"><input value={form.billing_address || ''} onChange={e => setForm({ ...form, billing_address: e.target.value })} className="inp" /></Field>
@@ -294,7 +295,7 @@ function ProductForm({ open, onClose, onSaved }) {
         <div className="col-span-2"><Field label="Nombre *"><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="inp" /></Field></div>
         <Field label="Código"><input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} className="inp" /></Field>
         <Field label="Categoría"><input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="inp" /></Field>
-        <Field label="Tipo"><select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })} className="inp"><option>Producto</option><option>Servicio</option></select></Field>
+        <Field label="Tipo"><StyledSelect value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })} className="inp"><option>Producto</option><option>Servicio</option></StyledSelect></Field>
         <Field label="Precio"><input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} className="inp" /></Field>
         <div className="col-span-2"><Field label="Descripción"><textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} className="inp resize-none" /></Field></div>
       </div>

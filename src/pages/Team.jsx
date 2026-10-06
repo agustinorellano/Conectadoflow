@@ -5,6 +5,7 @@ import { useData } from '@/lib/DataContext';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import Modal from '@/components/Modal';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
 const ROLES = [
@@ -120,10 +121,10 @@ function InviteModal({ open, onClose, onDone }) {
         <div><label className="text-sm font-medium mb-1.5 block">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@empresa.com" className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" /></div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Rol</label>
-          <select value={role} onChange={e => setRole(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30">
+          <StyledSelect value={role} onChange={e => setRole(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
             <option value="user">Vendedor</option>
             <option value="admin">Administrador</option>
-          </select>
+          </StyledSelect>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>

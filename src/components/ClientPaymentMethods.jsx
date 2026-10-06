@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import { ENTITY_TYPES, CARD_TYPES, CARD_BRANDS } from '@/lib/flowUtils';
+import { StyledSelect } from '@/components/ui/styled-select';
 
 export default function ClientPaymentMethods({ client }) {
   const [methods, setMethods] = useState([]);
@@ -76,13 +77,13 @@ function MethodForm({ open, onClose, onSaved, client }) {
       </>}>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium mb-1.5 block">Tipo</label><select value={form.entity_type} onChange={e => setForm({ ...form, entity_type: e.target.value })} className="inp">{ENTITY_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
+          <div><label className="text-sm font-medium mb-1.5 block">Tipo</label><StyledSelect value={form.entity_type} onChange={e => setForm({ ...form, entity_type: e.target.value })} className="inp">{ENTITY_TYPES.map(t => <option key={t}>{t}</option>)}</StyledSelect></div>
           <div><label className="text-sm font-medium mb-1.5 block">Nombre</label><input value={form.entity_name} onChange={e => setForm({ ...form, entity_name: e.target.value })} placeholder="ej: Santander" className="inp" /></div>
         </div>
         {form.entity_type === 'Tarjeta' && (
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-sm font-medium mb-1.5 block">Tipo de tarjeta</label><select value={form.card_type} onChange={e => setForm({ ...form, card_type: e.target.value })} className="inp"><option value="">—</option>{CARD_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
-            <div><label className="text-sm font-medium mb-1.5 block">Marca</label><select value={form.card_brand} onChange={e => setForm({ ...form, card_brand: e.target.value })} className="inp"><option value="">—</option>{CARD_BRANDS.map(t => <option key={t}>{t}</option>)}</select></div>
+            <div><label className="text-sm font-medium mb-1.5 block">Tipo de tarjeta</label><StyledSelect value={form.card_type} onChange={e => setForm({ ...form, card_type: e.target.value })} className="inp"><option value="">—</option>{CARD_TYPES.map(t => <option key={t}>{t}</option>)}</StyledSelect></div>
+            <div><label className="text-sm font-medium mb-1.5 block">Marca</label><StyledSelect value={form.card_brand} onChange={e => setForm({ ...form, card_brand: e.target.value })} className="inp"><option value="">—</option>{CARD_BRANDS.map(t => <option key={t}>{t}</option>)}</StyledSelect></div>
           </div>
         )}
         <div><label className="text-sm font-medium mb-1.5 block">Últimos dígitos</label><input value={form.last_digits} onChange={e => setForm({ ...form, last_digits: e.target.value })} placeholder="1234" className="inp" /></div>

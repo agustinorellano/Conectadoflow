@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { formatDateTime, MEETING_TYPES } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
@@ -126,19 +127,19 @@ function MeetingForm({ open, onClose, onSaved, clients, user }) {
       <div className="space-y-3">
         <div>
           <label className="text-sm font-medium mb-1.5 block">Cliente</label>
-          <select value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30">
+          <StyledSelect value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
             <option value="">Seleccionar…</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </StyledSelect>
         </div>
         <Inp label="Título *" value={form.title} onChange={v => setForm({ ...form, title: v })} />
         <div className="grid grid-cols-2 gap-3">
           <Inp label="Fecha y hora" type="datetime-local" value={form.date} onChange={v => setForm({ ...form, date: v })} />
           <div>
             <label className="text-sm font-medium mb-1.5 block">Tipo</label>
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30">
+            <StyledSelect value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
               {MEETING_TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
+            </StyledSelect>
           </div>
         </div>
       </div>

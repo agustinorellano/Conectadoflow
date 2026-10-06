@@ -8,6 +8,7 @@ import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { formatCurrency, CLIENT_TYPES } from '@/lib/flowUtils';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
 export default function Clients() {
@@ -136,7 +137,7 @@ export function ClientForm({ open, onClose, onSaved, user, editClient }) {
         <Field label="DNI / CUIT"><input value={form.tax_id} onChange={e => setForm({ ...form, tax_id: e.target.value })} className="inp" /></Field>
         <Field label="Teléfono"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="inp" /></Field>
         <Field label="Email"><input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="inp" /></Field>
-        <Field label="Tipo"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="inp">{CLIENT_TYPES.map(t => <option key={t}>{t}</option>)}</select></Field>
+        <Field label="Tipo"><StyledSelect value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="inp">{CLIENT_TYPES.map(t => <option key={t}>{t}</option>)}</StyledSelect></Field>
         <Field label="Segmento"><input value={form.segment} onChange={e => setForm({ ...form, segment: e.target.value })} className="inp" /></Field>
         <div className="col-span-2"><Field label="Dirección"><input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="inp" /></Field></div>
         <Field label="Valor potencial"><input type="number" value={form.potential_value} onChange={e => setForm({ ...form, potential_value: e.target.value })} className="inp" /></Field>

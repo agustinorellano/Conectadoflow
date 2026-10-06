@@ -9,6 +9,7 @@ import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { formatCurrency, formatDate, timeAgo, LEAD_SOURCES } from '@/lib/flowUtils';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
 const STATUSES = ['Nuevo','Contactado','Calificado','Convertido','Perdido'];
@@ -246,10 +247,10 @@ function Select({ label, value, options, onChange }) {
   return (
     <div>
       <label className="text-sm font-medium mb-1.5 block">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all">
+      <StyledSelect value={value} onChange={e => onChange(e.target.value)}
+        className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
         {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
+      </StyledSelect>
     </div>
   );
 }

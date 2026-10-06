@@ -8,6 +8,7 @@ import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
 import { Image as UIImage } from '@/components/ui/image';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
@@ -217,7 +218,7 @@ function ProductForm({ open, onClose, onSaved, product }) {
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Tipo</label>
-          <select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })} className="inp"><option>Producto</option><option>Servicio</option></select>
+          <StyledSelect value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })} className="inp"><option>Producto</option><option>Servicio</option></StyledSelect>
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Stock</label>

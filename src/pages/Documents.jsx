@@ -7,6 +7,7 @@ import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { formatDate } from '@/lib/flowUtils';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
 const DOC_TYPES = ['Factura','Presupuesto','Orden de compra','Contrato','Comprobante','Otro'];
@@ -131,18 +132,18 @@ function DocForm({ open, onClose, onSaved, clients }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Tipo</label>
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30">
+            <StyledSelect value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
               {DOC_TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
+            </StyledSelect>
           </div>
           <Inp label="Fecha" type="date" value={form.date} onChange={v => setForm({ ...form, date: v })} />
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Cliente</label>
-          <select value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30">
+          <StyledSelect value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
             <option value="">Sin cliente</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </StyledSelect>
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Archivo (PDF, JPG, PNG)</label>

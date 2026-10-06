@@ -10,6 +10,7 @@ import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
 import { ClientForm } from '@/pages/Clients';
 import ClientPaymentMethods from '@/components/ClientPaymentMethods';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate, formatDateTime, timeAgo, MEETING_TYPES, PAYMENT_METHODS } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
@@ -261,9 +262,9 @@ function MeetingFormModal({ open, onClose, onSaved, client, user }) {
           <Inp label="Fecha y hora" type="datetime-local" value={form.date} onChange={v => setForm({ ...form, date: v })} />
           <div>
             <label className="text-sm font-medium mb-1.5 block">Tipo</label>
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30">
+            <StyledSelect value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
               {MEETING_TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
+            </StyledSelect>
           </div>
         </div>
       </div>

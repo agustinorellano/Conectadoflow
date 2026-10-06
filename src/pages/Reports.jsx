@@ -6,6 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useCommerce } from '@/lib/CommerceContext';
 import { formatCurrency, formatDate } from '@/lib/flowUtils';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
 export default function Reports() {
@@ -192,17 +193,17 @@ export default function Reports() {
           <button onClick={() => setPeriodType('monthly')} className={cn('px-4 py-2 rounded-xl text-sm font-medium', periodType === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border')}>Mensual</button>
           <button onClick={() => setPeriodType('biweekly')} className={cn('px-4 py-2 rounded-xl text-sm font-medium', periodType === 'biweekly' ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border')}>Quincenal</button>
         </div>
-        <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} className="px-3 py-2 rounded-xl border border-input bg-background text-sm font-medium">
+        <StyledSelect value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} className="px-3 py-2 rounded-xl border border-input bg-background text-sm font-medium">
           {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
-        </select>
-        <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="px-3 py-2 rounded-xl border border-input bg-background text-sm font-medium">
+        </StyledSelect>
+        <StyledSelect value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="px-3 py-2 rounded-xl border border-input bg-background text-sm font-medium">
           {Array.from({ length: 5 }, (_, i) => currentYear - i).map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
+        </StyledSelect>
         {periodType === 'biweekly' && (
-          <select value={biweekStart} onChange={e => setBiweekStart(e.target.value)} className="px-3 py-2 rounded-xl border border-input bg-background text-sm font-medium">
+          <StyledSelect value={biweekStart} onChange={e => setBiweekStart(e.target.value)} className="px-3 py-2 rounded-xl border border-input bg-background text-sm font-medium">
             <option value="1">1ª quincena (1-15)</option>
             <option value="16">2ª quincena (16-30)</option>
-          </select>
+          </StyledSelect>
         )}
       </div>
 

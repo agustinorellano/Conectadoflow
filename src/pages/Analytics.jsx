@@ -4,6 +4,7 @@ import { TrendingUp, Users, Target, DollarSign, Wallet, Activity } from 'lucide-
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { formatCurrency, inPeriod, LEAD_SOURCES, stageColor } from '@/lib/flowUtils';
+import { StyledSelect } from '@/components/ui/styled-select';
 
 const COLORS = ['#465BE8','#22c55e','#f59e0b','#8b5cf6','#0ea5e9','#f97316','#ec4899','#14b8a6','#64748b','#a855f7'];
 
@@ -80,11 +81,11 @@ export default function Analytics() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Análisis completo del negocio</p>
         </div>
-        <select value={period} onChange={e => setPeriod(e.target.value)} className="px-4 py-2.5 rounded-xl border border-input bg-card text-sm font-medium outline-none focus:ring-2 focus:ring-primary/30">
+        <StyledSelect value={period} onChange={e => setPeriod(e.target.value)} className="px-4 py-2.5 rounded-xl border border-input bg-card text-sm font-medium">
           <option value="month">Este mes</option>
           <option value="3m">3 meses</option>
           <option value="year">Este año</option>
-        </select>
+        </StyledSelect>
       </div>
 
       {/* KPI row */}

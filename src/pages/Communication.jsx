@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { buildWhatsAppUrl, fillTemplate } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
@@ -139,9 +140,9 @@ function TemplateForm({ open, onClose, onSaved, editT }) {
         <div><label className="text-sm font-medium mb-1.5 block">Nombre</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" /></div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Categoría</label>
-          <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30">
+          <StyledSelect value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
             {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-          </select>
+          </StyledSelect>
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Mensaje</label>
