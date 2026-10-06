@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { LogIn, Mail, Loader2 } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
 import AuthLayout from "@/components/AuthLayout";
-import GoogleIcon from "@/components/GoogleIcon";
 import { useAuth } from "@/lib/AuthContext";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
@@ -17,7 +16,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
   const returnTo = safeReturnTo();
 
@@ -27,23 +25,15 @@ export default function Login() {
     setLoading(true);
     try {
       await base44.auth.loginViaEmailPassword(email, password);
-      await checkUserAuth();
+      const loggedInUser = await checkUserAuth();
+      if (!loggedInUser) {
+        throw new Error("No se pudo confirmar la sesión. Mirá la consola del navegador (F12) para más detalle y probá de nuevo.");
+      }
       navigate(returnTo, { replace: true });
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogle = async () => {
-    setError("");
-    setGoogleLoading(true);
-    try {
-      await base44.auth.loginWithProvider("google", returnTo);
-    } catch (err) {
-      setError(err.message || "No se pudo iniciar sesión con Google");
-      setGoogleLoading(false);
     }
   };
 
@@ -116,20 +106,6 @@ export default function Login() {
           )}
         </Button>
       </form>
-
-      <div className="relative my-5">
-        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-        <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">o</span></div>
-      </div>
-
-      <Button type="button" variant="outline" className="w-full h-12 font-medium" disabled={googleLoading} onClick={handleGoogle}>
-        {googleLoading ? (
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-        ) : (
-          <GoogleIcon className="w-4 h-4 mr-2" />
-        )}
-        Continuar con Google
-      </Button>
     </AuthLayout>
   );
 }
