@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudFog, CloudDrizzle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // Buenos Aires fallback when the browser denies/lacks geolocation.
 const FALLBACK_COORDS = { latitude: -34.6037, longitude: -58.3816 };
@@ -15,7 +16,7 @@ const WEATHER_ICON = (code) => {
   return Cloud;
 };
 
-export default function DateWeatherWidget() {
+export default function DateWeatherWidget({ variant = 'default' }) {
   const [now, setNow] = useState(new Date());
   const [weather, setWeather] = useState(null);
 
@@ -46,18 +47,23 @@ export default function DateWeatherWidget() {
   const timeLabel = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
   const Icon = weather ? WEATHER_ICON(weather.code) : Cloud;
 
+  const glass = variant === 'glass';
+
   return (
-    <div className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-card border border-border text-sm">
+    <div className={cn(
+      'inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-sm',
+      glass ? 'bg-white/15 backdrop-blur border border-white/25' : 'bg-card border border-border'
+    )}>
       <div className="text-right leading-tight">
-        <p className="font-medium capitalize text-xs text-muted-foreground">{dayLabel}</p>
-        <p className="font-semibold">{timeLabel}</p>
+        <p className={cn('font-medium capitalize text-xs', glass ? 'text-white/70' : 'text-muted-foreground')}>{dayLabel}</p>
+        <p className={cn('font-semibold', glass && 'text-white')}>{timeLabel}</p>
       </div>
       {weather && (
         <>
-          <div className="w-px h-7 bg-border" />
-          <div className="flex items-center gap-1.5 text-muted-foreground">
+          <div className={cn('w-px h-7', glass ? 'bg-white/25' : 'bg-border')} />
+          <div className={cn('flex items-center gap-1.5', glass ? 'text-white/70' : 'text-muted-foreground')}>
             <Icon className="w-4 h-4" />
-            <span className="font-semibold text-foreground">{weather.temp}°C</span>
+            <span className={cn('font-semibold', glass ? 'text-white' : 'text-foreground')}>{weather.temp}°C</span>
           </div>
         </>
       )}

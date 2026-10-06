@@ -177,32 +177,39 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1240px] mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Hola, {user?.full_name?.split(' ')[0] || '👋'}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{isAllCommerces ? 'Vista consolidada de todos tus comercios' : 'Del primer contacto al cobro — esto es lo que está pasando.'}</p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <DateWeatherWidget />
-          <div className="relative">
-            <button onClick={() => setPeriodOpen(!periodOpen)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border text-sm font-medium hover:bg-accent transition-colors">
-              {PERIODS.find(p => p.key === period)?.label}
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            {periodOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setPeriodOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-lg z-20 py-1">
-                  {PERIODS.map(p => (
-                    <button key={p.key} onClick={() => { setPeriod(p.key); setPeriodOpen(false); }}
-                      className={cn('w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors', p.key === period && 'text-primary font-medium')}>
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+      <div
+        className="relative overflow-hidden rounded-3xl p-5 sm:p-6 mb-5"
+        style={{ background: 'linear-gradient(135deg, hsl(232 78% 59%) 0%, hsl(252 80% 55%) 100%)' }}
+      >
+        <div className="absolute -right-10 -top-10 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-16 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Hola, {user?.full_name?.split(' ')[0] || '👋'}</h1>
+            <p className="text-sm text-white/70 mt-0.5">{isAllCommerces ? 'Vista consolidada de todos tus comercios' : 'Del primer contacto al cobro — esto es lo que está pasando.'}</p>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <DateWeatherWidget variant="glass" />
+            <div className="relative">
+              <button onClick={() => setPeriodOpen(!periodOpen)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 backdrop-blur border border-white/25 text-white text-sm font-medium hover:bg-white/25 transition-colors">
+                {PERIODS.find(p => p.key === period)?.label}
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              {periodOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setPeriodOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-lg z-20 py-1">
+                    {PERIODS.map(p => (
+                      <button key={p.key} onClick={() => { setPeriod(p.key); setPeriodOpen(false); }}
+                        className={cn('w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors', p.key === period && 'text-primary font-medium')}>
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
