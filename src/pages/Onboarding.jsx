@@ -21,6 +21,7 @@ export default function Onboarding() {
   const [sellTo, setSellTo] = useState('Ambos');
   const [channels, setChannels] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export default function Onboarding() {
 
   const finish = async () => {
     setSaving(true);
+    setError('');
     try {
       let currentConfig = config;
 
@@ -64,6 +66,7 @@ export default function Onboarding() {
       navigate('/');
     } catch (e) {
       console.error(e);
+      setError(e.message || 'Algo salió mal. Intentá de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -205,6 +208,12 @@ export default function Onboarding() {
               {steps[step].content}
             </motion.div>
           </AnimatePresence>
+
+          {error && (
+            <div className="mt-4 p-3 rounded-xl bg-destructive/10 text-destructive text-sm">
+              {error}
+            </div>
+          )}
 
           <div className="flex items-center justify-between mt-8">
             {step > 0 ? (
