@@ -24,7 +24,7 @@ async function fetchProfile(authUser) {
     const { data: org } = await supabase.from('organizations').select('is_active').eq('id', profile.organization_id).maybeSingle();
     if (org && org.is_active === false) organizationActive = false;
   }
-  const { data: isPlatformAdmin } = await supabase.rpc('is_platform_admin').catch(() => ({ data: false }));
+  const { data: isPlatformAdmin } = await supabase.rpc('is_platform_admin');
 
   return {
     id: authUser.id,
