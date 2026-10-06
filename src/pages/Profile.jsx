@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { User, Lock, Bell, Check, Save, Shield, Mail } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 
 export default function Profile() {
   const { user, checkUserAuth } = useAuth();
@@ -137,9 +137,7 @@ function PrefRow({ label, desc, checked, onChange }) {
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground">{desc}</p>
       </div>
-      <button onClick={onChange} className={cn('relative w-11 h-6 rounded-full transition-colors shrink-0', checked ? 'bg-primary' : 'bg-secondary border border-border')}>
-        <span className={cn('absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform', checked ? 'translate-x-[22px]' : 'translate-x-0.5')} />
-      </button>
+      <Switch checked={checked} onCheckedChange={onChange} />
     </div>
   );
 }

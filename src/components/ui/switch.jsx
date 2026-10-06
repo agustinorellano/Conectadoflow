@@ -1,22 +1,33 @@
 import * as React from "react"
-import * as SwitchPrimitives from "@radix-ui/react-switch"
-
+import { Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const Switch = React.forwardRef(({ className, ...props }, ref) => (
-  <SwitchPrimitives.Root
+const Switch = React.forwardRef(({ checked, onCheckedChange, onLabel = "ON", offLabel = "OFF", disabled, className }, ref) => (
+  <button
+    ref={ref}
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={() => !disabled && onCheckedChange?.(!checked)}
     className={cn(
-      "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
+      "relative inline-flex items-center h-8 w-[84px] gap-1 rounded-full p-1 transition-colors duration-200 shrink-0",
+      "disabled:opacity-50 disabled:cursor-not-allowed",
+      checked ? "bg-primary flex-row-reverse" : "bg-secondary border border-border flex-row",
       className
     )}
-    {...props}
-    ref={ref}>
-    <SwitchPrimitives.Thumb
-      className={cn(
-        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0"
-      )} />
-  </SwitchPrimitives.Root>
+  >
+    <span className="w-6 h-6 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0">
+      {checked ? <Check className="w-3.5 h-3.5 text-primary" /> : <X className="w-3.5 h-3.5 text-muted-foreground" />}
+    </span>
+    <span className={cn(
+      "flex-1 text-center text-[11px] font-bold tracking-wide uppercase",
+      checked ? "text-primary-foreground" : "text-muted-foreground"
+    )}>
+      {checked ? onLabel : offLabel}
+    </span>
+  </button>
 ))
-Switch.displayName = SwitchPrimitives.Root.displayName
+Switch.displayName = "Switch"
 
 export { Switch }

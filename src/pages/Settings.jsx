@@ -9,6 +9,7 @@ import { LEAD_SOURCES, PAYMENT_METHODS } from '@/lib/flowUtils';
 import { NAV_ITEMS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
 import CommerceConfig from '@/components/CommerceConfig';
 import PaymentEntitiesConfig from '@/components/PaymentEntitiesConfig';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 const TABS = [
@@ -335,9 +336,7 @@ function NavigationConfig({ form, setForm, saving, saved, onSave }) {
                 <p className={cn('text-sm font-medium', !isVisible && 'text-muted-foreground')}>{item.label}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
               </div>
-              <button onClick={() => toggle(item.to)} className={cn('shrink-0 relative w-11 h-6 rounded-full transition-colors', isVisible ? 'bg-primary' : 'bg-muted')}>
-                <span className={cn('absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform', isVisible ? 'translate-x-5' : 'translate-x-0.5')} />
-              </button>
+              <Switch checked={isVisible} onCheckedChange={() => toggle(item.to)} />
             </div>
           );
         })}
