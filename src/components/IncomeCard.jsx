@@ -81,7 +81,7 @@ export default function IncomeCard({ revenue, variationPct, baseCurrency = 'ARS'
         </div>
 
         {hasSparkline && (
-          <div className="hidden lg:block h-14 flex-1 min-w-[120px]">
+          <div className="hidden lg:block h-14 flex-1 max-w-[220px] min-w-[120px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={sparkline.map(val => ({ val }))} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
                 <defs>
