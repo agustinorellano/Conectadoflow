@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { DollarSign, TrendingUp, TrendingDown, Eye, EyeOff } from 'lucide-react';
 import { fetchRates, convertFromArs } from '@/lib/currencyRates';
 import { formatDateTime } from '@/lib/flowUtils';
@@ -15,7 +16,8 @@ const CONVERTIBLE_CURRENCIES = [
 // MonthlyGoalCard-sized widget but for the headline revenue number. Picking
 // a currency only changes how this number is displayed; it never touches
 // the original stored amount/currency of any sale or payment.
-export default function IncomeCard({ revenue, variationPct, baseCurrency = 'ARS', hidden, onToggleHidden, className }) {
+export default function IncomeCard({ revenue, variationPct, baseCurrency = 'ARS', hidden, onToggleHidden, className, sparkline }) {
+  const hasSparkline = sparkline && sparkline.length > 1;
   const [rates, setRates] = useState(null);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState('BASE');
@@ -77,6 +79,22 @@ export default function IncomeCard({ revenue, variationPct, baseCurrency = 'ARS'
             )}
           </div>
         </div>
+
+        {hasSparkline && (
+          <div className="hidden lg:block h-14 flex-1 min-w-[120px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={sparkline.map(val => ({ val }))} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="income-spark" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#465BE8" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#465BE8" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="val" stroke="#465BE8" strokeWidth={2} fill="url(#income-spark)" isAnimationActive={false} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0">
           <div className="flex items-center gap-1 p-0.5 bg-secondary/60 rounded-lg w-fit overflow-x-auto no-scrollbar">

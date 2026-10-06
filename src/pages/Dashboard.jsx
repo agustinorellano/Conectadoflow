@@ -23,6 +23,27 @@ import {
 } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
+// Buckets records into a fixed number of trailing days (counts, or a summed
+// value when valueFn is given) for the small KPI-card trend charts.
+function buildDailySeries(records, dateField, valueFn, days = 14) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const buckets = Array.from({ length: days }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (days - 1 - i));
+    return { time: d.getTime(), total: 0 };
+  });
+  records.forEach(r => {
+    const raw = r[dateField];
+    if (!raw) return;
+    const d = new Date(raw);
+    d.setHours(0, 0, 0, 0);
+    const bucket = buckets.find(b => b.time === d.getTime());
+    if (bucket) bucket.total += valueFn ? valueFn(r) : 1;
+  });
+  return buckets.map(b => b.total);
+}
+
 const PERIODS = [
   { key: 'today', label: 'Hoy' },
   { key: '7d', label: '7 días' },
@@ -123,10 +144,17 @@ export default function Dashboard() {
     const monthlyGoal = config?.monthly_goal ? Number(config.monthly_goal) : Math.max(revenue, 1) * 1.2;
     const monthlyGoalIsEstimated = !config?.monthly_goal;
 
+    const notCancelledSales = fSales.filter(s => s.status !== 'Cancelada');
+    const revenueSparkline = buildDailySeries(notCancelledSales, 'date', s => Number(s.total_amount) || 0);
+    const salesSparkline = buildDailySeries(notCancelledSales, 'date');
+    const leadsSparkline = buildDailySeries(fLeads, 'created_date');
+    const collectedSparkline = buildDailySeries(fPayments.filter(p => p.status === 'Pagado'), 'paid_date', p => Number(p.amount) || 0);
+
     return {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
       commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, fSales,
+      revenueSparkline, salesSparkline, leadsSparkline, collectedSparkline,
     };
   }, [data, period, filterByCommerce, commerces, config]);
 
@@ -190,13 +218,14 @@ export default function Dashboard() {
           baseCurrency={currency}
           hidden={hideAmounts}
           onToggleHidden={() => setHideAmounts(!hideAmounts)}
+          sparkline={stats.revenueSparkline}
         />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
-        <KpiCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" sublabel={`Ticket ${amount(stats.avgTicket)}`} />
-        <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" />
-        <KpiCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" sublabel={stats.overdue > 0 ? `${amount(stats.overdue)} vencido` : 'Al día'} />
+        <KpiCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" sublabel={`Ticket ${amount(stats.avgTicket)}`} onClick={() => navigate('/ventas')} sparkline={stats.salesSparkline} />
+        <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} sparkline={stats.leadsSparkline} />
+        <KpiCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" sublabel={stats.overdue > 0 ? `${amount(stats.overdue)} vencido` : 'Al día'} onClick={() => navigate('/cobros')} sparkline={stats.collectedSparkline} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
