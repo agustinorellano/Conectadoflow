@@ -1,0 +1,20 @@
+// Maps Base44 entity names (PascalCase) to Postgres table names (snake_case).
+export const ENTITY_TABLES = {
+  Activity: 'activities',
+  AppConfig: 'app_config',
+  Client: 'clients',
+  ClientPaymentMethod: 'client_payment_methods',
+  Commerce: 'commerces',
+  Document: 'documents',
+  Goal: 'goals',
+  Lead: 'leads',
+  Meeting: 'meetings',
+  MessageTemplate: 'message_templates',
+  Notification: 'notifications',
+  Opportunity: 'opportunities',
+  Payment: 'payments',
+  PaymentEntity: 'payment_entities',
+  PipelineStage: 'pipeline_stages',
+  Product: 'products',
+  Sale: 'sales',
+};
