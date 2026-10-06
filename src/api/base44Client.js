@@ -190,6 +190,14 @@ const admin = {
     const { error } = await supabase.rpc('admin_set_organization_active', { org_id: orgId, active });
     if (error) throw error;
   },
+  // orgId null = broadcast to every organization on the platform.
+  async sendNotification(orgId, title, message) {
+    const { data, error } = await supabase.rpc('admin_send_notification', {
+      org_id: orgId, notif_title: title, notif_message: message,
+    });
+    if (error) throw error;
+    return data; // number of notifications created
+  },
 };
 
 const users = {

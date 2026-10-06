@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, AlertCircle, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Bell, X, AlertCircle, UserPlus, CheckCircle2, Megaphone } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
@@ -14,18 +15,31 @@ export default function NotificationBell() {
   const { user } = useAuth();
   const { config } = useData();
   const { filterByCommerce } = useCommerce();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       try {
-        const [payments, leads, activities] = await Promise.all([
+        const [payments, leads, activities, notifications] = await Promise.all([
           base44.entities.Payment.list().catch(() => []),
           base44.entities.Lead.list().catch(() => []),
           base44.entities.Activity.list().catch(() => []),
+          base44.entities.Notification.filter({ owner_id: user.id, is_read: false }, '-created_date', 20).catch(() => []),
         ]);
         if (cancelled) return;
+
+        const adminNotifications = notifications.map(n => ({
+          id: n.id,
+          type: 'notification',
+          icon: Megaphone,
+          color: 'text-primary bg-primary/10',
+          title: n.title,
+          subtitle: n.message,
+          link: n.link || null,
+          isAdminNotification: true,
+        }));
         const fPayments = filterByCommerce(payments);
         const fLeads = filterByCommerce(leads);
         const fActivities = filterByCommerce(activities);
@@ -71,7 +85,7 @@ export default function NotificationBell() {
             link: '/clientes',
           }));
 
-        setItems([...overduePayments, ...untouchedLeads, ...todayActivities]);
+        setItems([...adminNotifications, ...overduePayments, ...untouchedLeads, ...todayActivities]);
       } catch (e) {
         // silently fail
       }
@@ -118,7 +132,14 @@ export default function NotificationBell() {
                   items.map(item => (
                     <button
                       key={item.id}
-                      onClick={() => { setOpen(false); window.location.hash = item.link; }}
+                      onClick={async () => {
+                        setOpen(false);
+                        if (item.isAdminNotification) {
+                          base44.entities.Notification.update(item.id, { is_read: true }).catch(() => {});
+                          setItems(prev => prev.filter(i => i.id !== item.id));
+                        }
+                        if (item.link) navigate(item.link);
+                      }}
                       className="w-full flex items-start gap-3 px-4 py-3 hover:bg-accent/50 transition-colors text-left border-b border-border/50 last:border-0"
                     >
                       <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', item.color)}>
