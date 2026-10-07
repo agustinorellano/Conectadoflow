@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ShoppingCart, UserPlus, Wallet, Package, Award,
-  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy,
+  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
@@ -223,7 +223,9 @@ export default function Dashboard() {
             {stats.upcomingMeetings.length === 0 && <p className="text-sm text-muted-foreground py-2 text-center">Sin reuniones programadas</p>}
             {stats.upcomingMeetings.map(m => (
               <div key={m.id} className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-accent/50 transition-colors">
-                <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 text-sm">📅</span>
+                <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Calendar className="w-4 h-4" />
+                </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{m.title}</p>
                   <p className="text-xs text-muted-foreground">{m.client_name} · {formatDateTime(m.date)}</p>
