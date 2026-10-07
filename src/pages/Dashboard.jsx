@@ -15,6 +15,9 @@ import SalesByEntityChart from '@/components/SalesByEntityChart';
 import DashboardPills from '@/components/DashboardPills';
 import MonthlyGoalCard from '@/components/MonthlyGoalCard';
 import IncomeCard from '@/components/IncomeCard';
+import SalesReportChart from '@/components/SalesReportChart';
+import TopProductCard from '@/components/TopProductCard';
+import RecentSalesTable from '@/components/RecentSalesTable';
 import DateWeatherWidget from '@/components/DateWeatherWidget';
 import ProgressBar from '@/components/ProgressBar';
 import {
@@ -42,6 +45,35 @@ function buildDailySeries(records, dateField, valueFn, days = 14) {
     if (bucket) bucket.total += valueFn ? valueFn(r) : 1;
   });
   return buckets.map(b => b.total);
+}
+
+// Revenue series for the big sales-report chart, bucketed to fit the
+// selected dashboard period: daily for short windows, grouped into ~14
+// points for longer ones so the chart stays readable.
+function buildPeriodSeries(sales, period) {
+  const now = new Date();
+  const days = { today: 1, '7d': 7, '30d': 30, month: now.getDate(), '3m': 90, year: 365 }[period] || 30;
+  const notCancelled = sales.filter(s => s.status !== 'Cancelada');
+  const daily = buildDailySeries(notCancelled, 'date', s => Number(s.total_amount) || 0, days);
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (days - 1));
+
+  const maxPoints = 14;
+  if (days <= maxPoints) {
+    return daily.map((v, i) => {
+      const d = new Date(start); d.setDate(d.getDate() + i);
+      return { label: d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }), value: v };
+    });
+  }
+  const bucketSize = Math.ceil(days / maxPoints);
+  const grouped = [];
+  for (let i = 0; i < days; i += bucketSize) {
+    const slice = daily.slice(i, i + bucketSize);
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    grouped.push({ label: d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }), value: slice.reduce((a, b) => a + b, 0) });
+  }
+  return grouped;
 }
 
 const PERIODS = [
@@ -149,12 +181,26 @@ export default function Dashboard() {
     const salesSparkline = buildDailySeries(notCancelledSales, 'date');
     const leadsSparkline = buildDailySeries(fLeads, 'created_date');
     const collectedSparkline = buildDailySeries(fPayments.filter(p => p.status === 'Pagado'), 'paid_date', p => Number(p.amount) || 0);
+    const salesReportSeries = buildPeriodSeries(fSales, period);
+
+    const productUnits = {};
+    periodSales.forEach(s => {
+      (s.items || []).forEach(it => {
+        const name = it.description || 'Sin nombre';
+        productUnits[name] = (productUnits[name] || 0) + (Number(it.quantity) || 0);
+      });
+    });
+    const topProductEntry = Object.entries(productUnits).sort((a, b) => b[1] - a[1])[0];
+    const topProduct = topProductEntry ? { name: topProductEntry[0], units: topProductEntry[1] } : null;
+
+    const recentSales = [...periodSales].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
 
     return {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
       commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, fSales,
       revenueSparkline, salesSparkline, leadsSparkline, collectedSparkline,
+      salesReportSeries, topProduct, recentSales,
     };
   }, [data, period, filterByCommerce, commerces, config]);
 
@@ -253,6 +299,17 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">Sin ventas en el período</p>
           )}
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
+        <div className="lg:col-span-2">
+          <SalesReportChart series={stats.salesReportSeries} total={stats.revenue} variationPct={variation(stats.revenue, stats.prevRevenue)} formatValue={amount} />
+        </div>
+        <TopProductCard product={stats.topProduct} />
+      </div>
+
+      <div className="mb-4">
+        <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
       </div>
 
       {view === 'commerce' && isAllCommerces && stats.commerceBreakdown.length > 0 && (
