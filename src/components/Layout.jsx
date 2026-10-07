@@ -158,9 +158,13 @@ export default function Layout() {
             </NavLink>
           )}
           <div className={cn('flex items-center gap-3 px-2.5 py-2 rounded-xl', !collapsed && 'hover:bg-sidebar-accent transition-colors')}>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-xs font-semibold shrink-0">
-              {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-            </div>
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-xs font-semibold shrink-0">
+                {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
             {!collapsed && (
               <>
                 <div className="overflow-hidden flex-1">
@@ -257,8 +261,14 @@ export default function Layout() {
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-sm font-semibold shrink-0 hover:opacity-90 transition-opacity">
-                  {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+                <button className="w-9 h-9 rounded-full shrink-0 hover:opacity-90 transition-opacity overflow-hidden">
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="w-full h-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                      {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">

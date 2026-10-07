@@ -37,6 +37,7 @@ async function fetchProfile(authUser) {
     phone: meta.phone || '',
     position: meta.position || '',
     bio: meta.bio || '',
+    avatar_url: meta.avatar_url || '',
     preferences: meta.preferences || null,
   };
 }

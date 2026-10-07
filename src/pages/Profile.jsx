@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Lock, Bell, Check, Save, Shield, Mail } from 'lucide-react';
+import { User, Lock, Bell, Check, Save, Shield, Mail, Upload, Camera } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
@@ -16,6 +16,7 @@ export default function Profile() {
   const [savedProfile, setSavedProfile] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedPrefs, setSavedPrefs] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -32,6 +33,15 @@ export default function Profile() {
       setSavedProfile(true);
       setTimeout(() => setSavedProfile(false), 2000);
     } finally { setSavingProfile(false); }
+  };
+
+  const uploadAvatar = async (file) => {
+    setUploadingAvatar(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
+      await base44.auth.updateMe({ avatar_url: file_url });
+      await checkUserAuth();
+    } finally { setUploadingAvatar(false); }
   };
 
   const savePrefs = async () => {
@@ -56,16 +66,36 @@ export default function Profile() {
       <p className="text-sm text-muted-foreground mb-6">Gestioná tus datos personales y preferencias</p>
 
       <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 mb-6 flex items-center gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-2xl font-bold shrink-0">
-          {initials}
-        </div>
-        <div className="min-w-0">
+        <label className="relative shrink-0 cursor-pointer group">
+          {user.avatar_url ? (
+            <img src={user.avatar_url} alt={user.full_name || 'Foto de perfil'} className="w-16 h-16 rounded-2xl object-cover" />
+          ) : (
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-2xl font-bold">
+              {initials}
+            </div>
+          )}
+          <div className="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            {uploadingAvatar ? (
+              <span className="text-white text-[10px] font-medium">…</span>
+            ) : (
+              <Camera className="w-5 h-5 text-white" />
+            )}
+          </div>
+          <input type="file" accept="image/*" className="hidden" disabled={uploadingAvatar}
+            onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); }} />
+        </label>
+        <div className="min-w-0 flex-1">
           <p className="font-semibold text-lg truncate">{user.full_name || 'Usuario'}</p>
           <p className="text-sm text-muted-foreground truncate">{user.email}</p>
           <span className="inline-flex items-center gap-1 mt-1 text-xs text-primary font-medium">
             <Shield className="w-3 h-3" /> {user.role === 'admin' ? 'Administrador' : 'Usuario'}
           </span>
         </div>
+        <label className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-secondary border border-border text-sm font-medium hover:bg-accent transition-colors cursor-pointer shrink-0">
+          <Upload className="w-4 h-4" /> {uploadingAvatar ? 'Subiendo…' : 'Cambiar foto'}
+          <input type="file" accept="image/*" className="hidden" disabled={uploadingAvatar}
+            onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); }} />
+        </label>
       </div>
 
       <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 mb-6 space-y-4">
