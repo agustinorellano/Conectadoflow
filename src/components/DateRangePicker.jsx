@@ -77,7 +77,10 @@ export default function DateRangePicker({ value, onChange, presets = DEFAULT_PRE
       </button>
 
       {open && (
-        <div className="absolute right-0 sm:left-0 top-full mt-2 z-50 bg-popover text-popover-foreground border border-border rounded-2xl shadow-lg p-3 w-[300px] sm:w-[520px] flex flex-col sm:flex-row gap-3">
+        // Fixed + inset-x margins on mobile so this can never overflow the
+        // viewport regardless of where the trigger sits in the page's
+        // layout; reverts to the anchored absolute dropdown from sm: up.
+        <div className="fixed left-4 right-4 top-20 sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-2 z-50 bg-popover text-popover-foreground border border-border rounded-2xl shadow-lg p-3 sm:w-[520px] max-h-[80vh] overflow-y-auto flex flex-col sm:flex-row gap-3">
           <div className="flex sm:flex-col gap-1 sm:w-36 shrink-0 overflow-x-auto sm:overflow-visible no-scrollbar">
             {presets.map(p => (
               <button key={p.key} onClick={() => pickPreset(p.key)}
