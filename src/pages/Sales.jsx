@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt } from 'lucide-react';
+import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt, Package } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
@@ -9,6 +9,7 @@ import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
+import ProgressBar from '@/components/ProgressBar';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate, PAYMENT_METHODS, SALE_STATUS, isOverdue, CARD_TYPES, CARD_BRANDS, INSTALLMENT_OPTIONS } from '@/lib/flowUtils';
 import { useCommerce } from '@/lib/CommerceContext';
@@ -106,6 +107,22 @@ export default function Sales() {
     pending: fSales.reduce((s, x) => s + (Number(x.balance) || 0), 0),
   };
 
+  // Ventas por producto: breaks the totals above down item by item, since
+  // "Total ventas" etc. only count sale documents, not what was actually
+  // sold within each one.
+  const productSales = useMemo(() => {
+    const map = {};
+    fSales.filter(s => s.status !== 'Cancelada').forEach(s => {
+      (s.items || []).forEach(it => {
+        const key = it.description || 'Sin nombre';
+        if (!map[key]) map[key] = { name: key, units: 0, revenue: 0 };
+        map[key].units += Number(it.quantity) || 0;
+        map[key].revenue += Number(it.subtotal) || (Number(it.unit_price) || 0) * (Number(it.quantity) || 0);
+      });
+    });
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
+  }, [fSales]);
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -126,6 +143,23 @@ export default function Sales() {
         <KpiCard label="Cobrado" value={formatCurrency(totals.collected, currency)} icon={Receipt} accent="#0ea5e9" />
         <KpiCard label="Pendiente" value={formatCurrency(totals.pending, currency)} icon={Wallet} accent="#f59e0b" />
       </div>
+
+      {productSales.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-5">
+          <div className="flex items-center gap-2 mb-3.5">
+            <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Package className="w-4 h-4" />
+            </span>
+            <h2 className="font-semibold text-sm">Ventas por producto</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
+            {productSales.map(p => (
+              <ProgressBar key={p.name} label={p.name} value={p.revenue} max={productSales[0].revenue}
+                formatValue={v => formatCurrency(v, currency)} sublabel={`${p.units} unidad${p.units === 1 ? '' : 'es'} vendida${p.units === 1 ? '' : 's'}`} />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="relative mb-5">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
