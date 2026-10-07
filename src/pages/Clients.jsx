@@ -1,36 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send } from 'lucide-react';
+import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
-import { formatCurrency, CLIENT_TYPES } from '@/lib/flowUtils';
+import { formatCurrency, formatDateShort, CLIENT_TYPES } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
-// "Estado de situación": a quick-glance standing derived from what we
-// already have on the client record (balance + status), each with its
-// own default outreach message so it can be sent without opening the
-// client detail page.
+// "Estado de situación": a relationship stage the user sets and changes
+// themselves (not derived from balance/status), each with its own default
+// outreach message. Editable inline from the Clientes list, no need to
+// open the client detail page.
+const SITUATION_STAGES = [
+  { key: 'Primer contacto', variant: 'blue',
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Un gusto contactarte. Quería presentarme y ver en qué te podemos ayudar.` },
+  { key: 'Seguimiento', variant: 'violet',
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Te escribo para hacer un seguimiento y ver si tenés alguna consulta o si podemos avanzar con algo.` },
+  { key: 'Propuesta enviada', variant: 'amber',
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Quería saber si pudiste revisar la propuesta que te enviamos. ¡Quedo atento a tus comentarios!` },
+  { key: 'Cliente activo', variant: 'success',
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Quería saludarte y ver cómo va todo. ¡Cualquier cosa estamos para ayudarte!` },
+  { key: 'Saldo pendiente', variant: 'warning',
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Te escribo para recordarte que tenés un saldo pendiente de ${formatCurrency(c.balance)}. ¿Podemos coordinar el pago?` },
+  { key: 'Inactivo', variant: 'muted',
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Hace tiempo no hablamos, ¿cómo estás? Quería saber si hay algo en lo que te pueda ayudar.` },
+];
+
 function getStanding(c) {
-  if (c.status === 'Potencial') {
-    return { key: 'potencial', label: 'Potencial', variant: 'blue',
-      template: `Hola ${c.name?.split(' ')[0] || ''}! Te escribo de nuestra parte para ver si podemos coordinar los próximos pasos y avanzar juntos. ¡Quedo atento!` };
-  }
-  if (c.status === 'Inactivo') {
-    return { key: 'inactivo', label: 'Inactivo', variant: 'muted',
-      template: `Hola ${c.name?.split(' ')[0] || ''}! Hace tiempo no hablamos, ¿cómo estás? Quería saber si hay algo en lo que te pueda ayudar.` };
-  }
-  if (Number(c.balance) > 0) {
-    return { key: 'pendiente', label: 'Saldo pendiente', variant: 'warning',
-      template: `Hola ${c.name?.split(' ')[0] || ''}! Te escribo para recordarte que tenés un saldo pendiente de ${formatCurrency(c.balance)}. ¿Podemos coordinar el pago?` };
-  }
-  return { key: 'al_dia', label: 'Al día', variant: 'success',
-    template: `Hola ${c.name?.split(' ')[0] || ''}! Quería saludarte y ver cómo va todo. ¡Cualquier cosa estamos para ayudarte!` };
+  const stage = SITUATION_STAGES.find(s => s.key === c.situation_status) || SITUATION_STAGES[0];
+  return { key: stage.key, label: stage.key, variant: stage.variant, template: stage.template(c) };
 }
 
 export default function Clients() {
@@ -39,7 +42,7 @@ export default function Clients() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [viewMode, setViewMode] = useState('cards');
+  const [viewMode, setViewMode] = useState('rows');
   const [messageClient, setMessageClient] = useState(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -48,6 +51,11 @@ export default function Clients() {
     setLoading(true);
     try { setClients(await base44.entities.Client.list('-created_date', 200)); }
     finally { setLoading(false); }
+  };
+
+  const updateSituation = async (client, situation_status) => {
+    setClients(prev => prev.map(c => c.id === client.id ? { ...c, situation_status } : c));
+    await base44.entities.Client.update(client.id, { situation_status });
   };
 
   useEffect(() => { load(); }, []);
@@ -121,7 +129,9 @@ export default function Clients() {
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{c.name}</p>
                         {c.company && <p className="text-xs text-muted-foreground truncate">{c.company}</p>}
-                        <Badge variant={standing.variant} className="mt-1">{standing.label}</Badge>
+                        <div onClick={e => e.stopPropagation()} className="mt-1.5">
+                          <SituationSelect client={c} onChange={updateSituation} />
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-1 text-sm text-muted-foreground mb-3">
@@ -156,7 +166,6 @@ export default function Clients() {
           <div className="bg-card rounded-2xl border border-border card-shadow overflow-hidden">
             <AnimatePresence>
               {filtered.map((c, i) => {
-                const standing = getStanding(c);
                 return (
                   <motion.div key={c.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     onClick={() => navigate(`/clientes/${c.id}`)}
@@ -168,7 +177,13 @@ export default function Clients() {
                       <p className="text-sm font-medium truncate">{c.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{c.company || c.email || c.phone || '—'}</p>
                     </div>
-                    <Badge variant={standing.variant} className="shrink-0 hidden sm:inline-flex">{standing.label}</Badge>
+                    <div className="text-right shrink-0 hidden lg:block">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end"><Clock className="w-3 h-3" /> Últ. contacto</p>
+                      <p className="text-xs font-medium">{c.last_contact ? formatDateShort(c.last_contact) : 'Nunca'}</p>
+                    </div>
+                    <div onClick={e => e.stopPropagation()} className="shrink-0 hidden sm:block">
+                      <SituationSelect client={c} onChange={updateSituation} />
+                    </div>
                     <div className="text-right shrink-0 hidden md:block">
                       <p className="text-xs text-muted-foreground">Vendido</p>
                       <p className="text-sm font-semibold">{formatCurrency(c.total_sold || 0)}</p>
@@ -196,6 +211,33 @@ export default function Clients() {
       <ClientForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} user={user} />
       <ClientMessageModal client={messageClient} onClose={() => setMessageClient(null)} />
     </div>
+  );
+}
+
+const SITUATION_BADGE_CLASSES = {
+  blue: 'bg-blue-500/10 text-blue-600',
+  violet: 'bg-violet-500/10 text-violet-600',
+  amber: 'bg-amber-500/10 text-amber-600',
+  success: 'bg-success/10 text-success',
+  warning: 'bg-warning/15 text-warning',
+  muted: 'bg-secondary text-secondary-foreground',
+};
+
+// Pill-styled select so the "estado de situación" can be changed right
+// from the Clientes list (cards or rows) without opening the client.
+function SituationSelect({ client, onChange }) {
+  const standing = getStanding(client);
+  return (
+    <StyledSelect
+      value={client.situation_status || SITUATION_STAGES[0].key}
+      onChange={(e) => onChange(client, e.target.value)}
+      className={cn(
+        'h-auto w-fit border-0 shadow-none rounded-full px-2.5 py-0.5 text-xs font-medium gap-1 focus:ring-1',
+        SITUATION_BADGE_CLASSES[standing.variant] || SITUATION_BADGE_CLASSES.muted
+      )}
+    >
+      {SITUATION_STAGES.map(s => <option key={s.key} value={s.key}>{s.key}</option>)}
+    </StyledSelect>
   );
 }
 
