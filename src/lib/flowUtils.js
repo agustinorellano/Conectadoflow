@@ -66,6 +66,26 @@ export function isOverdue(dateStr) {
   return d.getTime() < Date.now();
 }
 
+// How many days since last_contact — null counts as "never", which callers
+// treat as needing a follow-up regardless of the threshold.
+export function daysSinceContact(lastContactStr) {
+  if (!lastContactStr) return null;
+  const d = new Date(lastContactStr);
+  if (isNaN(d)) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+
+// Shared threshold for the "sin seguimiento" alert (Dashboard banner,
+// NotificationBell) — a client with no activity in this many days surfaces
+// automatically instead of the seller having to notice on their own.
+export const STALE_CONTACT_DAYS = 15;
+
+export function isStaleClient(client) {
+  if (client.status !== 'Activo') return false;
+  const days = daysSinceContact(client.last_contact);
+  return days === null || days > STALE_CONTACT_DAYS;
+}
+
 // Period filter helpers. `period` is either a preset key ('month', '7d', …)
 // or a custom { start, end } range (Date instances or date strings) picked
 // from DateRangePicker — both go through the same inPeriod()/variation()

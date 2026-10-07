@@ -4,7 +4,7 @@ import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   ShoppingCart, UserPlus, Wallet, Package, Award,
-  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar,
+  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
@@ -24,7 +24,7 @@ import DateWeatherWidget from '@/components/DateWeatherWidget';
 import ProgressBar from '@/components/ProgressBar';
 import {
   formatCurrency, formatDateTime, inPeriod, previousPeriodAmount,
-  variation, daysUntil, isOverdue,
+  variation, daysUntil, isOverdue, isStaleClient, STALE_CONTACT_DAYS,
 } from '@/lib/flowUtils';
 import { buildDailySeries } from '@/lib/salesSeries';
 import { cn } from '@/lib/utils';
@@ -123,6 +123,11 @@ export default function Dashboard() {
     const pendingActivities = fActivities.filter(a => a.status === 'Pendiente').sort((a, b) => new Date(a.due_date || a.date) - new Date(b.due_date || b.date)).slice(0, 5);
     const topClients = [...fClients].map(c => ({ ...c, score: Number(c.total_sold) || 0 })).sort((a, b) => b.score - a.score).slice(0, 5);
 
+    // "Clientes importantes" = ones who've actually bought before (not a
+    // brand-new lead-turned-client with nothing to follow up on yet).
+    const staleClients = fClients.filter(c => isStaleClient(c) && Number(c.total_sold) > 0)
+      .sort((a, b) => (Number(b.total_sold) || 0) - (Number(a.total_sold) || 0));
+
     // Breakdown needs every commerce's sales/payments, not just the
     // currently-selected one (that's what fSales/fPayments are filtered
     // to) — same currency conversion, kept unfiltered by commerce.
@@ -169,7 +174,7 @@ export default function Dashboard() {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
       commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, fSales,
-      leadsSparkline, topProduct, recentSales, totalProductsCount,
+      leadsSparkline, topProduct, recentSales, totalProductsCount, staleClients,
     };
   }, [data, period, filterByCommerce, commerces, config, rates, currency]);
 
@@ -201,6 +206,23 @@ export default function Dashboard() {
           <DateWeatherWidget />
         </div>
       </div>
+
+      {stats.staleClients.length > 0 && (
+        <button onClick={() => navigate('/clientes')}
+          className="w-full flex items-center gap-3 bg-warning/10 border border-warning/30 rounded-2xl p-3.5 sm:p-4 mb-4 text-left hover:bg-warning/15 transition-colors">
+          <span className="w-9 h-9 rounded-xl bg-warning/20 text-warning flex items-center justify-center shrink-0">
+            <BellRing className="w-4 h-4" />
+          </span>
+          <p className="text-sm flex-1 min-w-0">
+            <span className="font-semibold">{stats.staleClients.length} cliente{stats.staleClients.length === 1 ? '' : 's'} importante{stats.staleClients.length === 1 ? '' : 's'}</span>{' '}
+            llevan más de {STALE_CONTACT_DAYS} días sin seguimiento
+            {stats.staleClients[0]?.name && (
+              <span className="text-muted-foreground"> — {stats.staleClients.slice(0, 3).map(c => c.name).join(', ')}{stats.staleClients.length > 3 ? '…' : ''}</span>
+            )}
+          </p>
+          <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+        </button>
+      )}
 
       {commerces.length > 1 && (
         <div className="mb-4">

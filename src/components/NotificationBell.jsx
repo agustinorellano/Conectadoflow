@@ -2,13 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, AlertCircle, UserPlus, CheckCircle2, Megaphone } from 'lucide-react';
+import { Bell, X, AlertCircle, UserPlus, CheckCircle2, Megaphone, BellRing } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { useCommerce } from '@/lib/CommerceContext';
 import { useEntityList } from '@/lib/useEntityQuery';
-import { isOverdue, formatDate } from '@/lib/flowUtils';
+import { isOverdue, formatDate, isStaleClient, STALE_CONTACT_DAYS } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
 const NOTIF_KEY = (userId) => ['Notification', 'list', { filter: { owner_id: userId, is_read: false }, sort: '-created_date', limit: 20 }];
@@ -27,6 +27,7 @@ export default function NotificationBell() {
   const { data: payments = [] } = useEntityList('Payment', { enabled: !!user });
   const { data: leads = [] } = useEntityList('Lead', { enabled: !!user });
   const { data: activities = [] } = useEntityList('Activity', { enabled: !!user });
+  const { data: clients = [] } = useEntityList('Client', { enabled: !!user });
   const { data: notifications = [] } = useEntityList('Notification', {
     filter: user ? { owner_id: user.id, is_read: false } : undefined,
     sort: '-created_date', limit: 20, enabled: !!user,
@@ -47,8 +48,20 @@ export default function NotificationBell() {
     const fPayments = filterByCommerce(payments);
     const fLeads = filterByCommerce(leads);
     const fActivities = filterByCommerce(activities);
+    const fClients = filterByCommerce(clients);
 
     const todayStr = new Date().toISOString().slice(0, 10);
+
+    const staleClients = fClients.filter(isStaleClient);
+    const staleAlert = staleClients.length === 0 ? [] : [{
+      id: 'stale-clients',
+      type: 'stale',
+      icon: BellRing,
+      color: 'text-warning bg-warning/10',
+      title: `${staleClients.length} cliente${staleClients.length === 1 ? '' : 's'} sin seguimiento`,
+      subtitle: `Llevan más de ${STALE_CONTACT_DAYS} días sin contacto`,
+      link: '/clientes',
+    }];
 
     const overduePayments = fPayments
       .filter(p => p.status !== 'Pagado' && p.status !== 'Cancelado' && isOverdue(p.due_date))
@@ -89,8 +102,8 @@ export default function NotificationBell() {
         link: '/clientes',
       }));
 
-    return [...adminNotifications, ...overduePayments, ...untouchedLeads, ...todayActivities];
-  }, [user, notifications, payments, leads, activities, filterByCommerce]);
+    return [...adminNotifications, ...staleAlert, ...overduePayments, ...untouchedLeads, ...todayActivities];
+  }, [user, notifications, payments, leads, activities, clients, filterByCommerce]);
 
   const count = items.length;
 
