@@ -82,12 +82,12 @@ export default function Layout() {
       {/* Desktop Sidebar */}
       <aside
         className={cn(
-          'hidden md:flex flex-col shrink-0 border-r border-border bg-sidebar transition-all duration-300 ease-out',
+          'hidden md:flex flex-col shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300 ease-out',
           collapsed ? 'w-[68px]' : 'w-[244px]'
         )}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center px-4 gap-3 border-b border-border">
+        <div className="h-16 flex items-center px-4 gap-3 border-b border-sidebar-border">
           <div className="w-9 h-9 rounded-[10px] bg-primary flex items-center justify-center shrink-0 shadow-sm">
             <svg viewBox="0 0 40 40" className="w-5 h-5" fill="none" stroke="white" strokeWidth="2.4">
               <circle cx="15" cy="20" r="8" />
@@ -97,13 +97,13 @@ export default function Layout() {
           {!collapsed && (
             <div className="overflow-hidden">
               <p className="font-semibold text-[15px] leading-tight tracking-tight">Conectado</p>
-              <p className="text-[13px] text-primary font-medium leading-tight">Flow</p>
+              <p className="text-[13px] text-[#9aa8ff] font-medium leading-tight">Flow</p>
             </div>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={cn(
-              'ml-auto w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors',
+              'ml-auto w-7 h-7 rounded-lg flex items-center justify-center text-sidebar-foreground/60 hover:bg-sidebar-accent transition-colors',
               collapsed && 'rotate-180'
             )}
           >
@@ -143,7 +143,7 @@ export default function Layout() {
         </nav>
 
         {/* User */}
-        <div className="p-2.5 border-t border-border space-y-0.5">
+        <div className="p-2.5 border-t border-sidebar-border space-y-0.5">
           {user?.is_platform_admin && (
             <NavLink to="/super-admin"
               className={({ isActive }) => cn(
@@ -162,9 +162,9 @@ export default function Layout() {
               <>
                 <div className="overflow-hidden flex-1">
                   <p className="text-[13px] font-medium truncate">{user?.full_name || 'Usuario'}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
+                  <p className="text-[11px] text-sidebar-foreground/50 truncate">{user?.email}</p>
                 </div>
-                <button onClick={handleLogout} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                <button onClick={handleLogout} className="w-7 h-7 rounded-lg flex items-center justify-center text-sidebar-foreground/60 hover:bg-destructive/20 hover:text-destructive transition-colors">
                   <LogOut className="w-4 h-4" />
                 </button>
               </>
@@ -185,9 +185,9 @@ export default function Layout() {
             <motion.aside
               initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed left-0 top-0 bottom-0 w-[260px] bg-sidebar z-50 md:hidden flex flex-col"
+              className="fixed left-0 top-0 bottom-0 w-[260px] bg-sidebar text-sidebar-foreground z-50 md:hidden flex flex-col"
             >
-              <div className="h-16 flex items-center px-4 gap-3 border-b border-border">
+              <div className="h-16 flex items-center px-4 gap-3 border-b border-sidebar-border">
                 <div className="w-9 h-9 rounded-[10px] bg-primary flex items-center justify-center">
                   <svg viewBox="0 0 40 40" className="w-5 h-5" fill="none" stroke="white" strokeWidth="2.4">
                     <circle cx="15" cy="20" r="8" /><circle cx="25" cy="20" r="8" />
@@ -195,9 +195,9 @@ export default function Layout() {
                 </div>
                 <div>
                   <p className="font-semibold text-[15px] leading-tight">Conectado</p>
-                  <p className="text-[13px] text-primary font-medium leading-tight">Flow</p>
+                  <p className="text-[13px] text-[#9aa8ff] font-medium leading-tight">Flow</p>
                 </div>
-                <button onClick={() => setMobileMenu(false)} className="ml-auto w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent">
+                <button onClick={() => setMobileMenu(false)} className="ml-auto w-8 h-8 rounded-lg flex items-center justify-center hover:bg-sidebar-accent">
                   <X className="w-5 h-5" />
                 </button>
               </div>
