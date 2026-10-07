@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
-import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle, FileDown, FileText } from 'lucide-react';
+import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle, FileDown, FileText, LayoutGrid, Rows3 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import Modal from '@/components/Modal';
@@ -24,6 +24,7 @@ export default function Products() {
   const [filterKind, setFilterKind] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
+  const [viewMode, setViewMode] = useState('cards');
   const currency = config?.currency || 'ARS';
 
   const load = async () => {
@@ -151,13 +152,21 @@ export default function Products() {
             <button key={k} onClick={() => setFilterKind(k)} className={cn('px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap', filterKind === k ? 'bg-primary text-primary-foreground' : 'bg-card border border-border')}>{k === 'all' ? 'Todos' : k}</button>
           ))}
         </div>
+        <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-xl w-fit shrink-0">
+          <button onClick={() => setViewMode('cards')} className={cn('px-3 h-9 rounded-lg flex items-center gap-1.5 text-xs font-medium transition-colors', viewMode === 'cards' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+            <LayoutGrid className="w-3.5 h-3.5" /> Tarjetas
+          </button>
+          <button onClick={() => setViewMode('rows')} className={cn('px-3 h-9 rounded-lg flex items-center gap-1.5 text-xs font-medium transition-colors', viewMode === 'rows' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+            <Rows3 className="w-3.5 h-3.5" /> Filas
+          </button>
+        </div>
       </div>
 
       {loading ? <div className="text-center py-16 text-muted-foreground">Cargando…</div> :
         filtered.length === 0 ? (
           <EmptyState icon={Package} title="Sin productos" subtitle="Agregá productos o servicios a tu catálogo para usarlos en cotizaciones y ventas."
             action={<button onClick={handleNew} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium"><Plus className="w-4 h-4" /> Nuevo producto</button>} />
-        ) : (
+        ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map(p => (
               <motion.div key={p.id} layout className="bg-card rounded-2xl border border-border card-shadow p-5 hover:card-shadow-lg transition-shadow group">
@@ -193,6 +202,36 @@ export default function Products() {
                     <button onClick={() => handleEdit(p)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => toggleActive(p)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Trash2 className="w-4 h-4" /></button>
                   </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-card rounded-2xl border border-border card-shadow overflow-hidden">
+            {filtered.map((p, i) => (
+              <motion.div key={p.id} layout
+                className={cn('flex items-center gap-3 p-3 sm:p-4 hover:bg-accent/50 transition-colors', i !== filtered.length - 1 && 'border-b border-border')}>
+                {p.image_url ? (
+                  <UIImage src={p.image_url} alt={p.name} className="w-10 h-10 rounded-xl shrink-0 object-cover" />
+                ) : (
+                  <span className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', p.kind === 'Servicio' ? 'bg-violet-500/10 text-violet-600' : 'bg-blue-500/10 text-blue-600')}>
+                    {p.kind === 'Servicio' ? <Box className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{p.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{p.kind} · {p.category || 'Sin categoría'}{p.code ? ` · Cód: ${p.code}` : ''}</p>
+                </div>
+                {p.kind === 'Producto' && (
+                  <Badge variant={(Number(p.stock) || 0) <= 0 ? 'destructive' : Number(p.stock) <= LOW_STOCK_THRESHOLD ? 'warning' : 'success'} dot className="shrink-0 hidden sm:inline-flex">
+                    {(Number(p.stock) || 0) <= 0 ? 'Sin stock' : `${p.stock} en stock`}
+                  </Badge>
+                )}
+                <Badge variant={p.is_active ? 'success' : 'muted'} className="shrink-0 hidden md:inline-flex">{p.is_active ? 'Activo' : 'Inactivo'}</Badge>
+                <p className="text-sm font-semibold shrink-0 w-24 text-right">{formatCurrency(p.price, currency)}</p>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => handleEdit(p)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Pencil className="w-4 h-4" /></button>
+                  <button onClick={() => toggleActive(p)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </motion.div>
             ))}
