@@ -173,9 +173,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mb-4">
-        <DashboardPills view={view} setView={setView} />
-      </div>
+      {commerces.length > 1 && (
+        <div className="mb-4">
+          <DashboardPills view={view} setView={setView} />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 items-start gap-3 mb-4">
         <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
@@ -254,17 +256,23 @@ export default function Dashboard() {
         <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} sparkline={stats.leadsSparkline} />
       </div>
 
-      {view === 'commerce' && isAllCommerces && stats.commerceBreakdown.length > 0 && (
+      {view === 'commerce' && (
         <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-4">
           <h2 className="font-semibold mb-3 text-sm">Rendimiento por comercio</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {stats.commerceBreakdown.map(c => (
-              <button key={c.id} onClick={() => setCurrentCommerceId(c.id)} className="text-left p-4 rounded-xl border border-border hover:border-primary transition-all">
-                <div className="flex items-center gap-2 mb-2"><Store className="w-4 h-4 text-primary" /><p className="text-sm font-medium truncate">{c.name}</p></div>
-                <ProgressBar value={c.revenue} max={Math.max(...stats.commerceBreakdown.map(x => x.revenue), 1)} formatValue={amount} sublabel={`${c.salesCount} ventas · ${c.clients} clientes`} />
-              </button>
-            ))}
-          </div>
+          {isAllCommerces && stats.commerceBreakdown.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {stats.commerceBreakdown.map(c => (
+                <button key={c.id} onClick={() => setCurrentCommerceId(c.id)} className="text-left p-4 rounded-xl border border-border hover:border-primary transition-all">
+                  <div className="flex items-center gap-2 mb-2"><Store className="w-4 h-4 text-primary" /><p className="text-sm font-medium truncate">{c.name}</p></div>
+                  <ProgressBar value={c.revenue} max={Math.max(...stats.commerceBreakdown.map(x => x.revenue), 1)} formatValue={amount} sublabel={`${c.salesCount} ventas · ${c.clients} clientes`} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-2">
+              Seleccioná <button onClick={() => setCurrentCommerceId('all')} className="text-primary font-medium hover:underline">"Todos los comercios"</button> en el selector de arriba para ver el desglose por comercio.
+            </p>
+          )}
         </div>
       )}
 
