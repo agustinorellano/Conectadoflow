@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Plus, Edit3, Trash2, Send } from 'lucide-react';
+import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, CheckCircle2, RefreshCw, Info } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
@@ -10,6 +10,17 @@ import { buildWhatsAppUrl, fillTemplate } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = ['Primer contacto','Seguimiento','Confirmación de reunión','Recordatorio','Envío de propuesta','Seguimiento de propuesta','Cierre','Agradecimiento','Facturación','Recordatorio de pago','Pago vencido','Reactivación','Postventa'];
+
+// Groups the 13 categories into the 5 broad stages of the customer
+// journey, so the page reads as a path (same idea as the client "estado
+// de situación" in Clientes) instead of a flat list of template buckets.
+const JOURNEY_PHASES = [
+  { key: 'contacto', label: 'Primer contacto', icon: UserPlus, categories: ['Primer contacto'] },
+  { key: 'seguimiento', label: 'Seguimiento', icon: MessageCircle, categories: ['Seguimiento', 'Confirmación de reunión', 'Recordatorio'] },
+  { key: 'propuesta', label: 'Propuesta', icon: FileText, categories: ['Envío de propuesta', 'Seguimiento de propuesta'] },
+  { key: 'cierre', label: 'Cierre', icon: CheckCircle2, categories: ['Cierre', 'Agradecimiento', 'Facturación', 'Recordatorio de pago', 'Pago vencido'] },
+  { key: 'postventa', label: 'Postventa', icon: RefreshCw, categories: ['Reactivación', 'Postventa'] },
+];
 
 const DEFAULT_TEMPLATES = [
   { name: 'Primer contacto', category: 'Primer contacto', body: 'Hola {nombre}, ¿cómo estás? Soy {vendedor} de Conectado. Vi tu interés en {producto} y quería presentarme. ¿Tenés unos minutos para charlar?' },
@@ -59,13 +70,40 @@ export default function Communication() {
         </button>
       </div>
 
+      <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-6">
+        <div className="flex items-start gap-2.5 mb-4">
+          <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Info className="w-4 h-4" />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            Mensajes listos para cada momento del recorrido del cliente, para no escribir cada contacto de cero. Elegí una etapa para ir directo a sus plantillas, completá las variables ({'{nombre}'}, {'{producto}'}, etc.) y mandalo por WhatsApp en un clic.
+          </p>
+        </div>
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {JOURNEY_PHASES.map((phase, i) => (
+            <React.Fragment key={phase.key}>
+              <button
+                onClick={() => document.getElementById(`cat-${phase.categories[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="flex flex-col items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-xl hover:bg-accent transition-colors"
+              >
+                <span className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <phase.icon className="w-4 h-4" />
+                </span>
+                <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">{phase.label}</span>
+              </button>
+              {i < JOURNEY_PHASES.length - 1 && <div className="w-6 sm:w-10 h-px bg-border shrink-0 mb-5" />}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
       {loading ? <div className="text-center py-16 text-muted-foreground">Cargando…</div> : (
         <div className="space-y-6">
           {CATEGORIES.map(cat => {
             const items = templates.filter(t => t.category === cat);
             if (items.length === 0) return null;
             return (
-              <div key={cat}>
+              <div key={cat} id={`cat-${cat}`} className="scroll-mt-4">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">{cat}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {items.map(t => (
