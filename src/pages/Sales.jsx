@@ -60,6 +60,35 @@ export default function Sales() {
     load();
   };
 
+  const handleEdit = (s) => { setEditingSale(s); setShowForm(true); };
+  const closeForm = () => { setShowForm(false); setEditingSale(null); };
+
+  const handleDelete = async (s) => {
+    if (!confirm(`¿Eliminar la venta ${s.number}? Esta acción no se puede deshacer y también va a borrar su plan de pagos.`)) return;
+    const salePayments = payments.filter(p => p.sale_id === s.id);
+    await Promise.all(salePayments.map(p => base44.entities.Payment.delete(p.id)));
+    await base44.entities.Sale.delete(s.id);
+    if (s.client_id) {
+      const client = clients.find(c => c.id === s.client_id);
+      if (client) {
+        await base44.entities.Client.update(client.id, {
+          total_sold: Math.max(0, (Number(client.total_sold) || 0) - (Number(s.total_amount) || 0)),
+          balance: Math.max(0, (Number(client.balance) || 0) - (Number(s.balance) || 0)),
+          total_collected: Math.max(0, (Number(client.total_collected) || 0) - (Number(s.collected_amount) || 0)),
+        });
+      }
+    }
+    load();
+  };
+
+  const fSales = filterByCommerce(sales);
+  const totals = {
+    count: fSales.length,
+    billed: fSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0),
+    collected: fSales.reduce((s, x) => s + (Number(x.collected_amount) || 0), 0),
+    pending: fSales.reduce((s, x) => s + (Number(x.balance) || 0), 0),
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -72,6 +101,13 @@ export default function Sales() {
         <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
           <Plus className="w-4 h-4" /> Nueva venta
         </button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <KpiCard label="Total ventas" value={totals.count} icon={ShoppingCart} accent="#465BE8" />
+        <KpiCard label="Facturado" value={formatCurrency(totals.billed, currency)} icon={DollarSign} accent="#22c55e" />
+        <KpiCard label="Cobrado" value={formatCurrency(totals.collected, currency)} icon={Receipt} accent="#0ea5e9" />
+        <KpiCard label="Pendiente" value={formatCurrency(totals.pending, currency)} icon={Wallet} accent="#f59e0b" />
       </div>
 
       <div className="relative mb-5">
@@ -92,7 +128,7 @@ export default function Sales() {
                 const isOpen = expanded === s.id;
                 return (
                   <motion.div key={s.id} layout className="bg-card rounded-2xl border border-border card-shadow overflow-hidden">
-                    <button onClick={() => setExpanded(isOpen ? null : s.id)} className="w-full flex items-center gap-4 p-4 hover:bg-accent/30 transition-colors text-left">
+                    <div onClick={() => setExpanded(isOpen ? null : s.id)} className="w-full flex items-center gap-4 p-4 hover:bg-accent/30 transition-colors text-left cursor-pointer">
                       <span className="w-11 h-11 rounded-xl bg-success/10 text-success flex items-center justify-center shrink-0">
                         <ShoppingCart className="w-5 h-5" />
                       </span>
@@ -107,8 +143,16 @@ export default function Sales() {
                            <Badge variant={payVariant(s.payment_status)} dot>Cobro: {s.payment_status}</Badge>
                          </div>
                       </div>
+                      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => handleEdit(s)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground flex items-center justify-center" title="Editar venta">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(s)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center" title="Eliminar venta">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                       {isOpen ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
-                    </button>
+                    </div>
                     <AnimatePresence>
                       {isOpen && (
                         <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
@@ -165,7 +209,7 @@ export default function Sales() {
         )
       }
 
-      <SaleForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} clients={clients} products={products} user={user} config={config} />
+      <SaleForm open={showForm} onClose={closeForm} onSaved={load} clients={clients} products={products} user={user} config={config} sale={editingSale} />
     </div>
   );
 }
@@ -208,15 +252,33 @@ function PaymentPlan({ sale, payments, currency, onPaid }) {
   );
 }
 
-function SaleForm({ open, onClose, onSaved, clients, products, user, config }) {
-  const [form, setForm] = useState({ client_id: '', date: new Date().toISOString().slice(0, 10), discount: '', tax: '', payment_method: 'Transferencia', status: 'Confirmada', installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1 });
+const emptySaleForm = { client_id: '', date: new Date().toISOString().slice(0, 10), discount: '', tax: '', payment_method: 'Transferencia', status: 'Confirmada', installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1 };
+
+function SaleForm({ open, onClose, onSaved, clients, products, user, config, sale }) {
+  const [form, setForm] = useState(emptySaleForm);
   const { currentCommerceId: curCommerceId } = useCommerce();
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: '' }]);
   const [saving, setSaving] = useState(false);
   const currency = config?.currency || 'ARS';
   const taxRate = (config?.tax_rate || 0) / 100;
+  const isEditing = !!sale;
 
-  useEffect(() => { if (open) setForm(f => ({ ...f, client_id: clients[0]?.id || '' })); }, [open, clients]);
+  useEffect(() => {
+    if (!open) return;
+    if (sale) {
+      setForm({
+        client_id: sale.client_id || '', date: (sale.date || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+        discount: sale.discount || '', tax: sale.tax || '', payment_method: sale.payment_method || 'Transferencia',
+        status: sale.status || 'Confirmada', installments: sale.installments_count || 1, observations: sale.observations || '',
+        bank_entity: sale.bank_entity || '', card_type: sale.card_type || '', card_brand: sale.card_brand || '',
+        installments_count: sale.installments_count || 1,
+      });
+      setItems(sale.items?.length ? sale.items.map(it => ({ description: it.description, quantity: it.quantity, unit_price: it.unit_price })) : [{ description: '', quantity: 1, unit_price: '' }]);
+    } else {
+      setForm({ ...emptySaleForm, client_id: clients[0]?.id || '' });
+      setItems([{ description: '', quantity: 1, unit_price: '' }]);
+    }
+  }, [open, sale, clients]);
 
   const gross = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 1), 0);
   const discount = Number(form.discount) || 0;
@@ -237,49 +299,77 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config }) {
     if (!client || items.length === 0) return;
     setSaving(true);
     try {
-      const num = `V-${Date.now().toString().slice(-6)}`;
       const computedItems = items.map(it => ({ ...it, subtotal: (Number(it.unit_price) || 0) * (Number(it.quantity) || 1) }));
-      const sale = await base44.entities.Sale.create({
-        number: num, client_id: client.id, client_name: client.name,
-        items: computedItems, gross_amount: gross, discount, tax, total_amount: total,
-        date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity, card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1, status: form.status,
-        commerce_id: curCommerceId !== 'all' ? curCommerceId : undefined,
-        collected_amount: 0, balance: total, payment_status: 'Pendiente', observations: form.observations,
-        owner_id: user?.id, owner_name: user?.full_name,
-      });
-      // create payment plan
-      const inst = Number(form.installments_count) || Number(form.installments) || 1;
-      const installmentAmount = total / inst;
-      const paymentRecords = [];
-      for (let i = 0; i < inst; i++) {
-        const due = new Date();
-        due.setDate(due.getDate() + 30 * (i + 1));
-        paymentRecords.push({
-          sale_id: sale.id, sale_number: num, client_id: client.id, client_name: client.name,
-          installment_number: i + 1, total_installments: inst, amount: installmentAmount,
-          due_date: due.toISOString().slice(0, 10),           method: form.payment_method, status: 'Pendiente', commerce_id: curCommerceId !== 'all' ? curCommerceId : undefined,
+
+      if (isEditing) {
+        const oldTotal = Number(sale.total_amount) || 0;
+        const collected = Number(sale.collected_amount) || 0;
+        const newBalance = Math.max(0, total - collected);
+        let paymentStatus = 'Pendiente';
+        if (newBalance <= 0) paymentStatus = 'Pagado';
+        else if (collected > 0) paymentStatus = 'Parcial';
+
+        await base44.entities.Sale.update(sale.id, {
+          client_id: client.id, client_name: client.name,
+          items: computedItems, gross_amount: gross, discount, tax, total_amount: total,
+          date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity,
+          card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1,
+          status: form.status, observations: form.observations,
+          balance: newBalance, payment_status: paymentStatus,
         });
+
+        const delta = total - oldTotal;
+        if (delta !== 0 && client.id === sale.client_id) {
+          await base44.entities.Client.update(client.id, {
+            total_sold: Math.max(0, (Number(client.total_sold) || 0) + delta),
+            balance: Math.max(0, (Number(client.balance) || 0) + delta),
+          });
+        }
+      } else {
+        const num = `V-${Date.now().toString().slice(-6)}`;
+        const newSale = await base44.entities.Sale.create({
+          number: num, client_id: client.id, client_name: client.name,
+          items: computedItems, gross_amount: gross, discount, tax, total_amount: total,
+          date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity, card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1, status: form.status,
+          commerce_id: curCommerceId !== 'all' ? curCommerceId : undefined,
+          collected_amount: 0, balance: total, payment_status: 'Pendiente', observations: form.observations,
+          owner_id: user?.id, owner_name: user?.full_name,
+        });
+        // create payment plan
+        const inst = Number(form.installments_count) || Number(form.installments) || 1;
+        const installmentAmount = total / inst;
+        const paymentRecords = [];
+        for (let i = 0; i < inst; i++) {
+          const due = new Date();
+          due.setDate(due.getDate() + 30 * (i + 1));
+          paymentRecords.push({
+            sale_id: newSale.id, sale_number: num, client_id: client.id, client_name: client.name,
+            installment_number: i + 1, total_installments: inst, amount: installmentAmount,
+            due_date: due.toISOString().slice(0, 10), method: form.payment_method, status: 'Pendiente', commerce_id: curCommerceId !== 'all' ? curCommerceId : undefined,
+          });
+        }
+        await base44.entities.Payment.bulkCreate(paymentRecords);
+        // update client totals
+        const newSold = (client.total_sold || 0) + total;
+        const newBalance = (client.balance || 0) + total;
+        await base44.entities.Client.update(client.id, { total_sold: newSold, balance: newBalance, last_contact: new Date().toISOString() });
       }
-      await base44.entities.Payment.bulkCreate(paymentRecords);
-      // update client totals
-      const newSold = (client.total_sold || 0) + total;
-      const newBalance = (client.balance || 0) + total;
-      await base44.entities.Client.update(client.id, { total_sold: newSold, balance: newBalance, last_contact: new Date().toISOString() });
+
       onSaved(); onClose();
       setItems([{ description: '', quantity: 1, unit_price: '' }]);
-      setForm({ client_id: '', date: new Date().toISOString().slice(0, 10), discount: '', tax: '', payment_method: 'Transferencia', status: 'Confirmada', installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1 });
+      setForm(emptySaleForm);
     } finally { setSaving(false); }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Nueva venta" size="lg"
+    <Modal open={open} onClose={onClose} title={isEditing ? 'Editar venta' : 'Nueva venta'} size="lg"
       footer={<>
         <div className="mr-auto text-right">
           <p className="text-xs text-muted-foreground">Total</p>
           <p className="text-lg font-bold">{formatCurrency(total, currency)}</p>
         </div>
         <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
-        <button onClick={save} disabled={saving || !form.client_id} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Registrar venta'}</button>
+        <button onClick={save} disabled={saving || !form.client_id} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : isEditing ? 'Guardar cambios' : 'Registrar venta'}</button>
       </>}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, CheckCircle2, Clock, AlertCircle, Search } from 'lucide-react';
+import { Wallet, CheckCircle2, Clock, AlertCircle, Search, Pencil, Trash2, Receipt } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import KpiCard from '@/components/KpiCard';
+import Modal from '@/components/Modal';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate, isOverdue, PAYMENT_METHODS } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +17,7 @@ export default function Payments() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [editingPayment, setEditingPayment] = useState(null);
   const currency = config?.currency || 'ARS';
 
   const load = async () => {
@@ -69,24 +73,43 @@ export default function Payments() {
 
   const payVariant = (s) => ({ Pagado: 'success', Parcial: 'warning', Pendiente: 'muted', Vencido: 'destructive', Cancelado: 'muted' }[s] || 'muted');
 
+  const handleDelete = async (p) => {
+    if (!confirm(`¿Eliminar este cobro de ${formatCurrency(p.amount, currency)}?`)) return;
+    const wasPaid = p.status === 'Pagado';
+    await base44.entities.Payment.delete(p.id);
+    if (wasPaid && p.sale_id) {
+      const sale = await base44.entities.Sale.get(p.sale_id).catch(() => null);
+      if (sale) {
+        const newCollected = Math.max(0, (Number(sale.collected_amount) || 0) - (Number(p.amount) || 0));
+        const newBalance = Math.max(0, (Number(sale.total_amount) || 0) - newCollected);
+        let ps = 'Pendiente';
+        if (newBalance <= 0) ps = 'Pagado';
+        else if (newCollected > 0) ps = 'Parcial';
+        await base44.entities.Sale.update(sale.id, { collected_amount: newCollected, balance: newBalance, payment_status: ps });
+        if (sale.client_id) {
+          const client = await base44.entities.Client.get(sale.client_id).catch(() => null);
+          if (client) {
+            await base44.entities.Client.update(client.id, {
+              total_collected: Math.max(0, (Number(client.total_collected) || 0) - (Number(p.amount) || 0)),
+              balance: (Number(client.balance) || 0) + (Number(p.amount) || 0),
+            });
+          }
+        }
+      }
+    }
+    load();
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-1">Cobros</h1>
       <p className="text-sm text-muted-foreground mb-6">Gestioná los pagos de tus ventas</p>
 
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-card rounded-2xl border border-border p-4">
-          <div className="flex items-center gap-2 mb-1"><CheckCircle2 className="w-4 h-4 text-success" /><p className="text-xs text-muted-foreground">Cobrado</p></div>
-          <p className="text-xl font-bold text-success">{formatCurrency(totals.collected, currency)}</p>
-        </div>
-        <div className="bg-card rounded-2xl border border-border p-4">
-          <div className="flex items-center gap-2 mb-1"><Clock className="w-4 h-4 text-warning" /><p className="text-xs text-muted-foreground">Pendiente</p></div>
-          <p className="text-xl font-bold text-warning">{formatCurrency(totals.pending, currency)}</p>
-        </div>
-        <div className="bg-card rounded-2xl border border-border p-4">
-          <div className="flex items-center gap-2 mb-1"><AlertCircle className="w-4 h-4 text-destructive" /><p className="text-xs text-muted-foreground">Vencido</p></div>
-          <p className="text-xl font-bold text-destructive">{formatCurrency(totals.overdue, currency)}</p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <KpiCard label="Total cobros" value={payments.length} icon={Receipt} accent="#465BE8" />
+        <KpiCard label="Cobrado" value={formatCurrency(totals.collected, currency)} icon={CheckCircle2} accent="#22c55e" />
+        <KpiCard label="Pendiente" value={formatCurrency(totals.pending, currency)} icon={Clock} accent="#f59e0b" />
+        <KpiCard label="Vencido" value={formatCurrency(totals.overdue, currency)} icon={AlertCircle} accent="#ef4444" />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
@@ -129,6 +152,14 @@ export default function Payments() {
                         )}
                       </div>
                     </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => setEditingPayment(p)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground flex items-center justify-center" title="Editar cobro">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(p)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center" title="Eliminar cobro">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </motion.div>
                 );
               })}
@@ -136,6 +167,59 @@ export default function Payments() {
           </div>
         )
       }
+
+      <EditPaymentModal payment={editingPayment} onClose={() => setEditingPayment(null)} onSaved={load} currency={currency} />
     </div>
+  );
+}
+
+function EditPaymentModal({ payment, onClose, onSaved, currency }) {
+  const [amount, setAmount] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [method, setMethod] = useState('Transferencia');
+  const [saving, setSaving] = useState(false);
+  const open = !!payment;
+
+  useEffect(() => {
+    if (payment) {
+      setAmount(String(payment.amount ?? ''));
+      setDueDate((payment.due_date || '').slice(0, 10));
+      setMethod(payment.method || 'Transferencia');
+    }
+  }, [payment]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await base44.entities.Payment.update(payment.id, {
+        amount: Number(amount) || 0, due_date: dueDate, method,
+      });
+      onSaved(); onClose();
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Editar cobro"
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
+        <button onClick={save} disabled={saving} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar cambios'}</button>
+      </>}>
+      <div className="space-y-3">
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Monto</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Fecha de vencimiento</label>
+          <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Medio de pago</label>
+          <StyledSelect value={method} onChange={e => setMethod(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
+            {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+          </StyledSelect>
+        </div>
+      </div>
+    </Modal>
   );
 }
