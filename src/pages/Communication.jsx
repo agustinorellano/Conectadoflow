@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, CheckCircle2, RefreshCw, Info } from 'lucide-react';
+import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
@@ -13,15 +13,16 @@ import { cn } from '@/lib/utils';
 
 const CATEGORIES = ['Primer contacto','Seguimiento','Confirmación de reunión','Recordatorio','Envío de propuesta','Seguimiento de propuesta','Cierre','Agradecimiento','Facturación','Recordatorio de pago','Pago vencido','Reactivación','Postventa'];
 
-// Groups the 13 categories into the 5 broad stages of the customer
-// journey, so the page reads as a path (same idea as the client "estado
-// de situación" in Clientes) instead of a flat list of template buckets.
+// Groups the 13 categories into the stages of the customer journey. Each
+// phase is now the page's primary navigation — clicking one goes straight
+// to its templates — instead of a row of anchors sitting above a flat list
+// of every category at once.
 const JOURNEY_PHASES = [
   { key: 'contacto', label: 'Primer contacto', icon: UserPlus, categories: ['Primer contacto'] },
   { key: 'seguimiento', label: 'Seguimiento', icon: MessageCircle, categories: ['Seguimiento', 'Confirmación de reunión', 'Recordatorio'] },
   { key: 'propuesta', label: 'Propuesta', icon: FileText, categories: ['Envío de propuesta', 'Seguimiento de propuesta'] },
-  { key: 'cierre', label: 'Cierre', icon: CheckCircle2, categories: ['Cierre', 'Agradecimiento', 'Facturación', 'Recordatorio de pago', 'Pago vencido'] },
-  { key: 'postventa', label: 'Postventa', icon: RefreshCw, categories: ['Reactivación', 'Postventa'] },
+  { key: 'pagos', label: 'Pagos', icon: Wallet, categories: ['Recordatorio de pago', 'Pago vencido', 'Facturación'] },
+  { key: 'postventa', label: 'Post venta', icon: RefreshCw, categories: ['Cierre', 'Agradecimiento', 'Reactivación', 'Postventa'] },
 ];
 
 const DEFAULT_TEMPLATES = [
@@ -40,6 +41,9 @@ export default function Communication() {
   const [showForm, setShowForm] = useState(false);
   const [editT, setEditT] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [selectedPhase, setSelectedPhase] = useState(null);
+
+  const countFor = (phase) => templates.filter(t => phase.categories.includes(t.category)).length;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['MessageTemplate'] });
 
@@ -70,39 +74,47 @@ export default function Communication() {
       </div>
 
       <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-6">
-        <div className="flex items-start gap-2.5 mb-4">
+        <div className="flex items-start gap-2.5 mb-5">
           <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <Info className="w-4 h-4" />
           </span>
           <p className="text-sm text-muted-foreground">
-            Mensajes listos para cada momento del recorrido del cliente, para no escribir cada contacto de cero. Elegí una etapa para ir directo a sus plantillas, completá las variables ({'{nombre}'}, {'{producto}'}, etc.) y mandalo por WhatsApp en un clic.
+            Mensajes listos para cada momento del recorrido del cliente, para no escribir cada contacto de cero. Elegí una etapa para ver sus plantillas, completá las variables ({'{nombre}'}, {'{producto}'}, etc.) y mandalo por WhatsApp en un clic.
           </p>
         </div>
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-          {JOURNEY_PHASES.map((phase, i) => (
-            <React.Fragment key={phase.key}>
-              <button
-                onClick={() => document.getElementById(`cat-${phase.categories[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                className="flex flex-col items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-xl hover:bg-accent transition-colors"
-              >
-                <span className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                  <phase.icon className="w-4 h-4" />
-                </span>
-                <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">{phase.label}</span>
-              </button>
-              {i < JOURNEY_PHASES.length - 1 && <div className="w-6 sm:w-10 h-px bg-border shrink-0 mb-5" />}
-            </React.Fragment>
-          ))}
-        </div>
+
+        {selectedPhase ? (
+          <button onClick={() => setSelectedPhase(null)} className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:gap-2 transition-all">
+            <ChevronLeft className="w-4 h-4" /> Todas las etapas
+          </button>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            {JOURNEY_PHASES.map(phase => {
+              const count = countFor(phase);
+              return (
+                <button key={phase.key} onClick={() => setSelectedPhase(phase.key)}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-border hover:border-primary hover:bg-accent/40 transition-colors text-center">
+                  <span className="w-11 h-11 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    <phase.icon className="w-5 h-5" />
+                  </span>
+                  <span className="text-sm font-semibold">{phase.label}</span>
+                  <span className="text-xs text-muted-foreground">{count} plantilla{count === 1 ? '' : 's'}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {loading ? <div className="text-center py-16 text-muted-foreground">Cargando…</div> : (
+      {loading ? <div className="text-center py-16 text-muted-foreground">Cargando…</div> : !selectedPhase ? (
+        <EmptyState icon={MessageCircle} title="Elegí una etapa" subtitle="Tocá una de las etapas de arriba para ver sus plantillas de mensaje." />
+      ) : (
         <div className="space-y-6">
-          {CATEGORIES.map(cat => {
+          {JOURNEY_PHASES.find(p => p.key === selectedPhase).categories.map(cat => {
             const items = templates.filter(t => t.category === cat);
             if (items.length === 0) return null;
             return (
-              <div key={cat} id={`cat-${cat}`} className="scroll-mt-4">
+              <div key={cat}>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">{cat}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {items.map(t => (
@@ -124,6 +136,10 @@ export default function Communication() {
               </div>
             );
           })}
+          {JOURNEY_PHASES.find(p => p.key === selectedPhase).categories.every(cat => templates.filter(t => t.category === cat).length === 0) && (
+            <EmptyState icon={MessageCircle} title="Sin plantillas en esta etapa" subtitle="Creá una nueva plantilla y elegí una categoría de esta etapa."
+              action={<button onClick={() => { setEditT(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium"><Plus className="w-4 h-4" /> Nueva plantilla</button>} />
+          )}
         </div>
       )}
 
