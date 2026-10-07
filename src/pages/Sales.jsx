@@ -10,8 +10,9 @@ import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
 import ProgressBar from '@/components/ProgressBar';
+import DateRangePicker from '@/components/DateRangePicker';
 import { StyledSelect } from '@/components/ui/styled-select';
-import { formatCurrency, formatDate, PAYMENT_METHODS, SALE_STATUS, isOverdue, CARD_TYPES, CARD_BRANDS, INSTALLMENT_OPTIONS } from '@/lib/flowUtils';
+import { formatCurrency, formatDate, inPeriod, PAYMENT_METHODS, SALE_STATUS, isOverdue, CARD_TYPES, CARD_BRANDS, INSTALLMENT_OPTIONS } from '@/lib/flowUtils';
 import { useCommerce } from '@/lib/CommerceContext';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +45,7 @@ export default function Sales() {
   const [editingSale, setEditingSale] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
+  const [period, setPeriod] = useState('all');
   const [searchParams] = useSearchParams();
 
   const currency = config?.currency || 'ARS';
@@ -64,7 +66,8 @@ export default function Sales() {
   useEffect(() => { load(); }, []);
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
 
-  const filtered = filterByCommerce(sales).filter(s => {
+  const fSales = filterByCommerce(sales).filter(s => period === 'all' || inPeriod(s.date, period));
+  const filtered = fSales.filter(s => {
     const q = search.toLowerCase();
     return !q || [s.number, s.client_name].some(v => (v || '').toLowerCase().includes(q));
   });
@@ -106,7 +109,6 @@ export default function Sales() {
     load();
   };
 
-  const fSales = filterByCommerce(sales);
   const totals = {
     count: fSales.length,
     billed: fSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0),
@@ -136,12 +138,23 @@ export default function Sales() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Ventas</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {sales.length} ventas · {formatCurrency(sales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0), currency)}
+            {totals.count} ventas · {formatCurrency(totals.billed, currency)}
           </p>
         </div>
-        <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
-          <Plus className="w-4 h-4" /> Nueva venta
-        </button>
+        <div className="flex gap-2">
+          <DateRangePicker value={period} onChange={setPeriod} presets={[
+            { key: 'all', label: 'Todo' },
+            { key: 'today', label: 'Hoy' },
+            { key: '7d', label: 'Últimos 7 días' },
+            { key: '30d', label: 'Últimos 30 días' },
+            { key: 'month', label: 'Este mes' },
+            { key: '3m', label: 'Últimos 3 meses' },
+            { key: 'year', label: 'Este año' },
+          ]} />
+          <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+            <Plus className="w-4 h-4" /> Nueva venta
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">

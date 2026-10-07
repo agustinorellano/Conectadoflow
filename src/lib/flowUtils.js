@@ -66,8 +66,17 @@ export function isOverdue(dateStr) {
   return d.getTime() < Date.now();
 }
 
-// Period filter helpers
+// Period filter helpers. `period` is either a preset key ('month', '7d', …)
+// or a custom { start, end } range (Date instances or date strings) picked
+// from DateRangePicker — both go through the same inPeriod()/variation()
+// call sites unchanged.
 export function getPeriodRange(period) {
+  if (period && typeof period === 'object' && period.start && period.end) {
+    const start = new Date(period.start); start.setHours(0, 0, 0, 0);
+    const end = new Date(period.end); end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+
   const now = new Date();
   const end = new Date(now);
   end.setHours(23, 59, 59, 999);
@@ -109,6 +118,15 @@ export function inPeriod(dateStr, period) {
 export function previousPeriodAmount(items, dateField, valueField, period) {
   const now = new Date();
   let pStart, pEnd;
+  if (period && typeof period === 'object' && period.start && period.end) {
+    const { start, end } = getPeriodRange(period);
+    const durationMs = end.getTime() - start.getTime();
+    pEnd = new Date(start.getTime() - 1);
+    pStart = new Date(pEnd.getTime() - durationMs);
+    return items
+      .filter(i => { const d = new Date(i[dateField]); return d >= pStart && d <= pEnd; })
+      .reduce((s, i) => s + (Number(i[valueField]) || 0), 0);
+  }
   switch (period) {
     case 'today':
       pStart = new Date(now); pStart.setDate(pStart.getDate() - 1); pStart.setHours(0,0,0,0);
