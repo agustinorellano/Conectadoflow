@@ -40,3 +40,24 @@ export function canAccessPath(role, path) {
 export function roleLabel(role) {
   return ROLE_LABELS[role] || 'Vendedor';
 }
+
+// 'full' = acceso total · 'own' = solo lo propio · 'read' = solo lectura · 'none' = sin acceso.
+// Mirrors the matrix actually enforced by 0013_role_permissions.sql +
+// canAccessPath() above — shown as a table in Equipo so it's not just a
+// chat message.
+export const PERMISSION_MATRIX = [
+  { section: 'Dashboard', admin: 'full', manager: 'full', user: 'own', viewer: 'read' },
+  { section: 'Leads', admin: 'full', manager: 'full', user: 'own', viewer: 'read' },
+  { section: 'Clientes', admin: 'full', manager: 'full', user: 'own', viewer: 'read' },
+  { section: 'Pipeline', admin: 'full', manager: 'full', user: 'own', viewer: 'read' },
+  { section: 'Ventas', admin: 'full', manager: 'full', user: 'own', viewer: 'read' },
+  { section: 'Cobros', admin: 'full', manager: 'full', user: 'none', viewer: 'none' },
+  { section: 'Productos', admin: 'full', manager: 'read', user: 'read', viewer: 'read' },
+  { section: 'Reuniones', admin: 'full', manager: 'full', user: 'own', viewer: 'read' },
+  { section: 'Comunicación', admin: 'full', manager: 'full', user: 'full', viewer: 'read' },
+  { section: 'Documentos', admin: 'full', manager: 'full', user: 'own', viewer: 'read' },
+  { section: 'Analytics', admin: 'full', manager: 'full', user: 'none', viewer: 'none' },
+  { section: 'Reportes', admin: 'full', manager: 'full', user: 'none', viewer: 'none' },
+  { section: 'Equipo', admin: 'full', manager: 'read', user: 'none', viewer: 'none' },
+  { section: 'Configuración', admin: 'full', manager: 'none', user: 'none', viewer: 'none' },
+];

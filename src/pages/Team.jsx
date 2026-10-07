@@ -7,13 +7,52 @@ import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import Modal from '@/components/Modal';
 import { StyledSelect } from '@/components/ui/styled-select';
-import { ROLE_OPTIONS, roleLabel } from '@/lib/roles';
+import { ROLE_OPTIONS, PERMISSION_MATRIX, roleLabel } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
 const ROLE_ICONS = { admin: Crown, manager: Users2, user: User, viewer: Eye };
 const ROLE_COLORS = { admin: 'text-primary', manager: 'text-violet-600', user: 'text-blue-600', viewer: 'text-muted-foreground' };
 const ROLE_BADGE_VARIANT = { admin: 'primary', manager: 'violet', user: 'blue', viewer: 'muted' };
 const ROLES = ROLE_OPTIONS.map(r => ({ name: r.label, icon: ROLE_ICONS[r.value], color: ROLE_COLORS[r.value], desc: r.desc }));
+
+const ACCESS_LABEL = { full: 'Completo', own: 'Lo propio', read: 'Lectura', none: '—' };
+const ACCESS_CLASS = {
+  full: 'bg-success/10 text-success',
+  own: 'bg-blue-500/10 text-blue-600',
+  read: 'bg-secondary text-secondary-foreground',
+  none: 'bg-destructive/5 text-muted-foreground',
+};
+
+function PermissionMatrixTable() {
+  return (
+    <div className="bg-card rounded-2xl border border-border card-shadow overflow-x-auto no-scrollbar">
+      <table className="w-full text-sm min-w-[560px]">
+        <thead>
+          <tr className="border-b border-border">
+            <th className="text-left font-medium text-muted-foreground px-4 py-3">Sección</th>
+            {ROLE_OPTIONS.map(r => (
+              <th key={r.value} className="text-center font-medium text-muted-foreground px-3 py-3 whitespace-nowrap">{r.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {PERMISSION_MATRIX.map((row, i) => (
+            <tr key={row.section} className={i !== PERMISSION_MATRIX.length - 1 ? 'border-b border-border/50' : ''}>
+              <td className="px-4 py-2.5 font-medium whitespace-nowrap">{row.section}</td>
+              {ROLE_OPTIONS.map(r => (
+                <td key={r.value} className="px-3 py-2.5 text-center">
+                  <span className={cn('inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap', ACCESS_CLASS[row[r.value]])}>
+                    {ACCESS_LABEL[row[r.value]]}
+                  </span>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function Team() {
   const { config } = useData();
@@ -55,6 +94,8 @@ export default function Team() {
               </div>
             ))}
           </div>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 mt-6">Qué ve cada rol</h2>
+          <PermissionMatrixTable />
         </div>
         <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={load} />
       </div>
@@ -96,7 +137,7 @@ export default function Team() {
       </div>
 
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Roles y permisos</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         {ROLES.map(r => (
           <div key={r.name} className="bg-card rounded-2xl border border-border p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -107,6 +148,9 @@ export default function Team() {
           </div>
         ))}
       </div>
+
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Qué ve cada rol</h2>
+      <PermissionMatrixTable />
 
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={load} />
     </div>
