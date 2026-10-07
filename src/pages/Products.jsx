@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
-import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle, FileDown, FileText, LayoutGrid, Rows3, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle, FileDown, FileText, LayoutGrid, Rows3, ChevronLeft, ChevronRight, Power, PowerOff } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useEntityList } from '@/lib/useEntityQuery';
@@ -30,6 +30,7 @@ export default function Products() {
   const [editProduct, setEditProduct] = useState(null);
   const [viewMode, setViewMode] = useState('cards');
   const [page, setPage] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const currency = config?.currency || 'ARS';
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['Product'] });
@@ -203,8 +204,11 @@ export default function Products() {
                   </div>
                   {p.code && <span className="text-xs text-muted-foreground">Cód: {p.code}</span>}
                   <div className="flex items-center gap-1">
-                    <button onClick={() => handleEdit(p)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Pencil className="w-4 h-4" /></button>
-                    <button onClick={() => toggleActive(p)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => handleEdit(p)} title="Editar" className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => toggleActive(p)} title={p.is_active ? 'Desactivar' : 'Activar'} className={cn('w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center', p.is_active ? 'text-success' : 'text-muted-foreground')}>
+                      {p.is_active ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
+                    </button>
+                    <button onClick={() => setDeleteTarget(p)} title="Eliminar definitivamente" className="w-8 h-8 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-muted-foreground"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
               </motion.div>
@@ -234,8 +238,11 @@ export default function Products() {
                 <Badge variant={p.is_active ? 'success' : 'muted'} className="shrink-0 hidden md:inline-flex">{p.is_active ? 'Activo' : 'Inactivo'}</Badge>
                 <p className="text-sm font-semibold shrink-0 w-24 text-right">{formatCurrency(p.price, currency)}</p>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => handleEdit(p)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => toggleActive(p)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => handleEdit(p)} title="Editar" className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Pencil className="w-4 h-4" /></button>
+                  <button onClick={() => toggleActive(p)} title={p.is_active ? 'Desactivar' : 'Activar'} className={cn('w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center', p.is_active ? 'text-success' : 'text-muted-foreground')}>
+                    {p.is_active ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
+                  </button>
+                  <button onClick={() => setDeleteTarget(p)} title="Eliminar definitivamente" className="w-8 h-8 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-muted-foreground"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </motion.div>
             ))}
@@ -260,7 +267,51 @@ export default function Products() {
       )}
 
       <ProductForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} product={editProduct} />
+      <DeleteProductModal product={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={invalidate} />
     </div>
+  );
+}
+
+// Double confirmation on purpose: deleting a product is permanent (unlike
+// the active/inactive toggle, which is reversible) — a checked box plus a
+// second click, so it can't be fired by a stray double-click the way a
+// single confirm() dialog can.
+function DeleteProductModal({ product, onClose, onDeleted }) {
+  const [confirmed, setConfirmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const open = !!product;
+
+  useEffect(() => { if (open) setConfirmed(false); }, [open]);
+
+  const del = async () => {
+    setDeleting(true);
+    try {
+      await base44.entities.Product.delete(product.id);
+      onDeleted(); onClose();
+    } finally { setDeleting(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Eliminar producto definitivamente"
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
+        <button onClick={del} disabled={!confirmed || deleting} className="px-4 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">{deleting ? 'Eliminando…' : 'Eliminar definitivamente'}</button>
+      </>}>
+      {product && (
+        <div className="space-y-3">
+          <p className="text-sm">
+            Vas a eliminar <span className="font-semibold">{product.name}</span> para siempre. Esta acción no se puede deshacer.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Si solo querés dejar de venderlo pero conservar su historial, cancelá y usá el botón de activar/desactivar en vez de esto.
+          </p>
+          <label className="flex items-center gap-2.5 p-3 rounded-xl border border-destructive/30 bg-destructive/5 cursor-pointer select-none">
+            <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} className="w-4 h-4 accent-destructive" />
+            <span className="text-sm font-medium">Entiendo que esto es permanente y quiero eliminarlo</span>
+          </label>
+        </div>
+      )}
+    </Modal>
   );
 }
 
