@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ShoppingCart, UserPlus, Wallet,
+  ShoppingCart, UserPlus, Wallet, Package, Award,
   ChevronDown, ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -93,14 +93,14 @@ export default function Dashboard() {
   const [periodOpen, setPeriodOpen] = useState(false);
   const [view, setView] = useState('general');
   const [hideAmounts, setHideAmounts] = useState(false);
-  const [data, setData] = useState({ sales: [], leads: [], clients: [], payments: [], opportunities: [], meetings: [], activities: [] });
+  const [data, setData] = useState({ sales: [], leads: [], clients: [], payments: [], opportunities: [], meetings: [], activities: [], products: [] });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const load = async () => {
     setLoading(true);
     try {
-      const [sales, leads, clients, payments, opportunities, meetings, activities] = await Promise.all([
+      const [sales, leads, clients, payments, opportunities, meetings, activities, products] = await Promise.all([
         base44.entities.Sale.list().catch(() => []),
         base44.entities.Lead.list().catch(() => []),
         base44.entities.Client.list().catch(() => []),
@@ -108,8 +108,9 @@ export default function Dashboard() {
         base44.entities.Opportunity.list().catch(() => []),
         base44.entities.Meeting.list().catch(() => []),
         base44.entities.Activity.list().catch(() => []),
+        base44.entities.Product.list().catch(() => []),
       ]);
-      setData({ sales, leads, clients, payments, opportunities, meetings, activities });
+      setData({ sales, leads, clients, payments, opportunities, meetings, activities, products });
     } finally { setLoading(false); }
   };
 
@@ -127,6 +128,7 @@ export default function Dashboard() {
     const fOpps = filterByCommerce(data.opportunities);
     const fMeetings = filterByCommerce(data.meetings);
     const fActivities = filterByCommerce(data.activities);
+    const fProducts = filterByCommerce(data.products);
 
     const periodSales = fSales.filter(s => s.status !== 'Cancelada' && inPeriod(s.date, period));
     const revenue = periodSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
@@ -194,13 +196,14 @@ export default function Dashboard() {
     const topProduct = topProductEntry ? { name: topProductEntry[0], units: topProductEntry[1] } : null;
 
     const recentSales = [...periodSales].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
+    const totalProductsCount = fProducts.filter(p => p.is_active !== false).length;
 
     return {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
       commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, fSales,
       revenueSparkline, salesSparkline, leadsSparkline, collectedSparkline,
-      salesReportSeries, topProduct, recentSales,
+      salesReportSeries, topProduct, recentSales, totalProductsCount,
     };
   }, [data, period, filterByCommerce, commerces, config]);
 
@@ -264,24 +267,30 @@ export default function Dashboard() {
         <DashboardPills view={view} setView={setView} />
       </div>
 
-      <div className="mb-3">
-        <IncomeCard
-          revenue={stats.revenue}
-          variationPct={variation(stats.revenue, stats.prevRevenue)}
-          baseCurrency={currency}
-          hidden={hideAmounts}
-          onToggleHidden={() => setHideAmounts(!hideAmounts)}
-          sparkline={stats.revenueSparkline}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 items-start gap-3 mb-4">
+        <KpiCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
         <KpiCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" sublabel={`Ticket ${amount(stats.avgTicket)}`} onClick={() => navigate('/ventas')} sparkline={stats.salesSparkline} />
-        <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} sparkline={stats.leadsSparkline} />
         <KpiCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" sublabel={stats.overdue > 0 ? `${amount(stats.overdue)} vencido` : 'Al día'} onClick={() => navigate('/cobros')} sparkline={stats.collectedSparkline} />
+        <KpiCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" sublabel={stats.topProduct?.name || 'Sin ventas aún'} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 items-stretch gap-3 mb-4">
+        <div className="lg:col-span-2 flex flex-col gap-3">
+          <IncomeCard
+            revenue={stats.revenue}
+            variationPct={variation(stats.revenue, stats.prevRevenue)}
+            baseCurrency={currency}
+            hidden={hideAmounts}
+            onToggleHidden={() => setHideAmounts(!hideAmounts)}
+            sparkline={stats.revenueSparkline}
+          />
+          <SalesReportChart series={stats.salesReportSeries} total={stats.revenue} variationPct={variation(stats.revenue, stats.prevRevenue)} formatValue={amount} />
+          <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
+        </div>
+        <TopProductCard product={stats.topProduct} />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.revenue} formatValue={amount} />
         <div className="bg-card rounded-2xl border border-border card-shadow p-3.5 h-full flex flex-col justify-center">
           <div className="flex items-center gap-2 mb-2">
@@ -299,17 +308,7 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">Sin ventas en el período</p>
           )}
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
-        <div className="lg:col-span-2">
-          <SalesReportChart series={stats.salesReportSeries} total={stats.revenue} variationPct={variation(stats.revenue, stats.prevRevenue)} formatValue={amount} />
-        </div>
-        <TopProductCard product={stats.topProduct} />
-      </div>
-
-      <div className="mb-4">
-        <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
+        <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} sparkline={stats.leadsSparkline} />
       </div>
 
       {view === 'commerce' && isAllCommerces && stats.commerceBreakdown.length > 0 && (
