@@ -99,20 +99,27 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
             {hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
           </button>
         </div>
-        <div className="flex items-center gap-1 p-0.5 bg-secondary/60 rounded-lg w-fit overflow-x-auto no-scrollbar">
-          {currencies.map(c => (
-            <button
-              key={c.key}
-              onClick={() => setSelectedCurrency(c.key)}
-              className={cn(
-                'px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors inline-flex items-center gap-1',
-                selectedCurrency === c.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <span>{c.flag}</span>
-              {c.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-0.5 p-1 bg-secondary/60 rounded-full w-fit overflow-x-auto no-scrollbar">
+          {currencies.map(c => {
+            const active = selectedCurrency === c.key;
+            return (
+              <button
+                key={c.key}
+                onClick={() => setSelectedCurrency(c.key)}
+                className={cn(
+                  'rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors inline-flex items-center gap-1.5',
+                  active ? 'bg-foreground text-background pl-1 pr-3 py-1' : 'text-muted-foreground hover:text-foreground px-2.5 py-1'
+                )}
+              >
+                {active && (
+                  <span className="w-5 h-5 rounded-full bg-background/90 flex items-center justify-center text-[11px] shrink-0">
+                    {c.flag}
+                  </span>
+                )}
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
