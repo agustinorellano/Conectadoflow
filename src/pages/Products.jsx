@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
+import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle, FileDown, FileText } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import Modal from '@/components/Modal';
@@ -56,6 +58,61 @@ export default function Products() {
     load();
   };
 
+  const stockSituation = (p) => {
+    if (p.kind !== 'Producto') return '—';
+    const s = Number(p.stock) || 0;
+    if (s <= 0) return 'Sin stock';
+    if (s <= LOW_STOCK_THRESHOLD) return 'Stock bajo';
+    return 'En stock';
+  };
+
+  const exportExcel = () => {
+    const rows = filtered.map(p => ({
+      'Nombre': p.name || '',
+      'Código': p.code || '',
+      'Categoría': p.category || '',
+      'Tipo': p.kind || '',
+      'Estado': p.is_active ? 'Activo' : 'Inactivo',
+      'Stock': p.kind === 'Producto' ? (Number(p.stock) || 0) : '',
+      'Situación de stock': stockSituation(p),
+      'Precio': Number(p.price) || 0,
+      'Costo': Number(p.cost) || 0,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+    XLSX.writeFile(wb, `control_de_stock_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    const companyName = config?.company_name || 'Conectado Flow';
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.text(companyName, 20, y); y += 8;
+    doc.setFontSize(11); doc.setFont(undefined, 'normal'); doc.setTextColor(100);
+    doc.text('Control de stock', 20, y); y += 6;
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 20, y); y += 10;
+
+    doc.setTextColor(0); doc.setFontSize(9); doc.setFont(undefined, 'bold');
+    doc.text('Producto', 20, y); doc.text('Tipo', 95, y); doc.text('Stock', 120, y); doc.text('Situación', 142, y); doc.text('Estado', 172, y); y += 5;
+    doc.setFont(undefined, 'normal');
+    filtered.forEach(p => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      doc.text((p.name || '').substring(0, 38), 20, y);
+      doc.text(p.kind || '', 95, y);
+      doc.text(p.kind === 'Producto' ? String(Number(p.stock) || 0) : '—', 120, y);
+      doc.text(stockSituation(p), 142, y);
+      doc.text(p.is_active ? 'Activo' : 'Inactivo', 172, y);
+      y += 5.5;
+    });
+
+    const pageCount = doc.internal.pages.length - 1;
+    for (let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150); doc.text(`Conectado Flow · Página ${i} de ${pageCount}`, pageWidth / 2, 290, { align: 'center' }); }
+    doc.save(`control_de_stock_${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -63,9 +120,17 @@ export default function Products() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Catálogo</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{products.length} productos y servicios</p>
         </div>
-        <button onClick={handleNew} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
-          <Plus className="w-4 h-4" /> Nuevo producto
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportExcel} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-success text-white text-sm font-medium hover:opacity-90">
+            <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Exportar</span> Excel
+          </button>
+          <button onClick={exportPDF} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-foreground border border-border text-sm font-medium hover:bg-accent">
+            <FileText className="w-4 h-4" /> PDF
+          </button>
+          <button onClick={handleNew} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+            <Plus className="w-4 h-4" /> Nuevo producto
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
