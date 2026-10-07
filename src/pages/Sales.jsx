@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt, Package } from 'lucide-react';
+import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt, Package, Share2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
@@ -12,7 +12,7 @@ import KpiCard from '@/components/KpiCard';
 import ProgressBar from '@/components/ProgressBar';
 import DateRangePicker from '@/components/DateRangePicker';
 import { StyledSelect } from '@/components/ui/styled-select';
-import { formatCurrency, formatDate, inPeriod, PAYMENT_METHODS, SALE_STATUS, isOverdue, CARD_TYPES, CARD_BRANDS, INSTALLMENT_OPTIONS } from '@/lib/flowUtils';
+import { formatCurrency, formatDate, inPeriod, PAYMENT_METHODS, SALE_STATUS, isOverdue, CARD_TYPES, CARD_BRANDS, INSTALLMENT_OPTIONS, SALE_CHANNELS } from '@/lib/flowUtils';
 import { useCommerce } from '@/lib/CommerceContext';
 import { cn } from '@/lib/utils';
 
@@ -132,6 +132,19 @@ export default function Sales() {
     return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
   }, [fSales]);
 
+  // Ventas por canal: which channel (WhatsApp, Instagram, Web, Local…)
+  // actually closes sales, not just which one brings leads in.
+  const channelSales = useMemo(() => {
+    const map = {};
+    fSales.filter(s => s.status !== 'Cancelada').forEach(s => {
+      const key = s.channel || 'Sin especificar';
+      if (!map[key]) map[key] = { name: key, count: 0, revenue: 0 };
+      map[key].count += 1;
+      map[key].revenue += Number(s.total_amount) || 0;
+    });
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+  }, [fSales]);
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -164,20 +177,40 @@ export default function Sales() {
         <KpiCard label="Pendiente" value={formatCurrency(totals.pending, currency)} icon={Wallet} accent="#f59e0b" />
       </div>
 
-      {productSales.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-5">
-          <div className="flex items-center gap-2 mb-3.5">
-            <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Package className="w-4 h-4" />
-            </span>
-            <h2 className="font-semibold text-sm">Ventas por producto</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
-            {productSales.map(p => (
-              <ProgressBar key={p.name} label={p.name} value={p.revenue} max={productSales[0].revenue}
-                formatValue={v => formatCurrency(v, currency)} sublabel={`${p.units} unidad${p.units === 1 ? '' : 'es'} vendida${p.units === 1 ? '' : 's'}`} />
-            ))}
-          </div>
+      {(productSales.length > 0 || channelSales.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+          {productSales.length > 0 && (
+            <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-3.5">
+                <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Package className="w-4 h-4" />
+                </span>
+                <h2 className="font-semibold text-sm">Ventas por producto</h2>
+              </div>
+              <div className="space-y-3.5">
+                {productSales.map(p => (
+                  <ProgressBar key={p.name} label={p.name} value={p.revenue} max={productSales[0].revenue}
+                    formatValue={v => formatCurrency(v, currency)} sublabel={`${p.units} unidad${p.units === 1 ? '' : 'es'} vendida${p.units === 1 ? '' : 's'}`} />
+                ))}
+              </div>
+            </div>
+          )}
+          {channelSales.length > 0 && (
+            <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-3.5">
+                <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Share2 className="w-4 h-4" />
+                </span>
+                <h2 className="font-semibold text-sm">Ventas por canal</h2>
+              </div>
+              <div className="space-y-3.5">
+                {channelSales.map(c => (
+                  <ProgressBar key={c.name} label={c.name} value={c.revenue} max={channelSales[0].revenue}
+                    formatValue={v => formatCurrency(v, currency)} sublabel={`${c.count} venta${c.count === 1 ? '' : 's'}`} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -205,7 +238,7 @@ export default function Sales() {
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{s.number} · {s.client_name}</p>
-                        <p className="text-sm text-muted-foreground">{formatDate(s.date)} · {s.items?.length || 0} ítem(s)</p>
+                        <p className="text-sm text-muted-foreground">{formatDate(s.date)} · {s.items?.length || 0} ítem(s){s.channel ? ` · ${s.channel}` : ''}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-bold">{formatCurrency(s.total_amount, currency)}</p>
@@ -323,7 +356,7 @@ function PaymentPlan({ sale, payments, currency, onPaid }) {
   );
 }
 
-const emptySaleForm = { client_id: '', date: new Date().toISOString().slice(0, 10), discount: '', tax: '', payment_method: 'Transferencia', status: 'Confirmada', installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1 };
+const emptySaleForm = { client_id: '', date: new Date().toISOString().slice(0, 10), discount: '', tax: '', payment_method: 'Transferencia', status: 'Confirmada', installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1, channel: '' };
 const CUSTOM_ITEM = '__custom__';
 
 function SaleForm({ open, onClose, onSaved, clients, products, user, config, sale }) {
@@ -343,11 +376,12 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
         discount: sale.discount || '', tax: sale.tax || '', payment_method: sale.payment_method || 'Transferencia',
         status: sale.status || 'Confirmada', installments: sale.installments_count || 1, observations: sale.observations || '',
         bank_entity: sale.bank_entity || '', card_type: sale.card_type || '', card_brand: sale.card_brand || '',
-        installments_count: sale.installments_count || 1,
+        installments_count: sale.installments_count || 1, channel: sale.channel || '',
       });
       setItems(sale.items?.length ? sale.items.map(it => ({ description: it.description, quantity: it.quantity, unit_price: it.unit_price, product_id: it.product_id })) : [{ description: '', quantity: 1, unit_price: '' }]);
     } else {
-      setForm({ ...emptySaleForm, client_id: clients[0]?.id || '' });
+      const firstClient = clients[0];
+      setForm({ ...emptySaleForm, client_id: firstClient?.id || '', channel: firstClient?.lead_source || '' });
       setItems([{ description: '', quantity: 1, unit_price: '' }]);
     }
   }, [open, sale, clients]);
@@ -381,7 +415,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
           items: computedItems, gross_amount: gross, discount, tax, total_amount: total,
           date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity,
           card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1,
-          status: form.status, observations: form.observations,
+          status: form.status, observations: form.observations, channel: form.channel || null,
           balance: newBalance, payment_status: paymentStatus,
         });
         await syncProductStock(products, sale.items, computedItems);
@@ -399,6 +433,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
           number: num, client_id: client.id, client_name: client.name,
           items: computedItems, gross_amount: gross, discount, tax, total_amount: total,
           date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity, card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1, status: form.status,
+          channel: form.channel || null,
           commerce_id: curCommerceId !== 'all' ? curCommerceId : undefined,
           collected_amount: 0, balance: total, payment_status: 'Pendiente', observations: form.observations,
           owner_id: user?.id, owner_name: user?.full_name,
@@ -450,6 +485,13 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
             </StyledSelect>
           </div>
           <Inp label="Fecha" type="date" value={form.date} onChange={v => setForm({ ...form, date: v })} />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Canal de venta</label>
+          <input list="sale-channels" value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value })}
+            placeholder="Ej: WhatsApp, Instagram, Ecommerce…" className="inp" />
+          <datalist id="sale-channels">{SALE_CHANNELS.map(c => <option key={c} value={c} />)}</datalist>
         </div>
 
         <div>

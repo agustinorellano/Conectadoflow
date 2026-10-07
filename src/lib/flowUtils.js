@@ -192,6 +192,10 @@ export function fillTemplate(body, vars) {
 }
 
 export const LEAD_SOURCES = ['WhatsApp','Instagram','Facebook','Web','Referido','Evento','Local','LinkedIn','Publicidad','Otro'];
+// Sale channels: same idea as LEAD_SOURCES but for where a sale actually
+// closed — a free-text field with these as suggestions, not a fixed list,
+// since any business may sell through a channel of their own.
+export const SALE_CHANNELS = ['WhatsApp','Instagram','TikTok','Facebook','Ecommerce','Web','Local','Referido','Evento','LinkedIn','Publicidad'];
 export const MEETING_TYPES = ['Presencial','Videollamada','Teléfono','WhatsApp','Otro'];
 export const PAYMENT_METHODS = ['Efectivo','Transferencia','Tarjeta','Billetera virtual','Débito','Crédito','Mercado Pago','Cuotas','Otro'];
 export const PAYMENT_TYPES = ['Efectivo','Transferencia','Tarjeta','Billetera virtual','Débito','Crédito','Otro'];
