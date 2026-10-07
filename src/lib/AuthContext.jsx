@@ -4,6 +4,21 @@ import { supabase } from '@/lib/supabaseClient';
 
 const AuthContext = createContext();
 
+// Shallow-compares the plain profile fields fetchProfile() returns, so
+// setUser() can skip creating a new object when nothing actually changed —
+// every context/effect keyed on `user` (DataContext, CommerceContext,
+// NotificationBell, etc.) only re-runs when the profile really changed.
+function sameUser(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (key === 'preferences') continue; // nested object, compared loosely below
+    if (a[key] !== b[key]) return false;
+  }
+  return JSON.stringify(a.preferences || null) === JSON.stringify(b.preferences || null);
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -14,7 +29,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     try {
       const currentUser = await base44.auth.me();
-      setUser(currentUser);
+      setUser(prev => (sameUser(prev, currentUser) ? prev : currentUser));
       setIsAuthenticated(true);
       return currentUser;
     } catch (err) {
@@ -30,7 +45,14 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkUserAuth();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      // TOKEN_REFRESHED fires automatically ~hourly (and often on tab focus)
+      // purely to rotate the access token — supabase-js already persists
+      // the new token itself. The profile row/metadata it fronts hasn't
+      // changed, so re-running fetchProfile()'s 3 round trips here just to
+      // throw away an identical result was pure overhead, and every
+      // context keyed on `user` was re-fetching along with it.
+      if (event === 'TOKEN_REFRESHED') return;
       checkUserAuth();
     });
     return () => sub.subscription.unsubscribe();

@@ -44,8 +44,11 @@ export function makeEntity(table) {
     },
 
     async create(payload) {
-      const { data: userData } = await supabase.auth.getUser();
-      const row = { ...payload, created_by_id: userData?.user?.id || null };
+      // getSession() reads the already-persisted session instead of
+      // round-tripping to the auth server like getUser() does — one less
+      // network hop before every insert.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const row = { ...payload, created_by_id: sessionData?.session?.user?.id || null };
       const { data, error } = await supabase.from(table).insert(row).select().single();
       if (error) throw error;
       return data;
@@ -69,8 +72,8 @@ export function makeEntity(table) {
     },
 
     async bulkCreate(payloads) {
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData?.user?.id || null;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData?.session?.user?.id || null;
       const rows = payloads.map((p) => ({ ...p, created_by_id: uid }));
       const { data, error } = await supabase.from(table).insert(rows).select();
       if (error) throw error;
