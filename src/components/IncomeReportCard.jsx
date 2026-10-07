@@ -6,13 +6,18 @@ import { buildPeriodSeries } from '@/lib/salesSeries';
 import { inPeriod, previousPeriodAmount, variation as calcVariation } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
-const BASE_FLAGS = { ARS: '🇦🇷', USD: '🇺🇸', EUR: '🇪🇺' };
+const FLAG_CDN = 'https://cdn.jsdelivr.net/gh/HatScripts/circle-flags@gh-pages/flags';
+const BASE_FLAGS = { ARS: 'ar', USD: 'us', EUR: 'eu' };
 
 const CONVERTIBLE_CURRENCIES = [
-  { key: 'USD', label: 'USD', flag: '🇺🇸' },
-  { key: 'USD_BLUE', label: 'USD blue', flag: '🇺🇸' },
-  { key: 'BRL', label: 'BRL', flag: '🇧🇷' },
+  { key: 'USD', label: 'USD', flag: 'us' },
+  { key: 'USD_BLUE', label: 'USD blue', flag: 'us' },
+  { key: 'BRL', label: 'BRL', flag: 'br' },
 ];
+
+function FlagIcon({ code, className }) {
+  return <img src={`${FLAG_CDN}/${code}.svg`} alt="" className={className} />;
+}
 
 const CHART_PERIODS = [
   { key: 'today', label: '1d' },
@@ -45,7 +50,7 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
   const [selectedCurrency, setSelectedCurrency] = useState('BASE');
 
   const canConvert = baseCurrency === 'ARS';
-  const currencies = useMemo(() => [{ key: 'BASE', label: baseCurrency, flag: BASE_FLAGS[baseCurrency] || '💰' }, ...(canConvert ? CONVERTIBLE_CURRENCIES : [])], [baseCurrency, canConvert]);
+  const currencies = useMemo(() => [{ key: 'BASE', label: baseCurrency, flag: BASE_FLAGS[baseCurrency] || null }, ...(canConvert ? CONVERTIBLE_CURRENCIES : [])], [baseCurrency, canConvert]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,9 +116,9 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
                   active ? 'bg-foreground text-background pl-1 pr-3 py-1' : 'text-muted-foreground hover:text-foreground px-2.5 py-1'
                 )}
               >
-                {active && (
-                  <span className="w-5 h-5 rounded-full bg-background/90 flex items-center justify-center text-[11px] shrink-0">
-                    {c.flag}
+                {active && c.flag && (
+                  <span className="w-5 h-5 rounded-full bg-background/90 flex items-center justify-center shrink-0 overflow-hidden">
+                    <FlagIcon code={c.flag} className="w-full h-full object-cover" />
                   </span>
                 )}
                 {c.label}
