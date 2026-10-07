@@ -10,6 +10,7 @@ import { useData } from '@/lib/DataContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useCommerce } from '@/lib/CommerceContext';
 import KpiCard from '@/components/KpiCard';
+import StatCard from '@/components/StatCard';
 import Badge from '@/components/Badge';
 import SalesByEntityChart from '@/components/SalesByEntityChart';
 import DashboardPills from '@/components/DashboardPills';
@@ -268,10 +269,10 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 items-start gap-3 mb-4">
-        <KpiCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
-        <KpiCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" sublabel={`Ticket ${amount(stats.avgTicket)}`} onClick={() => navigate('/ventas')} sparkline={stats.salesSparkline} />
-        <KpiCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" sublabel={stats.overdue > 0 ? `${amount(stats.overdue)} vencido` : 'Al día'} onClick={() => navigate('/cobros')} sparkline={stats.collectedSparkline} />
-        <KpiCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" sublabel={stats.topProduct?.name || 'Sin ventas aún'} />
+        <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} onClick={() => navigate('/productos')} />
+        <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} onClick={() => navigate('/ventas')} />
+        <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} onClick={() => navigate('/cobros')} />
+        <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 items-stretch gap-3 mb-4">

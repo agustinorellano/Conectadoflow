@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Plus, Search, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import KpiCard from '@/components/KpiCard';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate, PAYMENT_METHODS, SALE_STATUS, isOverdue, CARD_TYPES, CARD_BRANDS, INSTALLMENT_OPTIONS } from '@/lib/flowUtils';
 import { useCommerce } from '@/lib/CommerceContext';
@@ -23,6 +24,7 @@ export default function Sales() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingSale, setEditingSale] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
   const [searchParams] = useSearchParams();
