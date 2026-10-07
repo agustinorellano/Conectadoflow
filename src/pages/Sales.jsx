@@ -73,7 +73,14 @@ export default function Sales() {
   const payVariant = (s) => ({ Pagado: 'success', Parcial: 'warning', Pendiente: 'muted', Vencido: 'destructive', Cancelado: 'muted' }[s] || 'muted');
 
   const changeStatus = async (saleId, newStatus) => {
+    const s = sales.find(x => x.id === saleId);
     await base44.entities.Sale.update(saleId, { status: newStatus });
+    // Cancelling a sale means what it reserved was never actually sold —
+    // give the stock back. Un-cancelling re-reserves it.
+    if (s && s.status !== newStatus) {
+      if (newStatus === 'Cancelada') await syncProductStock(products, s.items, []);
+      else if (s.status === 'Cancelada') await syncProductStock(products, [], s.items);
+    }
     load();
   };
 
