@@ -19,10 +19,10 @@ export default function Meetings() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [tab, setTab] = useState('upcoming');
+  const [tab, setTab] = useState('calendar');
   const [searchParams] = useSearchParams();
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
-  const [selectedDay, setSelectedDay] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
 
   const load = async () => {
     setLoading(true);
@@ -202,21 +202,28 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
         <div className="grid grid-cols-7 gap-1.5">
           {cells.map((day, i) => {
             if (!day) return <div key={i} />;
-            const dayMeets = meetingsByDay(day);
+            const dayMeets = meetingsByDay(day).sort((a, b) => new Date(a.date) - new Date(b.date));
             const isToday = sameDay(day, today);
             const isSelected = selectedDay && sameDay(day, selectedDay);
+            const visible = dayMeets.slice(0, 2);
+            const extra = dayMeets.length - visible.length;
             return (
               <button key={i} onClick={() => setSelectedDay(day)}
                 className={cn(
-                  'aspect-square rounded-xl p-1.5 flex flex-col items-center justify-start gap-1 transition-colors border',
+                  'min-h-[84px] rounded-xl p-1.5 flex flex-col items-start gap-1 transition-colors border text-left overflow-hidden',
                   isSelected ? 'bg-primary/10 border-primary' : isToday ? 'border-primary/40' : 'border-transparent hover:bg-accent/50'
                 )}>
                 <span className={cn('text-xs font-medium', isToday && 'text-primary font-bold')}>{day.getDate()}</span>
-                {dayMeets.length > 0 && (
-                  <span className="flex gap-0.5 flex-wrap justify-center">
-                    {dayMeets.slice(0, 3).map(m => <span key={m.id} className="w-1.5 h-1.5 rounded-full bg-primary" />)}
-                  </span>
-                )}
+                <div className="flex flex-col gap-0.5 w-full">
+                  {visible.map(m => (
+                    <span key={m.id} className="text-[10px] leading-tight px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium truncate w-full">
+                      {new Date(m.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · {m.type}
+                    </span>
+                  ))}
+                  {extra > 0 && (
+                    <span className="text-[10px] leading-tight px-1.5 text-muted-foreground font-medium">+{extra} más</span>
+                  )}
+                </div>
               </button>
             );
           })}
