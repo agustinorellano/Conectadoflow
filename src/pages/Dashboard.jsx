@@ -15,8 +15,7 @@ import Badge from '@/components/Badge';
 import SalesByEntityChart from '@/components/SalesByEntityChart';
 import DashboardPills from '@/components/DashboardPills';
 import MonthlyGoalCard from '@/components/MonthlyGoalCard';
-import IncomeCard from '@/components/IncomeCard';
-import SalesReportChart from '@/components/SalesReportChart';
+import IncomeReportCard from '@/components/IncomeReportCard';
 import TopProductCard from '@/components/TopProductCard';
 import RecentSalesTable from '@/components/RecentSalesTable';
 import DateWeatherWidget from '@/components/DateWeatherWidget';
@@ -25,57 +24,8 @@ import {
   formatCurrency, formatDateTime, inPeriod, previousPeriodAmount,
   variation, daysUntil, isOverdue,
 } from '@/lib/flowUtils';
+import { buildDailySeries } from '@/lib/salesSeries';
 import { cn } from '@/lib/utils';
-
-// Buckets records into a fixed number of trailing days (counts, or a summed
-// value when valueFn is given) for the small KPI-card trend charts.
-function buildDailySeries(records, dateField, valueFn, days = 14) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const buckets = Array.from({ length: days }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (days - 1 - i));
-    return { time: d.getTime(), total: 0 };
-  });
-  records.forEach(r => {
-    const raw = r[dateField];
-    if (!raw) return;
-    const d = new Date(raw);
-    d.setHours(0, 0, 0, 0);
-    const bucket = buckets.find(b => b.time === d.getTime());
-    if (bucket) bucket.total += valueFn ? valueFn(r) : 1;
-  });
-  return buckets.map(b => b.total);
-}
-
-// Revenue series for the big sales-report chart, bucketed to fit the
-// selected dashboard period: daily for short windows, grouped into ~14
-// points for longer ones so the chart stays readable.
-function buildPeriodSeries(sales, period) {
-  const now = new Date();
-  const days = { today: 1, '7d': 7, '30d': 30, month: now.getDate(), '3m': 90, year: 365 }[period] || 30;
-  const notCancelled = sales.filter(s => s.status !== 'Cancelada');
-  const daily = buildDailySeries(notCancelled, 'date', s => Number(s.total_amount) || 0, days);
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - (days - 1));
-
-  const maxPoints = 14;
-  if (days <= maxPoints) {
-    return daily.map((v, i) => {
-      const d = new Date(start); d.setDate(d.getDate() + i);
-      return { label: d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }), value: v };
-    });
-  }
-  const bucketSize = Math.ceil(days / maxPoints);
-  const grouped = [];
-  for (let i = 0; i < days; i += bucketSize) {
-    const slice = daily.slice(i, i + bucketSize);
-    const d = new Date(start); d.setDate(d.getDate() + i);
-    grouped.push({ label: d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }), value: slice.reduce((a, b) => a + b, 0) });
-  }
-  return grouped;
-}
 
 const PERIODS = [
   { key: 'today', label: 'Hoy' },
@@ -179,12 +129,7 @@ export default function Dashboard() {
     const monthlyGoal = config?.monthly_goal ? Number(config.monthly_goal) : Math.max(revenue, 1) * 1.2;
     const monthlyGoalIsEstimated = !config?.monthly_goal;
 
-    const notCancelledSales = fSales.filter(s => s.status !== 'Cancelada');
-    const revenueSparkline = buildDailySeries(notCancelledSales, 'date', s => Number(s.total_amount) || 0);
-    const salesSparkline = buildDailySeries(notCancelledSales, 'date');
     const leadsSparkline = buildDailySeries(fLeads, 'created_date');
-    const collectedSparkline = buildDailySeries(fPayments.filter(p => p.status === 'Pagado'), 'paid_date', p => Number(p.amount) || 0);
-    const salesReportSeries = buildPeriodSeries(fSales, period);
 
     const productUnits = {};
     periodSales.forEach(s => {
@@ -203,8 +148,7 @@ export default function Dashboard() {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
       commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, fSales,
-      revenueSparkline, salesSparkline, leadsSparkline, collectedSparkline,
-      salesReportSeries, topProduct, recentSales, totalProductsCount,
+      leadsSparkline, topProduct, recentSales, totalProductsCount,
     };
   }, [data, period, filterByCommerce, commerces, config]);
 
@@ -269,23 +213,20 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 items-start gap-3 mb-4">
-        <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} onClick={() => navigate('/productos')} />
-        <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} onClick={() => navigate('/ventas')} />
-        <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} onClick={() => navigate('/cobros')} />
-        <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} />
+        <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
+        <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
+        <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
+        <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 items-stretch gap-3 mb-4">
         <div className="lg:col-span-2 flex flex-col gap-3">
-          <IncomeCard
-            revenue={stats.revenue}
-            variationPct={variation(stats.revenue, stats.prevRevenue)}
+          <IncomeReportCard
+            sales={stats.fSales}
             baseCurrency={currency}
             hidden={hideAmounts}
             onToggleHidden={() => setHideAmounts(!hideAmounts)}
-            sparkline={stats.revenueSparkline}
           />
-          <SalesReportChart series={stats.salesReportSeries} total={stats.revenue} variationPct={variation(stats.revenue, stats.prevRevenue)} formatValue={amount} />
           <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
         </div>
         <TopProductCard product={stats.topProduct} />
