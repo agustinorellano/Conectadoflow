@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
 
   const { email, role, redirectTo } = await req.json().catch(() => ({}));
   if (!email || typeof email !== 'string') return json({ error: 'Falta el email' }, 400);
-  if (role !== 'admin' && role !== 'user') return json({ error: 'Rol inválido' }, 400);
+  if (!['admin', 'manager', 'user', 'viewer'].includes(role)) return json({ error: 'Rol inválido' }, 400);
 
   const { data: invited, error: inviteErr } = await db.auth.admin.inviteUserByEmail(email, {
     redirectTo: redirectTo || undefined,

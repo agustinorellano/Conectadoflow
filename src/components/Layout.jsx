@@ -17,6 +17,8 @@ import FAB from '@/components/FAB';
 import { NAV_ITEMS, NAV_SECTIONS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import Modal from '@/components/Modal';
+import { canAccessPath, roleLabel } from '@/lib/roles';
+import { ShieldOff } from 'lucide-react';
 
 const MOBILE_NAV = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
@@ -38,7 +40,9 @@ export default function Layout() {
   const location = useLocation();
 
   const hiddenNav = config?.hidden_nav || DEFAULT_HIDDEN_NAV;
-  const visibleNav = NAV_ITEMS.filter(item => !hiddenNav.includes(item.to));
+  const role = user?.role || 'user';
+  const visibleNav = NAV_ITEMS.filter(item => !hiddenNav.includes(item.to) && canAccessPath(role, item.to));
+  const pathAllowed = canAccessPath(role, location.pathname);
 
   useEffect(() => {
     setMobileMenu(false);
@@ -294,7 +298,18 @@ export default function Layout() {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto pb-24 md:pb-8">
-          <Outlet />
+          {pathAllowed ? <Outlet /> : (
+            <div className="p-4 sm:p-6 lg:p-8 max-w-[600px] mx-auto text-center pt-16">
+              <div className="w-14 h-14 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center mx-auto mb-4">
+                <ShieldOff className="w-7 h-7" />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight mb-1">No tenés acceso a esta sección</h1>
+              <p className="text-sm text-muted-foreground mb-5">Tu rol actual ({roleLabel(role)}) no incluye esta sección. Si creés que deberías tenerlo, pedile a un administrador que te lo habilite.</p>
+              <button onClick={() => navigate('/')} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+                Volver al Dashboard
+              </button>
+            </div>
+          )}
         </main>
       </div>
 

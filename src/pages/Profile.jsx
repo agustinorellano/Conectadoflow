@@ -4,6 +4,7 @@ import { User, Lock, Bell, Check, Save, Shield, Mail, Upload, Camera } from 'luc
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
+import { roleLabel } from '@/lib/roles';
 
 export default function Profile() {
   const { user, checkUserAuth } = useAuth();
@@ -88,7 +89,7 @@ export default function Profile() {
           <p className="font-semibold text-lg truncate">{user.full_name || 'Usuario'}</p>
           <p className="text-sm text-muted-foreground truncate">{user.email}</p>
           <span className="inline-flex items-center gap-1 mt-1 text-xs text-primary font-medium">
-            <Shield className="w-3 h-3" /> {user.role === 'admin' ? 'Administrador' : 'Usuario'}
+            <Shield className="w-3 h-3" /> {roleLabel(user.role)}
           </span>
         </div>
         <label className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-secondary border border-border text-sm font-medium hover:bg-accent transition-colors cursor-pointer shrink-0">

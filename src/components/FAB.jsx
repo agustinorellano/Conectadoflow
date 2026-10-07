@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, UserPlus, Users, KanbanSquare, Calendar, ShoppingCart, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
+import { canAccessPath } from '@/lib/roles';
 
 const ACTIONS = [
   { label: 'Lead', icon: UserPlus, color: 'bg-violet-500', to: '/leads?new=1' },
@@ -15,6 +17,9 @@ const ACTIONS = [
 
 export default function FAB({ open, setOpen }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.role || 'user';
+  const actions = ACTIONS.filter(a => canAccessPath(role, a.to.split('?')[0]));
 
   const go = (to) => {
     setOpen(false);
@@ -26,13 +31,13 @@ export default function FAB({ open, setOpen }) {
       <AnimatePresence>
         {open && (
           <>
-            {ACTIONS.map((a, i) => (
+            {actions.map((a, i) => (
               <motion.button
                 key={a.label}
                 initial={{ opacity: 0, y: 10, scale: 0.8 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                transition={{ delay: (ACTIONS.length - i) * 0.04 }}
+                transition={{ delay: (actions.length - i) * 0.04 }}
                 onClick={() => go(a.to)}
                 className="flex items-center gap-3 pl-4 pr-5 py-2.5 rounded-2xl bg-card border border-border floating-island hover:scale-[1.03] transition-transform"
               >

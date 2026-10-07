@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
 import { formatCurrency, formatDate } from '@/lib/flowUtils';
+import { roleLabel } from '@/lib/roles';
 
 export default function SuperAdmin() {
   const { user } = useAuth();
@@ -123,7 +124,7 @@ export default function SuperAdmin() {
                 <p className="text-sm truncate">{u.organization_name || '— sin organización —'}</p>
                 <p className="text-[11px] text-muted-foreground">Alta: {formatDate(u.created_date)}</p>
               </div>
-              <Badge variant={u.role === 'admin' ? 'primary' : 'muted'}>{u.role === 'admin' ? 'Administrador' : 'Vendedor'}</Badge>
+              <Badge variant={u.role === 'admin' ? 'primary' : 'muted'}>{roleLabel(u.role)}</Badge>
             </div>
           ))}
         </div>

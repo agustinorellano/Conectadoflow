@@ -2,24 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { Users2, Crown, User, Eye, Mail, Plus } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
+import { useAuth } from '@/lib/AuthContext';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import Modal from '@/components/Modal';
 import { StyledSelect } from '@/components/ui/styled-select';
+import { ROLE_OPTIONS, roleLabel } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
-const ROLES = [
-  { name: 'Administrador', icon: Crown, color: 'text-primary', desc: 'Acceso total: usuarios, configuración, todo el equipo.' },
-  { name: 'Gerente', icon: Users2, color: 'text-violet-600', desc: 'Ve el equipo, asigna leads, consulta analytics.' },
-  { name: 'Vendedor', icon: User, color: 'text-blue-600', desc: 'Gestiona su cartera: leads, clientes, ventas, pagos.' },
-  { name: 'Consulta', icon: Eye, color: 'text-muted-foreground', desc: 'Visualiza información autorizada, sin modificar.' },
-];
+const ROLE_ICONS = { admin: Crown, manager: Users2, user: User, viewer: Eye };
+const ROLE_COLORS = { admin: 'text-primary', manager: 'text-violet-600', user: 'text-blue-600', viewer: 'text-muted-foreground' };
+const ROLE_BADGE_VARIANT = { admin: 'primary', manager: 'violet', user: 'blue', viewer: 'muted' };
+const ROLES = ROLE_OPTIONS.map(r => ({ name: r.label, icon: ROLE_ICONS[r.value], color: ROLE_COLORS[r.value], desc: r.desc }));
 
 export default function Team() {
   const { config } = useData();
+  const { user: me } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const isAdmin = me?.role === 'admin';
 
   const load = async () => {
     setLoading(true);
@@ -27,6 +29,11 @@ export default function Team() {
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+
+  const changeRole = async (u, role) => {
+    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, role } : x));
+    await base44.entities.User.update(u.id, { role });
+  };
 
   if (config?.mode === 'Independiente') {
     return (
@@ -76,7 +83,14 @@ export default function Team() {
               <p className="font-semibold truncate">{u.full_name || 'Sin nombre'}</p>
               <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5"><Mail className="w-3 h-3" /> {u.email}</p>
             </div>
-            <Badge variant={u.role === 'admin' ? 'primary' : 'muted'}>{u.role === 'admin' ? 'Administrador' : 'Vendedor'}</Badge>
+            {isAdmin ? (
+              <StyledSelect value={u.role || 'user'} onChange={e => changeRole(u, e.target.value)}
+                className="w-auto h-auto px-3 py-1.5 rounded-lg border-0 bg-secondary text-sm font-medium shrink-0">
+                {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </StyledSelect>
+            ) : (
+              <Badge variant={ROLE_BADGE_VARIANT[u.role] || 'muted'} className="shrink-0">{roleLabel(u.role)}</Badge>
+            )}
           </div>
         ))}
       </div>
@@ -122,8 +136,7 @@ function InviteModal({ open, onClose, onDone }) {
         <div>
           <label className="text-sm font-medium mb-1.5 block">Rol</label>
           <StyledSelect value={role} onChange={e => setRole(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
-            <option value="user">Vendedor</option>
-            <option value="admin">Administrador</option>
+            {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </StyledSelect>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
