@@ -55,6 +55,8 @@ export default function Clients() {
   const [showForm, setShowForm] = useState(false);
   const [viewMode, setViewMode] = useState('rows');
   const [messageClient, setMessageClient] = useState(null);
+  const [messageChannel, setMessageChannel] = useState('WhatsApp');
+  const openMessage = (c, ch) => { setMessageClient(c); setMessageChannel(ch); };
   const [page, setPage] = useState(1);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -185,12 +187,20 @@ export default function Clients() {
                           <p className="text-sm font-semibold text-warning">{formatCurrency(c.balance)}</p>
                         </div>
                       )}
-                      {c.phone && (
-                        <button onClick={(e) => { e.stopPropagation(); setMessageClient(c); }}
-                          className="shrink-0 w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 ml-2">
-                          <MessageCircle className="w-4 h-4" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        {c.phone && (
+                          <button onClick={(e) => { e.stopPropagation(); openMessage(c, 'WhatsApp'); }} title="Mandar WhatsApp"
+                            className="w-8 h-8 rounded-lg bg-[#25D366]/10 text-[#25D366] flex items-center justify-center hover:bg-[#25D366]/20">
+                            <MessageCircle className="w-4 h-4" />
+                          </button>
+                        )}
+                        {c.email && (
+                          <button onClick={(e) => { e.stopPropagation(); openMessage(c, 'Email'); }} title="Mandar mail"
+                            className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20">
+                            <Mail className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                       <ArrowRight className="w-4 h-4 text-muted-foreground ml-2" />
                     </div>
                   </motion.div>
@@ -235,12 +245,20 @@ export default function Clients() {
                         <p className="text-sm font-semibold text-warning">{formatCurrency(c.balance)}</p>
                       </div>
                     )}
-                    {c.phone && (
-                      <button onClick={(e) => { e.stopPropagation(); setMessageClient(c); }}
-                        className="shrink-0 w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20">
-                        <MessageCircle className="w-4 h-4" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {c.phone && (
+                        <button onClick={(e) => { e.stopPropagation(); openMessage(c, 'WhatsApp'); }} title="Mandar WhatsApp"
+                          className="w-8 h-8 rounded-lg bg-[#25D366]/10 text-[#25D366] flex items-center justify-center hover:bg-[#25D366]/20">
+                          <MessageCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                      {c.email && (
+                        <button onClick={(e) => { e.stopPropagation(); openMessage(c, 'Email'); }} title="Mandar mail"
+                          className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20">
+                          <Mail className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                     <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
                   </motion.div>
                 );
@@ -266,7 +284,7 @@ export default function Clients() {
       )}
 
       <ClientForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} user={user} />
-      <ClientMessageModal client={messageClient} onClose={() => setMessageClient(null)} />
+      <ClientMessageModal client={messageClient} initialChannel={messageChannel} onClose={() => setMessageClient(null)} />
     </div>
   );
 }
@@ -298,7 +316,7 @@ function SituationSelect({ client, onChange }) {
   );
 }
 
-function ClientMessageModal({ client, onClose }) {
+function ClientMessageModal({ client, initialChannel, onClose }) {
   const [text, setText] = useState('');
   const [subject, setSubject] = useState('');
   const [channel, setChannel] = useState('WhatsApp');
@@ -307,13 +325,15 @@ function ClientMessageModal({ client, onClose }) {
   useEffect(() => {
     if (!client) return;
     setText(getStanding(client).template);
-    // Preferred channel is the starting pick, not a lock — switch to
-    // whichever the client actually has contact info for if the preferred
-    // one is missing it.
-    const preferred = client.preferred_channel || 'WhatsApp';
+    // The icon clicked (WhatsApp or mail) picks the channel directly; if
+    // opened without one (e.g. from elsewhere) fall back to the client's
+    // preferred_channel, adjusted for whichever contact info they actually
+    // have.
+    const preferred = initialChannel || client.preferred_channel || 'WhatsApp';
     setChannel(preferred === 'Email' && !client.email && client.phone ? 'WhatsApp' : preferred === 'WhatsApp' && !client.phone && client.email ? 'Email' : preferred);
     setSubject(standing ? standing.label : '');
-  }, [client]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, initialChannel]);
 
   const canSend = channel === 'WhatsApp' ? !!client?.phone : !!client?.email;
 
