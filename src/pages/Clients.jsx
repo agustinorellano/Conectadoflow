@@ -10,7 +10,7 @@ import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
-import { formatCurrency, formatDateShort, CLIENT_TYPES } from '@/lib/flowUtils';
+import { formatCurrency, formatDateShort, CLIENT_TYPES, COMMUNICATION_CHANNELS, buildWhatsAppUrl, buildMailtoUrl } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
@@ -300,14 +300,27 @@ function SituationSelect({ client, onChange }) {
 
 function ClientMessageModal({ client, onClose }) {
   const [text, setText] = useState('');
+  const [subject, setSubject] = useState('');
+  const [channel, setChannel] = useState('WhatsApp');
   const standing = client ? getStanding(client) : null;
 
-  useEffect(() => { if (client) setText(getStanding(client).template); }, [client]);
+  useEffect(() => {
+    if (!client) return;
+    setText(getStanding(client).template);
+    // Preferred channel is the starting pick, not a lock — switch to
+    // whichever the client actually has contact info for if the preferred
+    // one is missing it.
+    const preferred = client.preferred_channel || 'WhatsApp';
+    setChannel(preferred === 'Email' && !client.email && client.phone ? 'WhatsApp' : preferred === 'WhatsApp' && !client.phone && client.email ? 'Email' : preferred);
+    setSubject(standing ? standing.label : '');
+  }, [client]);
+
+  const canSend = channel === 'WhatsApp' ? !!client?.phone : !!client?.email;
 
   const send = () => {
-    if (!client?.phone) return;
-    const phone = client.phone.replace(/[^\d+]/g, '');
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+    if (!canSend) return;
+    const url = channel === 'WhatsApp' ? buildWhatsAppUrl(client.phone, text) : buildMailtoUrl(client.email, subject, text);
+    window.open(url, channel === 'WhatsApp' ? '_blank' : '_self');
     onClose();
   };
 
@@ -315,16 +328,34 @@ function ClientMessageModal({ client, onClose }) {
     <Modal open={!!client} onClose={onClose} title={client ? `Mensaje a ${client.name}` : ''}
       footer={<>
         <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
-        <button onClick={send} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-success text-white text-sm font-medium hover:opacity-90">
-          <Send className="w-4 h-4" /> Enviar por WhatsApp
+        <button onClick={send} disabled={!canSend} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-success text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
+          <Send className="w-4 h-4" /> Enviar por {channel === 'WhatsApp' ? 'WhatsApp' : 'mail'}
         </button>
       </>}>
       {client && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant={standing.variant}>{standing.label}</Badge>
-            <span className="text-xs text-muted-foreground">{client.phone}</span>
+            <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-xl">
+              {COMMUNICATION_CHANNELS.map(c => (
+                <button key={c} type="button" onClick={() => setChannel(c)}
+                  disabled={c === 'WhatsApp' ? !client.phone : !client.email}
+                  className={cn('px-3 h-7 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                    channel === c ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                  {c === 'WhatsApp' ? <MessageCircle className="w-3.5 h-3.5 inline mr-1" /> : <Mail className="w-3.5 h-3.5 inline mr-1" />}
+                  {c === 'Email' ? 'Mail' : c}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">{channel === 'WhatsApp' ? (client.phone || 'Sin teléfono') : (client.email || 'Sin email')}</span>
           </div>
+          {channel === 'Email' && (
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Asunto</label>
+              <input value={subject} onChange={e => setSubject(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+            </div>
+          )}
           <div>
             <label className="text-sm font-medium mb-1.5 block">Mensaje (podés personalizarlo)</label>
             <textarea value={text} onChange={e => setText(e.target.value)} rows={5}
@@ -336,13 +367,15 @@ function ClientMessageModal({ client, onClose }) {
   );
 }
 
+const emptyClientForm = { name: '', company: '', tax_id: '', phone: '', email: '', address: '', type: 'Consumidor', segment: '', notes: '', potential_value: '', preferred_channel: 'WhatsApp' };
+
 export function ClientForm({ open, onClose, onSaved, user, editClient }) {
-  const [form, setForm] = useState({ name: '', company: '', tax_id: '', phone: '', email: '', address: '', type: 'Consumidor', segment: '', notes: '', potential_value: '' });
+  const [form, setForm] = useState(emptyClientForm);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (editClient) setForm({ ...editClient, potential_value: editClient.potential_value || '' });
-    else setForm({ name: '', company: '', tax_id: '', phone: '', email: '', address: '', type: 'Consumidor', segment: '', notes: '', potential_value: '' });
+    if (editClient) setForm({ ...emptyClientForm, ...editClient, potential_value: editClient.potential_value || '' });
+    else setForm(emptyClientForm);
   }, [editClient, open]);
 
   const save = async () => {
@@ -373,6 +406,7 @@ export function ClientForm({ open, onClose, onSaved, user, editClient }) {
         <Field label="Email"><input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="inp" /></Field>
         <Field label="Tipo"><StyledSelect value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="inp">{CLIENT_TYPES.map(t => <option key={t}>{t}</option>)}</StyledSelect></Field>
         <Field label="Segmento"><input value={form.segment} onChange={e => setForm({ ...form, segment: e.target.value })} className="inp" /></Field>
+        <Field label="Canal preferido"><StyledSelect value={form.preferred_channel} onChange={e => setForm({ ...form, preferred_channel: e.target.value })} className="inp">{COMMUNICATION_CHANNELS.map(c => <option key={c} value={c}>{c === 'Email' ? 'Mail' : c}</option>)}</StyledSelect></Field>
         <div className="col-span-2"><Field label="Dirección"><input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="inp" /></Field></div>
         <Field label="Valor potencial"><input type="number" value={form.potential_value} onChange={e => setForm({ ...form, potential_value: e.target.value })} className="inp" /></Field>
         <div className="col-span-2"><Field label="Notas"><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className="inp resize-none" /></Field></div>

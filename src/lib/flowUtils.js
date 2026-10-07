@@ -200,6 +200,14 @@ export function buildWhatsAppUrl(phone, message) {
   return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
 }
 
+// Opens the user's own mail client with the message pre-filled — no
+// sending API needed, same idea as the wa.me link above for WhatsApp.
+export function buildMailtoUrl(email, subject, body) {
+  return `mailto:${email || ''}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
+}
+
+export const COMMUNICATION_CHANNELS = ['WhatsApp', 'Email'];
+
 export function fillTemplate(body, vars) {
   return (body || '')
     .replace(/\{nombre\}/g, vars.nombre || '')

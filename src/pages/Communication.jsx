@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight, Mail } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { StyledSelect } from '@/components/ui/styled-select';
-import { buildWhatsAppUrl, fillTemplate } from '@/lib/flowUtils';
+import { buildWhatsAppUrl, buildMailtoUrl, fillTemplate, COMMUNICATION_CHANNELS } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = ['Primer contacto','Seguimiento','Confirmación de reunión','Recordatorio','Envío de propuesta','Seguimiento de propuesta','Cierre','Agradecimiento','Facturación','Recordatorio de pago','Pago vencido','Reactivación','Postventa'];
@@ -145,19 +145,54 @@ export default function Communication() {
 
 function PreviewModal({ template, onClose }) {
   const [msg, setMsg] = useState('');
+  const [channel, setChannel] = useState('WhatsApp');
+  const [phone, setPhone] = useState('+5491100000000');
+  const [email, setEmail] = useState('');
+  const [subject, setSubject] = useState('');
   useEffect(() => {
-    if (template) setMsg(fillTemplate(template.body, { nombre: 'Carlos', empresa: 'Acme', producto: 'Servicio Premium', monto: '$500.000', fecha: '15/10', hora: '15:00', vendedor: 'Ana' }));
+    if (template) {
+      setMsg(fillTemplate(template.body, { nombre: 'Carlos', empresa: 'Acme', producto: 'Servicio Premium', monto: '$500.000', fecha: '15/10', hora: '15:00', vendedor: 'Ana' }));
+      setSubject(template.name);
+      setChannel('WhatsApp');
+    }
   }, [template]);
   if (!template) return null;
-  const send = () => window.open(buildWhatsAppUrl('+5491100000000', msg), '_blank');
+  const canSend = channel === 'WhatsApp' ? !!phone : !!email;
+  const send = () => {
+    const url = channel === 'WhatsApp' ? buildWhatsAppUrl(phone, msg) : buildMailtoUrl(email, subject, msg);
+    window.open(url, channel === 'WhatsApp' ? '_blank' : '_self');
+  };
   return (
     <Modal open={!!template} onClose={onClose} title="Probar plantilla" subtitle={template.name}
       footer={<>
         <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
-        <button onClick={send} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#25D366] text-white text-sm font-medium hover:opacity-90"><Send className="w-4 h-4" /> Abrir WhatsApp</button>
+        <button onClick={send} disabled={!canSend} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#25D366] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
+          <Send className="w-4 h-4" /> {channel === 'WhatsApp' ? 'Abrir WhatsApp' : 'Abrir mail'}
+        </button>
       </>}>
-      <textarea value={msg} onChange={e => setMsg(e.target.value)} rows={6} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
-      <p className="text-xs text-muted-foreground mt-2">Variables: {'{nombre} {empresa} {producto} {monto} {fecha} {hora} {vendedor}'}</p>
+      <div className="space-y-3">
+        <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-xl w-fit">
+          {COMMUNICATION_CHANNELS.map(c => (
+            <button key={c} type="button" onClick={() => setChannel(c)}
+              className={cn('px-3 h-8 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition-colors', channel === c ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              {c === 'WhatsApp' ? <MessageCircle className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />} {c === 'Email' ? 'Mail' : c}
+            </button>
+          ))}
+        </div>
+        {channel === 'WhatsApp' ? (
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Teléfono de prueba"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Mail de prueba"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+            <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Asunto"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+          </div>
+        )}
+        <textarea value={msg} onChange={e => setMsg(e.target.value)} rows={6} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+        <p className="text-xs text-muted-foreground">Variables: {'{nombre} {empresa} {producto} {monto} {fecha} {hora} {vendedor}'}</p>
+      </div>
     </Modal>
   );
 }
