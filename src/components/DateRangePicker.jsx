@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Modal from '@/components/Modal';
 
 const DEFAULT_PRESETS = [
   { key: 'today', label: 'Hoy' },
@@ -18,26 +19,28 @@ function isCustomRange(v) { return v && typeof v === 'object' && v.start && v.en
 
 function fmt(d) { return new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }); }
 
-// Preset dropdown + "point A to point B" calendar range picker, used
-// anywhere a page currently has a plain period <select> (Analytics,
-// Ventas). `value` is either a preset key string or a { start, end }
-// custom range; `onChange` receives the same shape back.
+// Preset list + "point A to point B" calendar range picker, used anywhere
+// a page currently has a plain period <select> (Analytics, Ventas).
+// `value` is either a preset key string or a { start, end } custom range;
+// `onChange` receives the same shape back. Renders as a centered modal
+// (via the app's shared Modal) rather than a trigger-anchored popover —
+// a fixed-position dropdown kept overflowing the viewport depending on
+// where the trigger button happened to sit in each page's layout.
 export default function DateRangePicker({ value, onChange, presets = DEFAULT_PRESETS, className }) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [selStart, setSelStart] = useState(isCustomRange(value) ? new Date(value.start) : null);
   const [selEnd, setSelEnd] = useState(isCustomRange(value) ? new Date(value.end) : null);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
 
   const label = isCustomRange(value)
     ? `${fmt(value.start)} – ${fmt(value.end)}`
     : presets.find(p => p.key === value)?.label || 'Elegir período';
+
+  const openModal = () => {
+    setSelStart(isCustomRange(value) ? new Date(value.start) : null);
+    setSelEnd(isCustomRange(value) ? new Date(value.end) : null);
+    setOpen(true);
+  };
 
   const pickPreset = (key) => { onChange(key); setOpen(false); };
 
@@ -66,9 +69,9 @@ export default function DateRangePicker({ value, onChange, presets = DEFAULT_PRE
   const today = new Date();
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={openModal}
         className={cn('inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-input bg-card text-sm font-medium hover:bg-accent transition-colors', className)}
       >
         <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -76,11 +79,8 @@ export default function DateRangePicker({ value, onChange, presets = DEFAULT_PRE
         <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
       </button>
 
-      {open && (
-        // Fixed + inset-x margins on mobile so this can never overflow the
-        // viewport regardless of where the trigger sits in the page's
-        // layout; reverts to the anchored absolute dropdown from sm: up.
-        <div className="fixed left-4 right-4 top-20 sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-2 z-50 bg-popover text-popover-foreground border border-border rounded-2xl shadow-lg p-3 sm:w-[520px] max-h-[80vh] overflow-y-auto flex flex-col sm:flex-row gap-3">
+      <Modal open={open} onClose={() => setOpen(false)} title="Elegir período" size="lg">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex sm:flex-col gap-1 sm:w-36 shrink-0 overflow-x-auto sm:overflow-visible no-scrollbar">
             {presets.map(p => (
               <button key={p.key} onClick={() => pickPreset(p.key)}
@@ -110,7 +110,7 @@ export default function DateRangePicker({ value, onChange, presets = DEFAULT_PRE
                 return (
                   <button key={i} onClick={() => pickDay(day)}
                     className={cn(
-                      'h-8 text-xs rounded-lg flex items-center justify-center transition-colors',
+                      'h-9 text-xs rounded-lg flex items-center justify-center transition-colors',
                       (isStart || isEnd) ? 'bg-primary text-primary-foreground font-semibold' :
                         inRange ? 'bg-primary/15 text-foreground' :
                           isToday ? 'border border-primary/40' : 'hover:bg-accent'
@@ -131,7 +131,7 @@ export default function DateRangePicker({ value, onChange, presets = DEFAULT_PRE
             </div>
           </div>
         </div>
-      )}
-    </div>
+      </Modal>
+    </>
   );
 }
