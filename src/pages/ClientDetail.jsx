@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Mail, Phone, MapPin, Building2, Plus, DollarSign, Calendar, FileText, CheckCircle2, MessageCircle, TrendingUp, Edit3 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -14,47 +15,40 @@ import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate, formatDateTime, timeAgo, MEETING_TYPES, PAYMENT_METHODS } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
+const CLIENT_SUB_ENTITIES = ['Opportunity', 'Sale', 'Payment', 'Meeting', 'Activity'];
+
 export default function ClientDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [client, setClient] = useState(null);
-  const [timeline, setTimeline] = useState([]);
-  const [opportunities, setOpportunities] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [meetings, setMeetings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [oppForm, setOppForm] = useState(false);
   const [meetingForm, setMeetingForm] = useState(false);
   const [note, setNote] = useState('');
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [c, opps, sls, pmts, mtgs, acts] = await Promise.all([
-        base44.entities.Client.get(id).catch(() => null),
-        base44.entities.Opportunity.filter({ client_id: id }).catch(() => []),
-        base44.entities.Sale.filter({ client_id: id }).catch(() => []),
-        base44.entities.Payment.filter({ client_id: id }).catch(() => []),
-        base44.entities.Meeting.filter({ client_id: id }).catch(() => []),
-        base44.entities.Activity.filter({ client_id: id }).catch(() => []),
-      ]);
-      setClient(c); setOpportunities(opps); setSales(sls); setPayments(pmts); setMeetings(mtgs);
-      // build timeline
-      const items = [
-        ...opps.map(o => ({ id: o.id, type: 'opportunity', date: o.created_date, title: `Oportunidad: ${o.title}`, subtitle: `${o.stage} · ${formatCurrency(o.amount)}`, icon: TrendingUp, color: 'text-primary' })),
-        ...sls.map(s => ({ id: s.id, type: 'sale', date: s.date || s.created_date, title: `Venta ${s.number || ''}`, subtitle: `${formatCurrency(s.total_amount)} · ${s.payment_status}`, icon: DollarSign, color: 'text-success' })),
-        ...pmts.map(p => ({ id: p.id, type: 'payment', date: p.paid_date || p.due_date, title: `Pago ${p.installment_number}/${p.total_installments}`, subtitle: `${formatCurrency(p.amount)} · ${p.status}`, icon: DollarSign, color: p.status === 'Pagado' ? 'text-success' : 'text-warning' })),
-        ...mtgs.map(m => ({ id: m.id, type: 'meeting', date: m.date, title: m.title, subtitle: `${m.type} · ${formatDateTime(m.date)}`, icon: Calendar, color: 'text-cyan-600' })),
-        ...acts.map(a => ({ id: a.id, type: 'activity', date: a.date, title: a.title, subtitle: a.description, icon: MessageCircle, color: 'text-muted-foreground' })),
-      ].sort((a, b) => new Date(b.date) - new Date(a.date));
-      setTimeline(items);
-    } finally { setLoading(false); }
-  };
+  const { data: client, isLoading: loadingClient } = useQuery({
+    queryKey: ['Client', 'get', id],
+    queryFn: () => base44.entities.Client.get(id).catch(() => null),
+  });
+  const subQueries = useQueries({
+    queries: CLIENT_SUB_ENTITIES.map((name) => ({
+      queryKey: [name, 'list', { filter: { client_id: id }, sort: undefined, limit: undefined }],
+      queryFn: () => base44.entities[name].filter({ client_id: id }).catch(() => []),
+    })),
+  });
+  const loading = loadingClient || subQueries.some(q => q.isLoading);
+  const [opportunities, sales, payments, meetings, activities] = subQueries.map(q => q.data || []);
 
-  useEffect(() => { load(); }, [id]);
+  const invalidate = (names) => names.forEach(n => queryClient.invalidateQueries({ queryKey: [n] }));
+
+  const timeline = useMemo(() => [
+    ...opportunities.map(o => ({ id: o.id, type: 'opportunity', date: o.created_date, title: `Oportunidad: ${o.title}`, subtitle: `${o.stage} · ${formatCurrency(o.amount)}`, icon: TrendingUp, color: 'text-primary' })),
+    ...sales.map(s => ({ id: s.id, type: 'sale', date: s.date || s.created_date, title: `Venta ${s.number || ''}`, subtitle: `${formatCurrency(s.total_amount)} · ${s.payment_status}`, icon: DollarSign, color: 'text-success' })),
+    ...payments.map(p => ({ id: p.id, type: 'payment', date: p.paid_date || p.due_date, title: `Pago ${p.installment_number}/${p.total_installments}`, subtitle: `${formatCurrency(p.amount)} · ${p.status}`, icon: DollarSign, color: p.status === 'Pagado' ? 'text-success' : 'text-warning' })),
+    ...meetings.map(m => ({ id: m.id, type: 'meeting', date: m.date, title: m.title, subtitle: `${m.type} · ${formatDateTime(m.date)}`, icon: Calendar, color: 'text-cyan-600' })),
+    ...activities.map(a => ({ id: a.id, type: 'activity', date: a.date, title: a.title, subtitle: a.description, icon: MessageCircle, color: 'text-muted-foreground' })),
+  ].sort((a, b) => new Date(b.date) - new Date(a.date)), [opportunities, sales, payments, meetings, activities]);
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando…</div>;
   if (!client) return <div className="p-8 text-center"><p className="text-muted-foreground">Cliente no encontrado</p><button onClick={() => navigate('/clientes')} className="mt-4 text-primary">Volver</button></div>;
@@ -66,7 +60,7 @@ export default function ClientDetail() {
       date: new Date().toISOString(), status: 'Realizada', owner_id: user?.id, owner_name: user?.full_name,
     });
     setNote('');
-    load();
+    invalidate(['Activity']);
   };
 
   return (
@@ -187,9 +181,9 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      <ClientForm open={editOpen} onClose={() => setEditOpen(false)} onSaved={load} editClient={client} user={user} />
-      <OppFormModal open={oppForm} onClose={() => setOppForm(false)} onSaved={load} client={client} user={user} />
-      <MeetingFormModal open={meetingForm} onClose={() => setMeetingForm(false)} onSaved={load} client={client} user={user} />
+      <ClientForm open={editOpen} onClose={() => setEditOpen(false)} onSaved={() => invalidate(['Client'])} editClient={client} user={user} />
+      <OppFormModal open={oppForm} onClose={() => setOppForm(false)} onSaved={() => invalidate(['Opportunity'])} client={client} user={user} />
+      <MeetingFormModal open={meetingForm} onClose={() => setMeetingForm(false)} onSaved={() => invalidate(['Meeting', 'Client'])} client={client} user={user} />
     </div>
   );
 }

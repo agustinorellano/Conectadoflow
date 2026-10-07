@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQueries } from '@tanstack/react-query';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 import { DollarSign, Wallet, ShoppingCart, FileDown, Clock, Store } from 'lucide-react';
@@ -9,11 +10,11 @@ import { formatCurrency, formatDate } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
+const ENTITY_KEYS = ['Sale', 'Payment', 'Opportunity', 'Client'];
+
 export default function Reports() {
   const { config } = useData();
   const { commerces, filterByCommerce } = useCommerce();
-  const [data, setData] = useState({ sales: [], payments: [], opportunities: [], clients: [] });
-  const [loading, setLoading] = useState(true);
   const [periodType, setPeriodType] = useState('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -21,20 +22,21 @@ export default function Reports() {
   const [selectedCommerces, setSelectedCommerces] = useState({});
   const currency = config?.currency || 'ARS';
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [sales, payments, opportunities, clients] = await Promise.all([
-          base44.entities.Sale.list().catch(() => []),
-          base44.entities.Payment.list().catch(() => []),
-          base44.entities.Opportunity.list().catch(() => []),
-          base44.entities.Client.list().catch(() => []),
-        ]);
-        setData({ sales, payments, opportunities, clients });
-      } finally { setLoading(false); }
-    })();
-  }, []);
+  // Cached per-entity (same keys Dashboard/Analytics use) instead of a
+  // Promise.all fired on every mount.
+  const results = useQueries({
+    queries: ENTITY_KEYS.map((name) => ({
+      queryKey: [name, 'list', { filter: undefined, sort: undefined, limit: undefined }],
+      queryFn: () => base44.entities[name].list().catch(() => []),
+    })),
+  });
+  const loading = results.some(r => r.isLoading);
+  const resultData = results.map(r => r.data || []);
+  const data = useMemo(() => {
+    const [sales, payments, opportunities, clients] = resultData;
+    return { sales, payments, opportunities, clients };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, resultData);
 
   useEffect(() => {
     if (commerces.length > 0) {

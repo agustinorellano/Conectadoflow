@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { TrendingUp, Users, Target, DollarSign, Wallet, Activity } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -8,28 +9,28 @@ import DateRangePicker from '@/components/DateRangePicker';
 
 const COLORS = ['#465BE8','#22c55e','#f59e0b','#8b5cf6','#0ea5e9','#f97316','#ec4899','#14b8a6','#64748b','#a855f7'];
 
+const ENTITY_KEYS = ['Sale', 'Lead', 'Client', 'Payment', 'Opportunity'];
+
 export default function Analytics() {
   const { config } = useData();
-  const [data, setData] = useState({ sales: [], leads: [], clients: [], payments: [], opportunities: [] });
-  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('year');
   const currency = config?.currency || 'ARS';
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [sales, leads, clients, payments, opportunities] = await Promise.all([
-          base44.entities.Sale.list().catch(() => []),
-          base44.entities.Lead.list().catch(() => []),
-          base44.entities.Client.list().catch(() => []),
-          base44.entities.Payment.list().catch(() => []),
-          base44.entities.Opportunity.list().catch(() => []),
-        ]);
-        setData({ sales, leads, clients, payments, opportunities });
-      } finally { setLoading(false); }
-    })();
-  }, []);
+  // Cached per-entity like Dashboard — leaving Analytics and coming back
+  // reuses this instead of re-fetching 5 full tables.
+  const results = useQueries({
+    queries: ENTITY_KEYS.map((name) => ({
+      queryKey: [name, 'list', { filter: undefined, sort: undefined, limit: undefined }],
+      queryFn: () => base44.entities[name].list().catch(() => []),
+    })),
+  });
+  const loading = results.some(r => r.isLoading);
+  const resultData = results.map(r => r.data || []);
+  const data = useMemo(() => {
+    const [sales, leads, clients, payments, opportunities] = resultData;
+    return { sales, leads, clients, payments, opportunities };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, resultData);
 
   const stats = useMemo(() => {
     const periodSales = data.sales.filter(s => s.status !== 'Cancelada' && inPeriod(s.date, period));
