@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DollarSign, Eye, EyeOff, TrendingUp, TrendingDown } from 'lucide-react';
-import { fetchRates, convertFromArs, convertAmount } from '@/lib/currencyRates';
+import { fetchRates, convertAmount } from '@/lib/currencyRates';
 import { buildPeriodSeries } from '@/lib/salesSeries';
 import { inPeriod, previousPeriodAmount, variation as calcVariation } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
@@ -78,23 +78,23 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales, chartPeriod, rates, baseCurrency]);
 
-  const converted = rates ? convertFromArs(total, rates) : null;
   const baseSymbol = { ARS: '$', USD: 'US$', EUR: '€' }[baseCurrency] || '$';
   const positive = variationPct >= 0;
 
+  // Computed directly from `total` (in ARS, since this toggle only shows
+  // when baseCurrency === 'ARS') instead of going through an intermediate
+  // scale factor — one division, nothing to cancel out or get backwards.
   const display = useMemo(() => {
     if (selectedCurrency === 'BASE') return { prefix: baseSymbol, value: total, scale: 1 };
-    if (!converted || !total) return { prefix: '', value: null, scale: 1 };
-    const scale = (() => {
-      if (selectedCurrency === 'USD') return converted.usdOficial != null ? converted.usdOficial / total : null;
-      if (selectedCurrency === 'USD_BLUE') return converted.usdBlue != null ? converted.usdBlue / total : null;
-      if (selectedCurrency === 'BRL') return converted.brl != null ? converted.brl / total : null;
-      return null;
-    })();
     const prefix = selectedCurrency === 'BRL' ? 'R$' : 'US$';
-    if (scale == null) return { prefix, value: null, scale: 1 };
-    return { prefix, value: total * scale, scale };
-  }, [selectedCurrency, total, converted, baseSymbol]);
+    if (!rates || !total) return { prefix, value: null, scale: 1 };
+    let value = null;
+    if (selectedCurrency === 'USD' && rates.arsPerUsdOficial) value = total / rates.arsPerUsdOficial;
+    else if (selectedCurrency === 'USD_BLUE' && rates.arsPerUsdBlue) value = total / rates.arsPerUsdBlue;
+    else if (selectedCurrency === 'BRL' && rates.arsPerUsdOficial && rates.brlPerUsd) value = (total / rates.arsPerUsdOficial) * rates.brlPerUsd;
+    if (value == null) return { prefix, value: null, scale: 1 };
+    return { prefix, value, scale: value / total };
+  }, [selectedCurrency, total, rates, baseSymbol]);
 
   const chartData = series.map(p => ({ ...p, v: p.value * (display.scale || 1) }));
 
