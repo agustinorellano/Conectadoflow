@@ -15,6 +15,8 @@ import CommerceSelector from '@/components/CommerceSelector';
 import NotificationBell from '@/components/NotificationBell';
 import FAB from '@/components/FAB';
 import { NAV_ITEMS, NAV_SECTIONS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import Modal from '@/components/Modal';
 
 const MOBILE_NAV = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
@@ -29,8 +31,9 @@ export default function Layout() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const [modeModalOpen, setModeModalOpen] = useState(false);
   const { user, logout } = useAuth();
-  const { config, configLoading } = useData();
+  const { config, configLoading, updateConfig } = useData();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -247,10 +250,35 @@ export default function Layout() {
           <div className="ml-auto flex items-center gap-2">
             <CommerceSelector />
             <NotificationBell />
-            <div className="hidden lg:flex items-center gap-2 px-3 h-9 rounded-xl bg-primary-soft text-primary text-[13px] font-medium">
+            <button onClick={() => setModeModalOpen(true)}
+              className="hidden lg:flex items-center gap-2 px-3 h-9 rounded-xl bg-primary-soft text-primary text-[13px] font-medium hover:bg-primary/20 transition-colors">
               <Sparkles className="w-3.5 h-3.5" />
               <span>{config?.mode === 'Equipo' ? 'Modo Equipo' : 'Modo Independiente'}</span>
-            </div>
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center text-sm font-semibold shrink-0 hover:opacity-90 transition-opacity">
+                  {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <p className="text-sm font-medium truncate">{user?.full_name || 'Usuario'}</p>
+                  <p className="text-xs text-muted-foreground font-normal truncate">{user?.email}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/perfil')} className="cursor-pointer">
+                  <User className="w-4 h-4 mr-2" /> Mi perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/configuracion')} className="cursor-pointer">
+                  <Settings className="w-4 h-4 mr-2" /> Configuración
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
+                  <LogOut className="w-4 h-4 mr-2" /> Cerrar sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -276,6 +304,56 @@ export default function Layout() {
 
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <FAB open={fabOpen} setOpen={setFabOpen} />
+      <ModeModal open={modeModalOpen} onClose={() => setModeModalOpen(false)} config={config} updateConfig={updateConfig} />
     </div>
+  );
+}
+
+function ModeModal({ open, onClose, config, updateConfig }) {
+  const [mode, setMode] = useState(config?.mode === 'Equipo' ? 'Equipo' : 'Independiente');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) setMode(config?.mode === 'Equipo' ? 'Equipo' : 'Independiente');
+  }, [open, config]);
+
+  const save = async () => {
+    if (!config?.id) return;
+    setSaving(true);
+    try {
+      await updateConfig(config.id, { mode });
+      onClose();
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Modo de trabajo"
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
+        <button onClick={save} disabled={saving || mode === config?.mode} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
+          {saving ? 'Guardando…' : 'Guardar'}
+        </button>
+      </>}>
+      <div className="space-y-3">
+        <button onClick={() => setMode('Independiente')}
+          className={cn('w-full text-left p-4 rounded-2xl border-2 transition-colors flex items-start gap-3',
+            mode === 'Independiente' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent')}>
+          <span className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><User className="w-5 h-5" /></span>
+          <div>
+            <p className="font-semibold">Modo Independiente</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Gestionás vos solo tus leads, clientes y ventas.</p>
+          </div>
+        </button>
+        <button onClick={() => setMode('Equipo')}
+          className={cn('w-full text-left p-4 rounded-2xl border-2 transition-colors flex items-start gap-3',
+            mode === 'Equipo' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent')}>
+          <span className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><Users2 className="w-5 h-5" /></span>
+          <div>
+            <p className="font-semibold">Modo Equipo</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Trabajás con varios vendedores: podés invitar miembros, asignar leads y ver el rendimiento de cada uno en Equipo.</p>
+          </div>
+        </button>
+      </div>
+    </Modal>
   );
 }
