@@ -201,13 +201,19 @@ const admin = {
 };
 
 const users = {
-  // Base44 could send a real invite email + provision access in one call.
-  // Supabase's equivalent (auth.admin.inviteUserByEmail) needs the service-role
-  // key, which must never ship to the browser — it has to run server-side
-  // (a Supabase Edge Function). That function isn't built yet, so this is a
-  // clear placeholder rather than a silent no-op.
-  async inviteUser() {
-    throw new Error('Invitar miembros requiere una Edge Function de Supabase con la service role key (todavía no está implementada).');
+  // Sends a real Supabase auth invite + assigns the new profile to the
+  // caller's organization/role, via the invite-user Edge Function (needs
+  // the service-role key, so it can't run in the browser).
+  async inviteUser(email, role) {
+    const { data, error } = await supabase.functions.invoke('invite-user', {
+      body: { email, role, redirectTo: window.location.origin + '/reset-password' },
+    });
+    if (error) {
+      const message = data?.error || error.context?.error || error.message || 'No se pudo invitar';
+      throw new Error(message);
+    }
+    if (data?.error) throw new Error(data.error);
+    return data;
   },
 };
 
