@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useEntityList } from '@/lib/useEntityQuery';
@@ -18,19 +18,23 @@ import { cn } from '@/lib/utils';
 // themselves (not derived from balance/status), each with its own default
 // outreach message. Editable inline from the Clientes list, no need to
 // open the client detail page.
+// `c.top_product` (injected from the client's purchase history — see
+// topProductByClient in Clients()) lets each template mention what this
+// client actually buys, instead of a generic line, without the seller
+// having to remember or look it up before writing.
 const SITUATION_STAGES = [
   { key: 'Primer contacto', variant: 'blue',
     template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Un gusto contactarte. Quería presentarme y ver en qué te podemos ayudar.` },
   { key: 'Seguimiento', variant: 'violet',
-    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Te escribo para hacer un seguimiento y ver si tenés alguna consulta o si podemos avanzar con algo.` },
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Te escribo para hacer un seguimiento${c.top_product ? ` sobre ${c.top_product}` : ''} y ver si tenés alguna consulta o si podemos avanzar con algo.` },
   { key: 'Propuesta enviada', variant: 'amber',
     template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Quería saber si pudiste revisar la propuesta que te enviamos. ¡Quedo atento a tus comentarios!` },
   { key: 'Cliente activo', variant: 'success',
-    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Quería saludarte y ver cómo va todo. ¡Cualquier cosa estamos para ayudarte!` },
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Quería saludarte y ver cómo va todo${c.top_product ? ` con ${c.top_product}` : ''}. ¡Cualquier cosa estamos para ayudarte!` },
   { key: 'Saldo pendiente', variant: 'warning',
     template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Te escribo para recordarte que tenés un saldo pendiente de ${formatCurrency(c.balance)}. ¿Podemos coordinar el pago?` },
   { key: 'Inactivo', variant: 'muted',
-    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Hace tiempo no hablamos, ¿cómo estás? Quería saber si hay algo en lo que te pueda ayudar.` },
+    template: (c) => `Hola ${c.name?.split(' ')[0] || ''}! Hace tiempo no hablamos, ¿cómo estás?${c.top_product ? ` La última vez te interesó ${c.top_product} —` : ''} Quería saber si hay algo en lo que te pueda ayudar.` },
 ];
 
 function getStanding(c) {
@@ -44,6 +48,9 @@ export default function Clients() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: clients = [], isLoading: loading } = useEntityList('Client', { sort: '-created_date', limit: 200 });
+  // Shares its cache key with Ventas (same sort/limit) — opening Clientes
+  // after Ventas doesn't re-fetch sales again.
+  const { data: sales = [] } = useEntityList('Sale', { sort: '-date', limit: 200 });
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [viewMode, setViewMode] = useState('rows');
@@ -62,6 +69,28 @@ export default function Clients() {
 
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
   useEffect(() => { setPage(1); }, [search]);
+
+  // What each client actually buys: units per product across their
+  // non-cancelled sales, so a seller can see or mention it before even
+  // opening the chat, instead of having to dig through Ventas first.
+  const topProductByClient = useMemo(() => {
+    const byClient = {};
+    sales.filter(s => s.status !== 'Cancelada' && s.client_id).forEach(s => {
+      const units = byClient[s.client_id] || (byClient[s.client_id] = {});
+      (s.items || []).forEach(it => {
+        const name = it.description || 'Sin nombre';
+        units[name] = (units[name] || 0) + (Number(it.quantity) || 0);
+      });
+    });
+    const top = {};
+    Object.entries(byClient).forEach(([clientId, units]) => {
+      const sorted = Object.entries(units).sort((a, b) => b[1] - a[1]);
+      if (sorted.length) top[clientId] = { name: sorted[0][0], count: sorted.length };
+    });
+    return top;
+  }, [sales]);
+
+  const withTopProduct = (c) => ({ ...c, top_product: topProductByClient[c.id]?.name || null });
 
   const filtered = clients.filter(c => {
     const q = search.toLowerCase();
@@ -121,7 +150,8 @@ export default function Clients() {
         ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             <AnimatePresence>
-              {paged.map(c => {
+              {paged.map(rawC => {
+                const c = withTopProduct(rawC);
                 const standing = getStanding(c);
                 return (
                   <motion.div key={c.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -142,6 +172,7 @@ export default function Clients() {
                     <div className="space-y-1 text-sm text-muted-foreground mb-3">
                       {c.email && <p className="flex items-center gap-2 truncate"><Mail className="w-3.5 h-3.5 shrink-0" /> {c.email}</p>}
                       {c.phone && <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5" /> {c.phone}</p>}
+                      {c.top_product && <p className="flex items-center gap-2 truncate text-primary"><Package className="w-3.5 h-3.5 shrink-0" /> Compra: {c.top_product}</p>}
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-border">
                       <div>
@@ -170,7 +201,8 @@ export default function Clients() {
         ) : (
           <div className="bg-card rounded-2xl border border-border card-shadow overflow-hidden">
             <AnimatePresence>
-              {paged.map((c, i) => {
+              {paged.map((rawC, i) => {
+                const c = withTopProduct(rawC);
                 return (
                   <motion.div key={c.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     onClick={() => navigate(`/clientes/${c.id}`)}
@@ -180,7 +212,11 @@ export default function Clients() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{c.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{c.company || c.email || c.phone || '—'}</p>
+                      {c.top_product ? (
+                        <p className="text-xs text-primary truncate flex items-center gap-1"><Package className="w-3 h-3 shrink-0" /> {c.top_product}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground truncate">{c.company || c.email || c.phone || '—'}</p>
+                      )}
                     </div>
                     <div className="text-right shrink-0 hidden lg:block">
                       <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end"><Clock className="w-3 h-3" /> Últ. contacto</p>

@@ -321,14 +321,15 @@ function ProductForm({ open, onClose, onSaved, product }) {
   const [form, setForm] = useState({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (open) {
-      if (product) {
-        setForm({ ...product, price: String(product.price || ''), cost: String(product.cost || ''), stock: String(product.stock || ''), currency: product.currency || config?.currency || 'ARS' });
-      } else {
-        setForm({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true });
-      }
+    if (!open) return;
+    setError('');
+    if (product) {
+      setForm({ ...product, price: String(product.price || ''), cost: String(product.cost || ''), stock: String(product.stock || ''), currency: product.currency || config?.currency || 'ARS' });
+    } else {
+      setForm({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true });
     }
   }, [open, product, config]);
 
@@ -337,20 +338,34 @@ function ProductForm({ open, onClose, onSaved, product }) {
     try {
       const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
       setForm(f => ({ ...f, image_url: file_url }));
+    } catch (err) {
+      setError(err?.message || 'No se pudo subir la imagen.');
     } finally { setUploading(false); }
   };
 
   const save = async () => {
     if (!form.name) return;
+    setError('');
     setSaving(true);
     try {
-      const payload = { ...form, price: Number(form.price) || 0, cost: Number(form.cost) || 0, stock: Number(form.stock) || 0 };
+      // Only send columns the product table actually has — spreading the
+      // raw `product` prop in earlier edits also pulled in read-only
+      // fields (created_date, created_by_id, etc.) that don't belong in
+      // an update payload.
+      const payload = {
+        name: form.name, code: form.code, category: form.category, kind: form.kind,
+        price: Number(form.price) || 0, cost: Number(form.cost) || 0, currency: form.currency,
+        description: form.description, image_url: form.image_url,
+        stock: Number(form.stock) || 0, is_active: form.is_active,
+      };
       if (product) {
         await base44.entities.Product.update(product.id, payload);
       } else {
         await base44.entities.Product.create(payload);
       }
       onSaved(); onClose();
+    } catch (err) {
+      setError(err?.message || 'No se pudo guardar el producto. Probá de nuevo.');
     } finally { setSaving(false); }
   };
 
@@ -360,6 +375,7 @@ function ProductForm({ open, onClose, onSaved, product }) {
         <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
         <button onClick={save} disabled={saving || !form.name} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar'}</button>
       </>}>
+      {error && <div className="mb-3 p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>}
       <div className="grid grid-cols-2 gap-3">
         {/* Image upload */}
         <div className="col-span-2">
