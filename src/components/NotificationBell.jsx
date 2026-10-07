@@ -1,97 +1,96 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X, AlertCircle, UserPlus, CheckCircle2, Megaphone } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { useCommerce } from '@/lib/CommerceContext';
+import { useEntityList } from '@/lib/useEntityQuery';
 import { isOverdue, formatDate } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
+const NOTIF_KEY = (userId) => ['Notification', 'list', { filter: { owner_id: userId, is_read: false }, sort: '-created_date', limit: 20 }];
+
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState([]);
   const { user } = useAuth();
   const { config } = useData();
   const { filterByCommerce } = useCommerce();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [payments, leads, activities, notifications] = await Promise.all([
-          base44.entities.Payment.list().catch(() => []),
-          base44.entities.Lead.list().catch(() => []),
-          base44.entities.Activity.list().catch(() => []),
-          base44.entities.Notification.filter({ owner_id: user.id, is_read: false }, '-created_date', 20).catch(() => []),
-        ]);
-        if (cancelled) return;
+  // Shares its cache key with Dashboard/Analytics/Reportes (same entities,
+  // no filter/sort/limit) — opening the bell after any of those pages
+  // doesn't re-fetch Payment/Lead/Activity again.
+  const { data: payments = [] } = useEntityList('Payment', { enabled: !!user });
+  const { data: leads = [] } = useEntityList('Lead', { enabled: !!user });
+  const { data: activities = [] } = useEntityList('Activity', { enabled: !!user });
+  const { data: notifications = [] } = useEntityList('Notification', {
+    filter: user ? { owner_id: user.id, is_read: false } : undefined,
+    sort: '-created_date', limit: 20, enabled: !!user,
+  });
 
-        const adminNotifications = notifications.map(n => ({
-          id: n.id,
-          type: 'notification',
-          icon: Megaphone,
-          color: 'text-primary bg-primary/10',
-          title: n.title,
-          subtitle: n.message,
-          link: n.link || null,
-          isAdminNotification: true,
-        }));
-        const fPayments = filterByCommerce(payments);
-        const fLeads = filterByCommerce(leads);
-        const fActivities = filterByCommerce(activities);
+  const items = useMemo(() => {
+    if (!user) return [];
+    const adminNotifications = notifications.map(n => ({
+      id: n.id,
+      type: 'notification',
+      icon: Megaphone,
+      color: 'text-primary bg-primary/10',
+      title: n.title,
+      subtitle: n.message,
+      link: n.link || null,
+      isAdminNotification: true,
+    }));
+    const fPayments = filterByCommerce(payments);
+    const fLeads = filterByCommerce(leads);
+    const fActivities = filterByCommerce(activities);
 
-        const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = new Date().toISOString().slice(0, 10);
 
-        const overduePayments = fPayments
-          .filter(p => p.status !== 'Pagado' && p.status !== 'Cancelado' && isOverdue(p.due_date))
-          .slice(0, 5)
-          .map(p => ({
-            id: 'pay-' + p.id,
-            type: 'payment',
-            icon: AlertCircle,
-            color: 'text-destructive bg-destructive/10',
-            title: `Cobro vencido: ${p.client_name}`,
-            subtitle: `${p.sale_number} · Vencía ${formatDate(p.due_date)}`,
-            link: '/cobros',
-          }));
+    const overduePayments = fPayments
+      .filter(p => p.status !== 'Pagado' && p.status !== 'Cancelado' && isOverdue(p.due_date))
+      .slice(0, 5)
+      .map(p => ({
+        id: 'pay-' + p.id,
+        type: 'payment',
+        icon: AlertCircle,
+        color: 'text-destructive bg-destructive/10',
+        title: `Cobro vencido: ${p.client_name}`,
+        subtitle: `${p.sale_number} · Vencía ${formatDate(p.due_date)}`,
+        link: '/cobros',
+      }));
 
-        const untouchedLeads = fLeads
-          .filter(l => l.status === 'Nuevo')
-          .slice(0, 5)
-          .map(l => ({
-            id: 'lead-' + l.id,
-            type: 'lead',
-            icon: UserPlus,
-            color: 'text-violet-600 bg-violet-500/10',
-            title: `Lead sin contactar: ${l.first_name} ${l.last_name || ''}`.trim(),
-            subtitle: l.source || 'Sin fuente',
-            link: '/leads',
-          }));
+    const untouchedLeads = fLeads
+      .filter(l => l.status === 'Nuevo')
+      .slice(0, 5)
+      .map(l => ({
+        id: 'lead-' + l.id,
+        type: 'lead',
+        icon: UserPlus,
+        color: 'text-violet-600 bg-violet-500/10',
+        title: `Lead sin contactar: ${l.first_name} ${l.last_name || ''}`.trim(),
+        subtitle: l.source || 'Sin fuente',
+        link: '/leads',
+      }));
 
-        const todayActivities = fActivities
-          .filter(a => a.status === 'Pendiente' && a.due_date === todayStr)
-          .slice(0, 5)
-          .map(a => ({
-            id: 'act-' + a.id,
-            type: 'activity',
-            icon: CheckCircle2,
-            color: 'text-primary bg-primary/10',
-            title: a.title,
-            subtitle: a.client_name || 'Sin cliente',
-            link: '/clientes',
-          }));
+    const todayActivities = fActivities
+      .filter(a => a.status === 'Pendiente' && a.due_date === todayStr)
+      .slice(0, 5)
+      .map(a => ({
+        id: 'act-' + a.id,
+        type: 'activity',
+        icon: CheckCircle2,
+        color: 'text-primary bg-primary/10',
+        title: a.title,
+        subtitle: a.client_name || 'Sin cliente',
+        link: '/clientes',
+      }));
 
-        setItems([...adminNotifications, ...overduePayments, ...untouchedLeads, ...todayActivities]);
-      } catch (e) {
-        // silently fail
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [user, filterByCommerce]);
+    return [...adminNotifications, ...overduePayments, ...untouchedLeads, ...todayActivities];
+  }, [user, notifications, payments, leads, activities, filterByCommerce]);
 
   const count = items.length;
 
@@ -136,7 +135,7 @@ export default function NotificationBell() {
                         setOpen(false);
                         if (item.isAdminNotification) {
                           base44.entities.Notification.update(item.id, { is_read: true }).catch(() => {});
-                          setItems(prev => prev.filter(i => i.id !== item.id));
+                          queryClient.setQueryData(NOTIF_KEY(user.id), (prev) => (prev || []).filter(n => n.id !== item.id));
                         }
                         if (item.link) navigate(item.link);
                       }}
