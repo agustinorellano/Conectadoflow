@@ -18,11 +18,11 @@ const CATEGORIES = ['Primer contacto','Seguimiento','Confirmación de reunión',
 // to its templates — instead of a row of anchors sitting above a flat list
 // of every category at once.
 const JOURNEY_PHASES = [
-  { key: 'contacto', label: 'Primer contacto', icon: UserPlus, categories: ['Primer contacto'] },
-  { key: 'seguimiento', label: 'Seguimiento', icon: MessageCircle, categories: ['Seguimiento', 'Confirmación de reunión', 'Recordatorio'] },
-  { key: 'propuesta', label: 'Propuesta', icon: FileText, categories: ['Envío de propuesta', 'Seguimiento de propuesta'] },
-  { key: 'pagos', label: 'Pagos', icon: Wallet, categories: ['Recordatorio de pago', 'Pago vencido', 'Facturación'] },
-  { key: 'postventa', label: 'Post venta', icon: RefreshCw, categories: ['Cierre', 'Agradecimiento', 'Reactivación', 'Postventa'] },
+  { key: 'contacto', label: 'Primer contacto', icon: UserPlus, color: '#465BE8', categories: ['Primer contacto'] },
+  { key: 'seguimiento', label: 'Seguimiento', icon: MessageCircle, color: '#8b5cf6', categories: ['Seguimiento', 'Confirmación de reunión', 'Recordatorio'] },
+  { key: 'propuesta', label: 'Propuesta', icon: FileText, color: '#f59e0b', categories: ['Envío de propuesta', 'Seguimiento de propuesta'] },
+  { key: 'pagos', label: 'Pagos', icon: Wallet, color: '#0ea5e9', categories: ['Recordatorio de pago', 'Pago vencido', 'Facturación'] },
+  { key: 'postventa', label: 'Post venta', icon: RefreshCw, color: '#22c55e', categories: ['Cierre', 'Agradecimiento', 'Reactivación', 'Postventa'] },
 ];
 
 const DEFAULT_TEMPLATES = [
@@ -66,23 +66,16 @@ export default function Communication() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Comunicación</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Plantillas de mensajes y WhatsApp</p>
+          <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 shrink-0" /> Elegí una etapa y mandá el mensaje por WhatsApp en un clic.
+          </p>
         </div>
         <button onClick={() => { setEditT(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
           <Plus className="w-4 h-4" /> Nueva plantilla
         </button>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-6">
-        <div className="flex items-start gap-2.5 mb-5">
-          <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <Info className="w-4 h-4" />
-          </span>
-          <p className="text-sm text-muted-foreground">
-            Mensajes listos para cada momento del recorrido del cliente, para no escribir cada contacto de cero. Elegí una etapa para ver sus plantillas, completá las variables ({'{nombre}'}, {'{producto}'}, etc.) y mandalo por WhatsApp en un clic.
-          </p>
-        </div>
-
+      <div className={cn('mb-6', !selectedPhase && 'bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5')}>
         {selectedPhase ? (
           <button onClick={() => setSelectedPhase(null)} className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:gap-2 transition-all">
             <ChevronLeft className="w-4 h-4" /> Todas las etapas
@@ -93,11 +86,12 @@ export default function Communication() {
               const count = countFor(phase);
               return (
                 <button key={phase.key} onClick={() => setSelectedPhase(phase.key)}
-                  className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-border hover:border-primary hover:bg-accent/40 transition-colors text-center">
-                  <span className="w-11 h-11 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  className="group flex flex-col items-center gap-2 p-4 rounded-2xl border border-border hover:border-current hover:-translate-y-0.5 hover:card-shadow transition-all text-center"
+                  style={{ color: phase.color }}>
+                  <span className="w-11 h-11 rounded-full flex items-center justify-center transition-transform group-hover:scale-105" style={{ background: phase.color + '1a' }}>
                     <phase.icon className="w-5 h-5" />
                   </span>
-                  <span className="text-sm font-semibold">{phase.label}</span>
+                  <span className="text-sm font-semibold text-foreground">{phase.label}</span>
                   <span className="text-xs text-muted-foreground">{count} plantilla{count === 1 ? '' : 's'}</span>
                 </button>
               );
