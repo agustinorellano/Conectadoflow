@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ShoppingCart, UserPlus, Wallet, Package, Award,
-  ChevronDown, ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy,
+  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
@@ -27,21 +27,14 @@ import {
 import { buildDailySeries } from '@/lib/salesSeries';
 import { cn } from '@/lib/utils';
 
-const PERIODS = [
-  { key: 'today', label: 'Hoy' },
-  { key: '7d', label: '7 días' },
-  { key: '30d', label: '30 días' },
-  { key: 'month', label: 'Este mes' },
-  { key: '3m', label: '3 meses' },
-  { key: 'year', label: 'Este año' },
-];
+// Dashboard-wide stats window. Not user-facing anymore (no selector in the
+// header) — IncomeReportCard has its own independent time toggle instead.
+const period = 'month';
 
 export default function Dashboard() {
   const { config } = useData();
   const { user } = useAuth();
   const { filterByCommerce, currentCommerceId, setCurrentCommerceId, commerces } = useCommerce();
-  const [period, setPeriod] = useState('month');
-  const [periodOpen, setPeriodOpen] = useState(false);
   const [view, setView] = useState('general');
   const [hideAmounts, setHideAmounts] = useState(false);
   const [data, setData] = useState({ sales: [], leads: [], clients: [], payments: [], opportunities: [], meetings: [], activities: [], products: [] });
@@ -171,40 +164,13 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1240px] mx-auto">
-      <div
-        className="relative overflow-hidden rounded-2xl p-4 sm:p-5 mb-4"
-        style={{ background: 'linear-gradient(135deg, hsl(232 78% 59%) 0%, hsl(252 80% 55%) 100%)' }}
-      >
-        <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-        <div className="absolute -left-10 -bottom-16 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Hola, {user?.full_name?.split(' ')[0] || '👋'}</h1>
-            <p className="text-[13px] text-white/70 mt-0.5">{isAllCommerces ? 'Vista consolidada de todos tus comercios' : 'Del primer contacto al cobro — esto es lo que está pasando.'}</p>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Hola, {user?.full_name?.split(' ')[0] || '👋'}</h1>
+            <p className="text-[13px] text-muted-foreground mt-0.5">{isAllCommerces ? 'Vista consolidada de todos tus comercios' : 'Del primer contacto al cobro — esto es lo que está pasando.'}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <DateWeatherWidget variant="glass" />
-            <div className="relative">
-              <button onClick={() => setPeriodOpen(!periodOpen)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/15 backdrop-blur border border-white/25 text-white text-sm font-medium hover:bg-white/25 transition-colors">
-                {PERIODS.find(p => p.key === period)?.label}
-                <ChevronDown className="w-4 h-4" />
-              </button>
-              {periodOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setPeriodOpen(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-lg z-20 py-1">
-                    {PERIODS.map(p => (
-                      <button key={p.key} onClick={() => { setPeriod(p.key); setPeriodOpen(false); }}
-                        className={cn('w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors', p.key === period && 'text-primary font-medium')}>
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+          <DateWeatherWidget />
         </div>
       </div>
 
