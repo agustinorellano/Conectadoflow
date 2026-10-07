@@ -7,6 +7,8 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { useEntityList } from '@/lib/useEntityQuery';
+import { useCurrencyRates } from '@/lib/useCurrencyRates';
+import { convertAmount } from '@/lib/currencyRates';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -66,6 +68,12 @@ export default function Sales() {
   const [searchParams] = useSearchParams();
 
   const currency = config?.currency || 'ARS';
+  const rates = useCurrencyRates();
+  // A sale can be in a different currency than the org's default (e.g. a
+  // USD-priced product sold while the org's base is ARS) — summing
+  // total_amount/collected_amount/balance across sales only makes sense
+  // once everything is expressed in the same currency.
+  const toBase = (amount, saleCurrency) => convertAmount(amount, saleCurrency || 'ARS', currency, rates);
 
   // Mutations below touch Sale/Payment/Client/Product in combination
   // (e.g. cancelling a sale restores Product stock and adjusts Client
@@ -125,9 +133,9 @@ export default function Sales() {
 
   const totals = {
     count: fSales.length,
-    billed: fSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0),
-    collected: fSales.reduce((s, x) => s + (Number(x.collected_amount) || 0), 0),
-    pending: fSales.reduce((s, x) => s + (Number(x.balance) || 0), 0),
+    billed: fSales.reduce((s, x) => s + toBase(x.total_amount, x.currency), 0),
+    collected: fSales.reduce((s, x) => s + toBase(x.collected_amount, x.currency), 0),
+    pending: fSales.reduce((s, x) => s + toBase(x.balance, x.currency), 0),
   };
 
   // Ventas por producto: breaks the totals above down item by item, since
@@ -140,11 +148,12 @@ export default function Sales() {
         const key = it.description || 'Sin nombre';
         if (!map[key]) map[key] = { name: key, units: 0, revenue: 0 };
         map[key].units += Number(it.quantity) || 0;
-        map[key].revenue += Number(it.subtotal) || (Number(it.unit_price) || 0) * (Number(it.quantity) || 0);
+        const itemAmount = Number(it.subtotal) || (Number(it.unit_price) || 0) * (Number(it.quantity) || 0);
+        map[key].revenue += toBase(itemAmount, s.currency);
       });
     });
     return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
-  }, [fSales]);
+  }, [fSales, rates, currency]);
 
   // Ventas por canal: which channel (WhatsApp, Instagram, Web, Local…)
   // actually closes sales, not just which one brings leads in.
@@ -154,10 +163,10 @@ export default function Sales() {
       const key = s.channel || 'Sin especificar';
       if (!map[key]) map[key] = { name: key, count: 0, revenue: 0 };
       map[key].count += 1;
-      map[key].revenue += Number(s.total_amount) || 0;
+      map[key].revenue += toBase(s.total_amount, s.currency);
     });
     return Object.values(map).sort((a, b) => b.revenue - a.revenue);
-  }, [fSales]);
+  }, [fSales, rates, currency]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
@@ -313,7 +322,7 @@ export default function Sales() {
                                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pagos</p>
                                 <span className="text-xs text-muted-foreground">{formatCurrency(s.collected_amount, s.currency || currency)} / {formatCurrency(s.total_amount, s.currency || currency)}</span>
                               </div>
-                              <PaymentPlan sale={s} payments={salePayments} currency={currency} onPaid={invalidate} />
+                              <PaymentPlan sale={s} payments={salePayments} currency={s.currency || currency} onPaid={invalidate} />
                             </div>
                           </div>
                         </motion.div>
@@ -492,7 +501,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
           due.setDate(due.getDate() + 30 * (i + 1));
           paymentRecords.push({
             sale_id: newSale.id, sale_number: num, client_id: client.id, client_name: client.name,
-            installment_number: i + 1, total_installments: inst, amount: installmentAmount,
+            installment_number: i + 1, total_installments: inst, amount: installmentAmount, currency: form.currency,
             due_date: due.toISOString().slice(0, 10), method: form.payment_method, status: 'Pendiente', commerce_id: curCommerceId !== 'all' ? curCommerceId : undefined,
           });
         }

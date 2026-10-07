@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DollarSign, Eye, EyeOff, TrendingUp, TrendingDown } from 'lucide-react';
-import { fetchRates, convertFromArs } from '@/lib/currencyRates';
+import { fetchRates, convertFromArs, convertAmount } from '@/lib/currencyRates';
 import { buildPeriodSeries } from '@/lib/salesSeries';
 import { inPeriod, previousPeriodAmount, variation as calcVariation } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
@@ -52,25 +52,31 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
   const canConvert = baseCurrency === 'ARS';
   const currencies = useMemo(() => [{ key: 'BASE', label: baseCurrency, flag: BASE_FLAGS[baseCurrency] || null }, ...(canConvert ? CONVERTIBLE_CURRENCIES : [])], [baseCurrency, canConvert]);
 
+  // Rates are needed even when canConvert is false: a sale can be in a
+  // currency other than baseCurrency (a USD-priced product sold while the
+  // org's base is ARS), so summing into `total` below needs them to add
+  // up correctly — independent of the USD/BRL display-conversion feature,
+  // which only applies when the base itself is ARS.
   useEffect(() => {
     let cancelled = false;
-    if (canConvert) {
-      fetchRates().then(r => { if (!cancelled) setRates(r); }).catch(() => { if (!cancelled) setError(true); });
-    }
+    fetchRates().then(r => { if (!cancelled) setRates(r); }).catch(() => { if (!cancelled) setError(true); });
     return () => { cancelled = true; };
-  }, [canConvert]);
+  }, []);
+
+  const toBase = (amount, cur) => convertAmount(amount, cur || 'ARS', baseCurrency, rates);
 
   const { total, variationPct, series } = useMemo(() => {
-    const notCancelled = sales.filter(s => s.status !== 'Cancelada');
+    const notCancelled = sales.filter(s => s.status !== 'Cancelada').map(s => ({ ...s, total_amount: toBase(s.total_amount, s.currency) }));
     const periodSales = notCancelled.filter(s => inPeriod(s.date, chartPeriod));
     const sum = periodSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
     const prevSum = previousPeriodAmount(notCancelled, 'date', 'total_amount', chartPeriod);
     return {
       total: sum,
       variationPct: calcVariation(sum, prevSum),
-      series: buildPeriodSeries(sales, chartPeriod),
+      series: buildPeriodSeries(notCancelled, chartPeriod),
     };
-  }, [sales, chartPeriod]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales, chartPeriod, rates, baseCurrency]);
 
   const converted = rates ? convertFromArs(total, rates) : null;
   const baseSymbol = { ARS: '$', USD: 'US$', EUR: '€' }[baseCurrency] || '$';

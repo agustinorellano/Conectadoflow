@@ -5,6 +5,8 @@ import { Wallet, CheckCircle2, Clock, AlertCircle, Search, Pencil, Trash2, Recei
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useEntityList } from '@/lib/useEntityQuery';
+import { useCurrencyRates } from '@/lib/useCurrencyRates';
+import { convertAmount } from '@/lib/currencyRates';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
@@ -21,6 +23,8 @@ export default function Payments() {
   const [search, setSearch] = useState('');
   const [editingPayment, setEditingPayment] = useState(null);
   const currency = config?.currency || 'ARS';
+  const rates = useCurrencyRates();
+  const toBase = (amount, cur) => convertAmount(amount, cur || 'ARS', currency, rates);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['Payment'] });
@@ -40,9 +44,9 @@ export default function Payments() {
   });
 
   const totals = {
-    collected: payments.filter(p => p.status === 'Pagado').reduce((s, p) => s + (Number(p.amount) || 0), 0),
-    pending: payments.filter(p => p.status === 'Pendiente' || p.status === 'Parcial').reduce((s, p) => s + (Number(p.amount) || 0), 0),
-    overdue: payments.filter(p => p.status !== 'Pagado' && p.status !== 'Cancelado' && isOverdue(p.due_date)).reduce((s, p) => s + (Number(p.amount) || 0), 0),
+    collected: payments.filter(p => p.status === 'Pagado').reduce((s, p) => s + toBase(p.amount, p.currency), 0),
+    pending: payments.filter(p => p.status === 'Pendiente' || p.status === 'Parcial').reduce((s, p) => s + toBase(p.amount, p.currency), 0),
+    overdue: payments.filter(p => p.status !== 'Pagado' && p.status !== 'Cancelado' && isOverdue(p.due_date)).reduce((s, p) => s + toBase(p.amount, p.currency), 0),
   };
 
   const register = async (p) => {
@@ -75,7 +79,7 @@ export default function Payments() {
   const payVariant = (s) => ({ Pagado: 'success', Parcial: 'warning', Pendiente: 'muted', Vencido: 'destructive', Cancelado: 'muted' }[s] || 'muted');
 
   const handleDelete = async (p) => {
-    if (!confirm(`¿Eliminar este cobro de ${formatCurrency(p.amount, currency)}?`)) return;
+    if (!confirm(`¿Eliminar este cobro de ${formatCurrency(p.amount, p.currency || currency)}?`)) return;
     const wasPaid = p.status === 'Pagado';
     await base44.entities.Payment.delete(p.id);
     if (wasPaid && p.sale_id) {
@@ -145,7 +149,7 @@ export default function Payments() {
                       <p className="text-sm text-muted-foreground truncate">{p.sale_number} · Cuota {p.installment_number}/{p.total_installments} · Vence {formatDate(p.due_date)}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-bold">{formatCurrency(p.amount, currency)}</p>
+                      <p className="font-bold">{formatCurrency(p.amount, p.currency || currency)}</p>
                       <div className="flex items-center gap-1.5 justify-end mt-1">
                         <Badge variant={payVariant(overdue ? 'Vencido' : p.status)} dot>{overdue && p.status !== 'Pagado' ? 'Vencido' : p.status}</Badge>
                         {p.status !== 'Pagado' && p.status !== 'Cancelado' && (

@@ -25,6 +25,7 @@ export async function fetchRates() {
     arsPerUsdOficial: oficial?.venta || null,
     arsPerUsdBlue: blue?.venta || null,
     brlPerUsd: usdBase?.rates?.BRL || null,
+    eurPerUsd: usdBase?.rates?.EUR || null,
   };
 
   try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(result)); } catch { /* ignore cache write errors */ }
@@ -39,4 +40,31 @@ export function convertFromArs(amountArs, rates) {
     usdBlue: rates.arsPerUsdBlue ? amountArs / rates.arsPerUsdBlue : null,
     brl: rates.arsPerUsdOficial && rates.brlPerUsd ? (amountArs / rates.arsPerUsdOficial) * rates.brlPerUsd : null,
   };
+}
+
+// General converter used to add up amounts that were entered in different
+// currencies (a sale or product can now carry its own `currency`, separate
+// from the organization's default) into one consistent total — via USD as
+// the pivot. Falls back to returning the amount unconverted (best-effort)
+// if a required rate hasn't loaded yet, rather than throwing mid-sum.
+export function convertAmount(amount, from, to, rates) {
+  const n = Number(amount) || 0;
+  if (!from || !to || from === to) return n;
+  if (!rates) return n;
+  const toUsd = (v, cur) => {
+    if (cur === 'USD') return v;
+    if (cur === 'ARS') return rates.arsPerUsdOficial ? v / rates.arsPerUsdOficial : null;
+    if (cur === 'EUR') return rates.eurPerUsd ? v / rates.eurPerUsd : null;
+    return null;
+  };
+  const fromUsd = (usd, cur) => {
+    if (cur === 'USD') return usd;
+    if (cur === 'ARS') return rates.arsPerUsdOficial ? usd * rates.arsPerUsdOficial : null;
+    if (cur === 'EUR') return rates.eurPerUsd ? usd * rates.eurPerUsd : null;
+    return null;
+  };
+  const usd = toUsd(n, from);
+  if (usd == null) return n;
+  const converted = fromUsd(usd, to);
+  return converted == null ? n : converted;
 }

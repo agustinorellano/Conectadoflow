@@ -10,6 +10,8 @@ import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useCommerce } from '@/lib/CommerceContext';
+import { useCurrencyRates } from '@/lib/useCurrencyRates';
+import { convertAmount } from '@/lib/currencyRates';
 import KpiCard from '@/components/KpiCard';
 import StatCard from '@/components/StatCard';
 import Badge from '@/components/Badge';
@@ -67,12 +69,23 @@ export default function Dashboard() {
   const currency = config?.currency || 'ARS';
   const isAllCommerces = currentCommerceId === 'all' && commerces.length > 1;
   const amount = (v) => hideAmounts ? '••••••' : formatCurrency(v, currency);
+  const rates = useCurrencyRates();
 
   const stats = useMemo(() => {
-    const fSales = filterByCommerce(data.sales);
+    const toBase = (v, cur) => convertAmount(v, cur || 'ARS', currency, rates);
+    // Sales/payments can each carry their own currency (a USD-priced
+    // product sold while the org's base is ARS, for example) — convert
+    // every amount to the org's base currency up front so every stat
+    // below can keep summing plain numbers without re-deriving this.
+    const fSales = filterByCommerce(data.sales).map(s => ({
+      ...s,
+      total_amount: toBase(s.total_amount, s.currency),
+      collected_amount: toBase(s.collected_amount, s.currency),
+      balance: toBase(s.balance, s.currency),
+    }));
     const fLeads = filterByCommerce(data.leads);
     const fClients = filterByCommerce(data.clients);
-    const fPayments = filterByCommerce(data.payments);
+    const fPayments = filterByCommerce(data.payments).map(p => ({ ...p, amount: toBase(p.amount, p.currency) }));
     const fOpps = filterByCommerce(data.opportunities);
     const fMeetings = filterByCommerce(data.meetings);
     const fActivities = filterByCommerce(data.activities);
@@ -104,12 +117,17 @@ export default function Dashboard() {
     const pendingActivities = fActivities.filter(a => a.status === 'Pendiente').sort((a, b) => new Date(a.due_date || a.date) - new Date(b.due_date || b.date)).slice(0, 5);
     const topClients = [...fClients].map(c => ({ ...c, score: Number(c.total_sold) || 0 })).sort((a, b) => b.score - a.score).slice(0, 5);
 
+    // Breakdown needs every commerce's sales/payments, not just the
+    // currently-selected one (that's what fSales/fPayments are filtered
+    // to) — same currency conversion, kept unfiltered by commerce.
+    const allSalesBase = data.sales.map(s => ({ ...s, total_amount: toBase(s.total_amount, s.currency) }));
+    const allPaymentsBase = data.payments.map(p => ({ ...p, amount: toBase(p.amount, p.currency) }));
     const commerceBreakdown = commerces.map(c => {
-      const cSales = data.sales.filter(s => s.status !== 'Cancelada' && (s.commerce_id === c.id || (!s.commerce_id && c.id === commerces[0]?.id)));
+      const cSales = allSalesBase.filter(s => s.status !== 'Cancelada' && (s.commerce_id === c.id || (!s.commerce_id && c.id === commerces[0]?.id)));
       const cRevenue = cSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
       const cClients = data.clients.filter(cl => cl.commerce_id === c.id || (!cl.commerce_id && c.id === commerces[0]?.id)).length;
       const cLeads = data.leads.filter(l => l.commerce_id === c.id || (!l.commerce_id && c.id === commerces[0]?.id)).length;
-      const cPending = data.payments.filter(p => (p.status === 'Pendiente' || p.status === 'Parcial') && (p.commerce_id === c.id || (!p.commerce_id && c.id === commerces[0]?.id))).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const cPending = allPaymentsBase.filter(p => (p.status === 'Pendiente' || p.status === 'Parcial') && (p.commerce_id === c.id || (!p.commerce_id && c.id === commerces[0]?.id))).reduce((s, p) => s + (Number(p.amount) || 0), 0);
       return { id: c.id, name: c.name, revenue: cRevenue, salesCount: cSales.length, clients: cClients, leads: cLeads, pending: cPending };
     }).filter(c => c.salesCount > 0 || c.clients > 0);
 
@@ -147,7 +165,7 @@ export default function Dashboard() {
       commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, fSales,
       leadsSparkline, topProduct, recentSales, totalProductsCount,
     };
-  }, [data, period, filterByCommerce, commerces, config]);
+  }, [data, period, filterByCommerce, commerces, config, rates, currency]);
 
   const toggleActivity = async (act) => {
     await base44.entities.Activity.update(act.id, { status: 'Realizada' });
@@ -210,7 +228,7 @@ export default function Dashboard() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{p.client_name}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xs text-muted-foreground">{amount(p.amount)}</span>
+                    <span className="text-xs text-muted-foreground">{hideAmounts ? '••••••' : formatCurrency(p.amount, p.currency || currency)}</span>
                     {isOverdue(p.due_date) ? (
                       <Badge variant="destructive" dot>Vencido</Badge>
                     ) : (
