@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -16,8 +18,8 @@ const STATUSES = ['Nuevo','Contactado','Calificado','Convertido','Perdido'];
 
 export default function Leads() {
   const { user } = useAuth();
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: leads = [], isLoading: loading } = useEntityList('Lead', { sort: '-created_date', limit: 200 });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
@@ -25,15 +27,13 @@ export default function Leads() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const list = await base44.entities.Lead.list('-created_date', 200);
-      setLeads(list);
-    } finally { setLoading(false); }
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['Lead'] });
+  const invalidateConversion = () => {
+    invalidate();
+    queryClient.invalidateQueries({ queryKey: ['Client'] });
+    queryClient.invalidateQueries({ queryKey: ['Opportunity'] });
   };
 
-  useEffect(() => { load(); }, []);
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
 
   const filtered = leads.filter(l => {
@@ -122,8 +122,8 @@ export default function Leads() {
         </div>
       )}
 
-      <LeadForm open={showForm} onClose={() => { setShowForm(false); }} onSaved={load} user={user} />
-      <ConvertModal lead={convertLead} onClose={() => setConvertLead(null)} onConverted={(id) => { load(); navigate(`/clientes/${id}`); }} user={user} />
+      <LeadForm open={showForm} onClose={() => { setShowForm(false); }} onSaved={invalidate} user={user} />
+      <ConvertModal lead={convertLead} onClose={() => setConvertLead(null)} onConverted={(id) => { invalidateConversion(); navigate(`/clientes/${id}`); }} user={user} />
     </div>
   );
 }

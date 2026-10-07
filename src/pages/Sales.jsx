@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt, Package, Share2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
+import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -36,11 +38,12 @@ export default function Sales() {
   const { user } = useAuth();
   const { config } = useData();
   const { filterByCommerce, currentCommerceId } = useCommerce();
-  const [sales, setSales] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: sales = [], isLoading: loadingSales } = useEntityList('Sale', { sort: '-date', limit: 200 });
+  const { data: payments = [], isLoading: loadingPayments } = useEntityList('Payment');
+  const { data: clients = [], isLoading: loadingClients } = useEntityList('Client');
+  const { data: products = [], isLoading: loadingProducts } = useEntityList('Product');
+  const loading = loadingSales || loadingPayments || loadingClients || loadingProducts;
   const [showForm, setShowForm] = useState(false);
   const [editingSale, setEditingSale] = useState(null);
   const [expanded, setExpanded] = useState(null);
@@ -50,20 +53,17 @@ export default function Sales() {
 
   const currency = config?.currency || 'ARS';
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [s, p, c, pr] = await Promise.all([
-        base44.entities.Sale.list('-date', 200).catch(() => []),
-        base44.entities.Payment.list().catch(() => []),
-        base44.entities.Client.list().catch(() => []),
-        base44.entities.Product.list().catch(() => []),
-      ]);
-      setSales(s); setPayments(p); setClients(c); setProducts(pr);
-    } finally { setLoading(false); }
+  // Mutations below touch Sale/Payment/Client/Product in combination
+  // (e.g. cancelling a sale restores Product stock and adjusts Client
+  // totals), so a single invalidate covers whichever of the four actually
+  // changed instead of each call site tracking that itself.
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['Sale'] });
+    queryClient.invalidateQueries({ queryKey: ['Payment'] });
+    queryClient.invalidateQueries({ queryKey: ['Client'] });
+    queryClient.invalidateQueries({ queryKey: ['Product'] });
   };
 
-  useEffect(() => { load(); }, []);
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
 
   const fSales = filterByCommerce(sales).filter(s => period === 'all' || inPeriod(s.date, period));
@@ -84,7 +84,7 @@ export default function Sales() {
       if (newStatus === 'Cancelada') await syncProductStock(products, s.items, []);
       else if (s.status === 'Cancelada') await syncProductStock(products, [], s.items);
     }
-    load();
+    invalidate();
   };
 
   const handleEdit = (s) => { setEditingSale(s); setShowForm(true); };
@@ -106,7 +106,7 @@ export default function Sales() {
         });
       }
     }
-    load();
+    invalidate();
   };
 
   const totals = {
@@ -299,7 +299,7 @@ export default function Sales() {
                                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pagos</p>
                                 <span className="text-xs text-muted-foreground">{formatCurrency(s.collected_amount, currency)} / {formatCurrency(s.total_amount, currency)}</span>
                               </div>
-                              <PaymentPlan sale={s} payments={salePayments} currency={currency} onPaid={load} />
+                              <PaymentPlan sale={s} payments={salePayments} currency={currency} onPaid={invalidate} />
                             </div>
                           </div>
                         </motion.div>
@@ -313,7 +313,7 @@ export default function Sales() {
         )
       }
 
-      <SaleForm open={showForm} onClose={closeForm} onSaved={load} clients={clients} products={products} user={user} config={config} sale={editingSale} />
+      <SaleForm open={showForm} onClose={closeForm} onSaved={invalidate} clients={clients} products={products} user={user} config={config} sale={editingSale} />
     </div>
   );
 }

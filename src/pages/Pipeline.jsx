@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { motion, AnimatePresence } from 'framer-motion';
 import { KanbanSquare, Plus, X, TrendingUp, Trophy, XCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -23,44 +25,44 @@ const DEFAULT_STAGES = [
   { name: 'Perdido', order: 7, color: '#ef4444', is_lost: true },
 ];
 
+const OPP_KEY = ['Opportunity', 'list', { filter: undefined, sort: undefined, limit: undefined }];
+const STAGE_KEY = ['PipelineStage', 'list', { filter: undefined, sort: undefined, limit: undefined }];
+
 export default function Pipeline() {
   const { user } = useAuth();
-  const [opps, setOpps] = useState([]);
-  const [stages, setStages] = useState(DEFAULT_STAGES);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: opps = [], isLoading: loadingOpps } = useEntityList('Opportunity');
+  const { data: stageList = [], isLoading: loadingStages } = useEntityList('PipelineStage');
+  const { data: clients = [], isLoading: loadingClients } = useEntityList('Client');
+  const loading = loadingOpps || loadingStages || loadingClients;
   const [showForm, setShowForm] = useState(false);
   const [winOpp, setWinOpp] = useState(null);
   const [loseOpp, setLoseOpp] = useState(null);
-  const [clients, setClients] = useState([]);
   const [searchParams] = useSearchParams();
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [oppList, stageList, clientList] = await Promise.all([
-        base44.entities.Opportunity.list().catch(() => []),
-        base44.entities.PipelineStage.list().catch(() => []),
-        base44.entities.Client.list().catch(() => []),
-      ]);
-      setOpps(oppList);
-      setClients(clientList);
-      if (stageList.length > 0) {
-        setStages(stageList.sort((a, b) => a.order - b.order));
-      } else {
-        await base44.entities.PipelineStage.bulkCreate(DEFAULT_STAGES);
-      }
-    } finally { setLoading(false); }
-  };
+  const stages = stageList.length > 0 ? [...stageList].sort((a, b) => a.order - b.order) : DEFAULT_STAGES;
 
-  useEffect(() => { load(); }, []);
+  // First-ever load of this org: no stages exist yet, seed the defaults
+  // once so the board has columns to render.
+  useEffect(() => {
+    if (!loadingStages && stageList.length === 0) {
+      base44.entities.PipelineStage.bulkCreate(DEFAULT_STAGES).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['PipelineStage'] });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingStages, stageList.length]);
+
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
+
+  const invalidateOpps = () => queryClient.invalidateQueries({ queryKey: ['Opportunity'] });
 
   const onDragEnd = async (result) => {
     if (!result.destination) return;
     const { draggableId, destination } = result;
     const stage = stages.find(s => s.name === destination.droppableId);
     if (!stage) return;
-    setOpps(prev => prev.map(o => o.id === draggableId ? { ...o, stage: stage.name, stage_order: stage.order } : o));
+    queryClient.setQueryData(OPP_KEY, (prev) => (prev || []).map(o => o.id === draggableId ? { ...o, stage: stage.name, stage_order: stage.order } : o));
     await base44.entities.Opportunity.update(draggableId, { stage: stage.name, stage_order: stage.order });
     if (stage.is_won) {
       const opp = opps.find(o => o.id === draggableId);
@@ -142,9 +144,9 @@ export default function Pipeline() {
         </DragDropContext>
       }
 
-      <OppForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} clients={clients} user={user} stages={stages} />
-      <WinModal opp={winOpp} onClose={() => setWinOpp(null)} onDone={load} user={user} />
-      <LoseModal opp={loseOpp} onClose={() => setLoseOpp(null)} onDone={load} />
+      <OppForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidateOpps} clients={clients} user={user} stages={stages} />
+      <WinModal opp={winOpp} onClose={() => setWinOpp(null)} onDone={() => { invalidateOpps(); queryClient.invalidateQueries({ queryKey: ['Sale'] }); }} user={user} />
+      <LoseModal opp={loseOpp} onClose={() => setLoseOpp(null)} onDone={invalidateOpps} />
     </div>
   );
 }
