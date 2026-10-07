@@ -270,6 +270,7 @@ function PaymentPlan({ sale, payments, currency, onPaid }) {
 }
 
 const emptySaleForm = { client_id: '', date: new Date().toISOString().slice(0, 10), discount: '', tax: '', payment_method: 'Transferencia', status: 'Confirmada', installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1 };
+const CUSTOM_ITEM = '__custom__';
 
 function SaleForm({ open, onClose, onSaved, clients, products, user, config, sale }) {
   const [form, setForm] = useState(emptySaleForm);
@@ -305,11 +306,6 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
   const addItem = () => setItems([...items, { description: '', quantity: 1, unit_price: '' }]);
   const removeItem = (i) => setItems(items.filter((_, idx) => idx !== i));
   const updateItem = (i, field, val) => setItems(items.map((it, idx) => idx === i ? { ...it, [field]: val } : it));
-
-  const pickProduct = (i, productId) => {
-    const p = products.find(x => x.id === productId);
-    if (p) updateItem(i, 'description', p.name) || updateItem(i, 'unit_price', p.price);
-  };
 
   const save = async () => {
     const client = clients.find(c => c.id === form.client_id);
@@ -408,21 +404,44 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
             <button onClick={addItem} className="text-sm text-primary font-medium inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Agregar</button>
           </div>
           <div className="space-y-2">
-            {items.map((it, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input list="products-list" value={it.description} onChange={e => {
-                  const val = e.target.value;
-                  const p = products.find(x => x.name === val);
-                  setItems(items.map((x, idx) => idx === i ? { ...x, description: val, unit_price: p ? p.price : x.unit_price, product_id: p?.id } : x));
-                }}
-                  placeholder="Descripción" className="inp flex-1" />
-                <datalist id="products-list">{products.map(p => <option key={p.id} value={p.name} />)}</datalist>
-                <input type="number" value={it.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} className="inp w-16" placeholder="Cant" />
-                <input type="number" value={it.unit_price} onChange={e => updateItem(i, 'unit_price', e.target.value)} className="inp w-28" placeholder="Precio" />
-                <span className="text-sm font-medium w-24 text-right">{formatCurrency((Number(it.unit_price) || 0) * (Number(it.quantity) || 1), currency)}</span>
-                {items.length > 1 && <button onClick={() => removeItem(i)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>}
+            {items.map((it, i) => {
+              const linkedProduct = it.product_id ? products.find(x => x.id === it.product_id) : null;
+              const overStock = linkedProduct?.kind === 'Producto' && Number(it.quantity) > (Number(linkedProduct.stock) || 0);
+              return (
+              <div key={i}>
+                <div className="flex items-center gap-2">
+                  <StyledSelect
+                    value={it.product_id || (it.description ? CUSTOM_ITEM : '')}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === CUSTOM_ITEM) {
+                        setItems(items.map((x, idx) => idx === i ? { ...x, product_id: undefined, description: x.description || '' } : x));
+                      } else {
+                        const p = products.find(x => x.id === val);
+                        setItems(items.map((x, idx) => idx === i ? { ...x, description: p?.name || '', unit_price: p ? p.price : x.unit_price, product_id: p?.id } : x));
+                      }
+                    }}
+                    className="inp flex-1"
+                  >
+                    <option value="">Seleccionar producto…</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}{p.kind === 'Producto' ? ` (stock: ${p.stock ?? 0})` : ''}</option>
+                    ))}
+                    <option value={CUSTOM_ITEM}>Personalizado / otro…</option>
+                  </StyledSelect>
+                  {!it.product_id && (
+                    <input value={it.description} onChange={e => updateItem(i, 'description', e.target.value)}
+                      placeholder="Descripción" className="inp flex-1" />
+                  )}
+                  <input type="number" value={it.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} className="inp w-16" placeholder="Cant" />
+                  <input type="number" value={it.unit_price} onChange={e => updateItem(i, 'unit_price', e.target.value)} className="inp w-28" placeholder="Precio" />
+                  <span className="text-sm font-medium w-24 text-right">{formatCurrency((Number(it.unit_price) || 0) * (Number(it.quantity) || 1), currency)}</span>
+                  {items.length > 1 && <button onClick={() => removeItem(i)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>}
+                </div>
+                {overStock && <p className="text-xs text-warning mt-1 ml-1">Supera el stock disponible ({linkedProduct.stock ?? 0} unidades)</p>}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
