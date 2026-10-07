@@ -163,7 +163,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1240px] mx-auto">
-      <div className="bg-gradient-to-br from-primary/5 via-card to-card rounded-2xl border border-primary/15 card-shadow p-4 sm:p-5 mb-4">
+      <div className="bg-gradient-to-br from-primary/15 via-primary/5 to-card rounded-2xl border border-primary/25 card-shadow p-4 sm:p-5 mb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Hola, {user?.full_name?.split(' ')[0] || '👋'}</h1>
