@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
-import { TrendingUp, Users, Target, DollarSign, Wallet, Activity } from 'lucide-react';
+import { TrendingUp, Users, Target, DollarSign, Wallet, Activity, Repeat, UserX, Lightbulb, Building2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { formatCurrency, inPeriod, LEAD_SOURCES, stageColor } from '@/lib/flowUtils';
@@ -70,7 +70,46 @@ export default function Analytics() {
     const weighted = data.opportunities.filter(o => !o.is_won && !o.is_lost).reduce((s, o) => s + (Number(o.amount) || 0) * (o.probability / 100), 0);
     const potential = data.opportunities.filter(o => !o.is_won && !o.is_lost).reduce((s, o) => s + (Number(o.amount) || 0), 0);
 
-    return { revenue, avgTicket, collected, pending, months, bySource, pipelineData, weighted, potential, salesCount: periodSales.length, leadsCount: data.leads.filter(l => inPeriod(l.created_date, period)).length, clientsCount: data.clients.filter(c => inPeriod(c.created_date, period)).length };
+    // Inteligencia comercial: patterns the business owner would otherwise
+    // have to notice by eye — who's buying again, who's gone quiet, who's
+    // about to (recoverable before they fully churn), and which payment
+    // entity concentrates enough volume to be worth a dedicated promo.
+    // No AI call needed: it's segmentation + a threshold, computed from
+    // data already on hand.
+    const byClient = {};
+    data.sales.filter(s => s.status !== 'Cancelada' && s.client_id).forEach(s => {
+      const bucket = byClient[s.client_id] || (byClient[s.client_id] = []);
+      bucket.push(new Date(s.date));
+    });
+    const now = Date.now();
+    const DAY = 86400000;
+    const buyers = Object.entries(byClient).map(([clientId, dates]) => {
+      const sorted = dates.sort((a, b) => b - a);
+      const daysSinceLast = Math.floor((now - sorted[0].getTime()) / DAY);
+      return { clientId, purchases: sorted.length, daysSinceLast };
+    });
+    const recurring = buyers.filter(b => b.purchases >= 2);
+    const inactive = buyers.filter(b => b.daysSinceLast > 90);
+    const recoverableBuyers = buyers.filter(b => b.daysSinceLast >= 60 && b.daysSinceLast <= 90)
+      .sort((a, b) => a.daysSinceLast - b.daysSinceLast);
+    const recoverableClients = recoverableBuyers.map(b => data.clients.find(c => c.id === b.clientId)).filter(Boolean);
+    const pctRecurring = buyers.length ? (recurring.length / buyers.length) * 100 : 0;
+    const pctInactive = buyers.length ? (inactive.length / buyers.length) * 100 : 0;
+
+    const entityCounts = {};
+    data.sales.filter(s => s.status !== 'Cancelada' && s.bank_entity).forEach(s => {
+      entityCounts[s.bank_entity] = (entityCounts[s.bank_entity] || 0) + 1;
+    });
+    const entityEntries = Object.entries(entityCounts).sort((a, b) => b[1] - a[1]);
+    const totalWithEntity = entityEntries.reduce((s, [, c]) => s + c, 0);
+    const topEntity = entityEntries[0] ? { name: entityEntries[0][0], count: entityEntries[0][1], share: (entityEntries[0][1] / totalWithEntity) * 100 } : null;
+
+    return {
+      revenue, avgTicket, collected, pending, months, bySource, pipelineData, weighted, potential,
+      salesCount: periodSales.length, leadsCount: data.leads.filter(l => inPeriod(l.created_date, period)).length,
+      clientsCount: data.clients.filter(c => inPeriod(c.created_date, period)).length,
+      pctRecurring, pctInactive, recoverableClients, topEntity, buyersCount: buyers.length,
+    };
   }, [data, period]);
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando…</div>;
@@ -156,7 +195,7 @@ export default function Analytics() {
       </div>
 
       {/* Top clients table */}
-      <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6">
+      <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 mb-6">
         <h2 className="font-semibold mb-4">Facturación por cliente</h2>
         <div className="space-y-1">
           {[...data.clients].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0)).slice(0, 8).map((c, i) => (
@@ -169,6 +208,47 @@ export default function Analytics() {
           {data.clients.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">Sin clientes</p>}
         </div>
       </div>
+
+      {/* Inteligencia comercial */}
+      {stats.buyersCount > 0 && (
+        <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6">
+          <h2 className="font-semibold mb-4">Inteligencia comercial</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+            <StatCard icon={Repeat} label="Clientes recurrentes" value={`${stats.pctRecurring.toFixed(0)}%`} color="#22c55e" sublabel="Compraron 2 veces o más" />
+            <StatCard icon={UserX} label="Clientes inactivos" value={`${stats.pctInactive.toFixed(0)}%`} color="#ef4444" sublabel="Sin comprar hace +90 días" />
+          </div>
+
+          {stats.recoverableClients.length > 0 && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-warning/10 border border-warning/20 mb-3">
+              <span className="w-8 h-8 rounded-lg bg-warning/20 text-warning flex items-center justify-center shrink-0">
+                <Lightbulb className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  Oportunidad: recuperar {stats.recoverableClients.length} cliente{stats.recoverableClients.length === 1 ? '' : 's'} que compr{stats.recoverableClients.length === 1 ? 'ó' : 'aron'} hace 60–90 días
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {stats.recoverableClients.slice(0, 5).map(c => c.name).join(', ')}{stats.recoverableClients.length > 5 ? '…' : ''}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {stats.topEntity && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-primary/5 border border-primary/20">
+              <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Entidad predominante: {stats.topEntity.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Participación: {stats.topEntity.share.toFixed(0)}% de las operaciones con tarjeta · Oportunidad: crear una promoción específica con esa entidad.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
