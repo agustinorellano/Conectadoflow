@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, Plus, Upload, Download, File, Image } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -14,19 +16,12 @@ const DOC_TYPES = ['Factura','Presupuesto','Orden de compra','Contrato','Comprob
 
 export default function Documents() {
   const { user } = useAuth();
-  const [docs, setDocs] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: docs = [], isLoading: loading } = useEntityList('Document', { sort: '-created_date', limit: 200 });
+  const { data: clients = [] } = useEntityList('Client');
   const [showForm, setShowForm] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [d, c] = await Promise.all([base44.entities.Document.list('-created_date', 200).catch(() => []), base44.entities.Client.list().catch(() => [])]);
-      setDocs(d); setClients(c);
-    } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['Document'] });
 
   const typeVariant = (t) => ({ Factura: 'primary', Presupuesto: 'amber', Contrato: 'violet', 'Orden de compra': 'cyan', Comprobante: 'success', Otro: 'muted' }[t] || 'muted');
 
@@ -73,7 +68,7 @@ export default function Documents() {
           </div>
         )
       }
-      <DocForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} clients={clients} />
+      <DocForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} clients={clients} />
     </div>
   );
 }

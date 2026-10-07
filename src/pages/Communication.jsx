@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, CheckCircle2, RefreshCw, Info } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -33,29 +35,26 @@ const DEFAULT_TEMPLATES = [
 ];
 
 export default function Communication() {
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: templates = [], isLoading: loading } = useEntityList('MessageTemplate');
   const [showForm, setShowForm] = useState(false);
   const [editT, setEditT] = useState(null);
   const [preview, setPreview] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const list = await base44.entities.MessageTemplate.list().catch(() => []);
-      if (list.length === 0) {
-        await base44.entities.MessageTemplate.bulkCreate(DEFAULT_TEMPLATES);
-        setTemplates(await base44.entities.MessageTemplate.list());
-      } else {
-        setTemplates(list);
-      }
-    } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['MessageTemplate'] });
+
+  // First-ever load of this org: no templates exist yet, seed the defaults
+  // once so there's something to show.
+  useEffect(() => {
+    if (!loading && templates.length === 0) {
+      base44.entities.MessageTemplate.bulkCreate(DEFAULT_TEMPLATES).then(invalidate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, templates.length]);
 
   const del = async (t) => {
     await base44.entities.MessageTemplate.delete(t.id);
-    load();
+    invalidate();
   };
 
   return (
@@ -128,7 +127,7 @@ export default function Communication() {
         </div>
       )}
 
-      <TemplateForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} editT={editT} />
+      <TemplateForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} editT={editT} />
       <PreviewModal template={preview} onClose={() => setPreview(null)} />
     </div>
   );

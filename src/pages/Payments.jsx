@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, CheckCircle2, Clock, AlertCircle, Search, Pencil, Trash2, Receipt } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
+import { useEntityList } from '@/lib/useEntityQuery';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
@@ -13,19 +15,18 @@ import { cn } from '@/lib/utils';
 
 export default function Payments() {
   const { config } = useData();
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: payments = [], isLoading: loading } = useEntityList('Payment', { sort: '-due_date', limit: 300 });
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [editingPayment, setEditingPayment] = useState(null);
   const currency = config?.currency || 'ARS';
 
-  const load = async () => {
-    setLoading(true);
-    try { setPayments(await base44.entities.Payment.list('-due_date', 300).catch(() => [])); }
-    finally { setLoading(false); }
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['Payment'] });
+    queryClient.invalidateQueries({ queryKey: ['Sale'] });
+    queryClient.invalidateQueries({ queryKey: ['Client'] });
   };
-  useEffect(() => { load(); }, []);
 
   const filtered = payments.filter(p => {
     const q = search.toLowerCase();
@@ -68,7 +69,7 @@ export default function Payments() {
         }
       }
     }
-    load();
+    invalidate();
   };
 
   const payVariant = (s) => ({ Pagado: 'success', Parcial: 'warning', Pendiente: 'muted', Vencido: 'destructive', Cancelado: 'muted' }[s] || 'muted');
@@ -97,7 +98,7 @@ export default function Payments() {
         }
       }
     }
-    load();
+    invalidate();
   };
 
   return (
@@ -168,7 +169,7 @@ export default function Payments() {
         )
       }
 
-      <EditPaymentModal payment={editingPayment} onClose={() => setEditingPayment(null)} onSaved={load} currency={currency} />
+      <EditPaymentModal payment={editingPayment} onClose={() => setEditingPayment(null)} onSaved={() => queryClient.invalidateQueries({ queryKey: ['Payment'] })} currency={currency} />
     </div>
   );
 }

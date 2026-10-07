@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Plus, Clock, Video, Phone, MapPin, MessageCircle, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Link as LinkIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -15,24 +17,20 @@ const TYPE_ICONS = { Presencial: MapPin, Videollamada: Video, Teléfono: Phone, 
 
 export default function Meetings() {
   const { user } = useAuth();
-  const [meetings, setMeetings] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: meetings = [], isLoading: loading } = useEntityList('Meeting', { sort: '-date', limit: 200 });
+  const { data: clients = [] } = useEntityList('Client');
   const [showForm, setShowForm] = useState(false);
   const [tab, setTab] = useState('calendar');
   const [searchParams] = useSearchParams();
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [selectedDay, setSelectedDay] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [m, c] = await Promise.all([base44.entities.Meeting.list('-date', 200).catch(() => []), base44.entities.Client.list().catch(() => [])]);
-      setMeetings(m); setClients(c);
-    } finally { setLoading(false); }
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['Meeting'] });
+    queryClient.invalidateQueries({ queryKey: ['Client'] });
   };
 
-  useEffect(() => { load(); }, []);
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
 
   const now = new Date();
@@ -43,7 +41,7 @@ export default function Meetings() {
 
   const setStatus = async (m, status) => {
     await base44.entities.Meeting.update(m.id, { status });
-    load();
+    queryClient.invalidateQueries({ queryKey: ['Meeting'] });
   };
 
   return (
@@ -107,7 +105,7 @@ export default function Meetings() {
         )
       }
 
-      <MeetingForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} clients={clients} user={user} />
+      <MeetingForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} clients={clients} user={user} />
     </div>
   );
 }
