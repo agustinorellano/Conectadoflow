@@ -58,25 +58,8 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
       <div className="absolute bottom-0 right-0 w-[40rem] h-[40rem] rounded-full bg-primary/25 blur-3xl translate-x-1/3 translate-y-1/3" aria-hidden="true" />
 
       <div className="relative z-10 w-full max-w-5xl bg-card rounded-3xl shadow-2xl border border-border/60 overflow-hidden flex flex-col lg:flex-row">
-        {/* Form panel */}
-        <div className="flex-1 flex items-center justify-center px-6 py-10 sm:px-10 lg:px-12">
-          <div className="w-full max-w-sm">
-            <div className="text-center lg:text-left mb-8">
-              <div className="inline-flex lg:hidden items-center justify-center w-14 h-14 rounded-2xl bg-primary mb-4">
-                <Icon className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{title}</h1>
-              {subtitle && <p className="text-muted-foreground mt-2">{subtitle}</p>}
-            </div>
-            {children}
-            {footer && (
-              <p className="text-center lg:text-left text-sm text-muted-foreground mt-6">{footer}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Brand panel — hidden on mobile, carries the page's identity on lg+ */}
-        <div className="hidden lg:flex lg:w-[46%] relative overflow-hidden bg-[#0a0e27] text-white flex-col justify-between p-10 xl:p-12">
+        {/* Brand panel — a compact banner on mobile, full identity panel on lg+ */}
+        <div className="order-first lg:order-none h-36 sm:h-44 lg:h-auto lg:w-[46%] relative overflow-hidden bg-[#0a0e27] text-white flex flex-col justify-between p-5 sm:p-6 lg:p-10 xl:p-12">
           <div className="absolute inset-0 bg-gradient-to-br from-[#0a0e27] via-[#0d1240] to-[#141a52]" aria-hidden="true" />
           <ConstellationBackground />
           <div className="absolute -top-28 -left-20 w-[22rem] h-[22rem] rounded-full bg-primary/20 blur-3xl" aria-hidden="true" />
@@ -84,22 +67,26 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
 
           {GLASS_LABELS.map(g => (
             <span key={g.label} style={{ top: g.top, left: g.left }}
-              className="absolute z-10 -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-medium text-white/90 shadow-lg whitespace-nowrap">
+              className="hidden lg:inline-flex absolute z-10 -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-medium text-white/90 shadow-lg whitespace-nowrap">
               {g.label}
             </span>
           ))}
 
           <div className="relative z-10 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[10px] bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
-              <LogoMark className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-[10px] bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
+              <LogoMark className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <p className="font-semibold text-lg leading-tight">Conectado</p>
-              <p className="text-sm text-white/70 leading-tight -mt-0.5">Flow</p>
+              <p className="font-semibold text-base sm:text-lg leading-tight">Conectado</p>
+              <p className="text-xs sm:text-sm text-white/70 leading-tight -mt-0.5">Flow</p>
             </div>
           </div>
 
-          <div className="relative z-10 max-w-sm">
+          <p className="relative z-10 text-sm font-medium text-white/90 leading-snug lg:hidden">
+            Del primer contacto al cobro, en un solo lugar.
+          </p>
+
+          <div className="relative z-10 max-w-sm hidden lg:block">
             <h2 className="text-2xl xl:text-3xl font-bold tracking-tight leading-tight mb-3">
               Del primer contacto al cobro, en un solo lugar.
             </h2>
@@ -108,7 +95,21 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
             </p>
           </div>
 
-          <p className="relative z-10 text-xs text-white/50">© {new Date().getFullYear()} Conectado Flow</p>
+          <p className="relative z-10 text-xs text-white/50 hidden lg:block">© {new Date().getFullYear()} Conectado Flow</p>
+        </div>
+
+        {/* Form panel */}
+        <div className="flex-1 flex items-center justify-center px-6 py-8 sm:px-10 sm:py-10 lg:px-12">
+          <div className="w-full max-w-sm">
+            <div className="text-center lg:text-left mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{title}</h1>
+              {subtitle && <p className="text-muted-foreground mt-2">{subtitle}</p>}
+            </div>
+            {children}
+            {footer && (
+              <p className="text-center lg:text-left text-sm text-muted-foreground mt-6">{footer}</p>
+            )}
+          </div>
         </div>
       </div>
     </div>
