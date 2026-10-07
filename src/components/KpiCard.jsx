@@ -14,34 +14,34 @@ export default function KpiCard({ label, value, sublabel, variation: v, icon: Ic
       transition={{ type: 'spring', damping: 25, stiffness: 400 }}
       onClick={onClick}
       className={cn(
-        'bg-card rounded-2xl border border-border p-5 card-shadow relative overflow-hidden',
+        'bg-card rounded-2xl border border-border p-3.5 sm:p-5 card-shadow relative overflow-hidden min-w-0',
         onClick && 'cursor-pointer'
       )}
     >
       {accent && <div className="absolute top-0 left-0 right-0 h-1" style={{ background: accent }} />}
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
+        <p className="text-xs sm:text-[13px] font-medium text-muted-foreground truncate">{label}</p>
+        <div className="flex items-center gap-1.5 shrink-0">
           {onClick && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           {Icon && (
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={accent ? { background: accent + '1a', color: accent } : { background: 'hsl(var(--primary-soft))', color: 'hsl(var(--primary))' }}>
-              <Icon className="w-[18px] h-[18px]" />
+            <span className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0" style={accent ? { background: accent + '1a', color: accent } : { background: 'hsl(var(--primary-soft))', color: 'hsl(var(--primary))' }}>
+              <Icon className="w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />
             </span>
           )}
         </div>
       </div>
-      <p className="text-[28px] font-bold tracking-tight leading-none">{value}</p>
-      <div className="flex items-center gap-2 mt-2.5">
+      <p className="text-xl sm:text-[28px] font-bold tracking-tight leading-none truncate">{value}</p>
+      <div className="flex items-center gap-2 mt-2 sm:mt-2.5 flex-wrap">
         {v !== undefined && v !== null && (
           <span className={cn(
-            'inline-flex items-center gap-0.5 text-[12px] font-semibold px-1.5 py-0.5 rounded-md',
+            'inline-flex items-center gap-0.5 text-[11px] sm:text-[12px] font-semibold px-1.5 py-0.5 rounded-md shrink-0',
             positive ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
           )}>
             {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
             {positive ? '+' : ''}{v.toFixed(1)}%
           </span>
         )}
-        {sublabel && <span className="text-[12px] text-muted-foreground">{sublabel}</span>}
+        {sublabel && <span className="text-[11px] sm:text-[12px] text-muted-foreground truncate">{sublabel}</span>}
       </div>
       {hasSparkline && (
         <div className="h-9 -mx-1 -mb-1 mt-2">

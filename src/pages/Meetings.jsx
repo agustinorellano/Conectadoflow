@@ -58,10 +58,10 @@ export default function Meetings() {
         </button>
       </div>
 
-      <div className="flex gap-1.5 mb-5">
-        <button onClick={() => setTab('upcoming')} className={cn('px-4 py-2 rounded-xl text-sm font-medium', tab === 'upcoming' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border hover:bg-accent')}>Próximas</button>
-        <button onClick={() => setTab('past')} className={cn('px-4 py-2 rounded-xl text-sm font-medium', tab === 'past' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border hover:bg-accent')}>Historial</button>
-        <button onClick={() => setTab('calendar')} className={cn('px-4 py-2 rounded-xl text-sm font-medium', tab === 'calendar' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border hover:bg-accent')}>Calendario</button>
+      <div className="flex gap-1.5 mb-5 overflow-x-auto no-scrollbar">
+        <button onClick={() => setTab('upcoming')} className={cn('shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap', tab === 'upcoming' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border hover:bg-accent')}>Próximas</button>
+        <button onClick={() => setTab('past')} className={cn('shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap', tab === 'past' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border hover:bg-accent')}>Historial</button>
+        <button onClick={() => setTab('calendar')} className={cn('shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap', tab === 'calendar' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border hover:bg-accent')}>Calendario</button>
       </div>
 
       {tab === 'calendar' ? (
@@ -188,18 +188,18 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2 bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-base capitalize">{month.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</h2>
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => goMonth(-1)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent"><ChevronLeft className="w-4 h-4" /></button>
-            <button onClick={() => { const d = new Date(); d.setDate(1); setMonth(d); setSelectedDay(null); }} className="px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-accent">Hoy</button>
-            <button onClick={() => goMonth(1)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent"><ChevronRight className="w-4 h-4" /></button>
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <h2 className="font-semibold text-sm sm:text-base capitalize truncate">{month.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</h2>
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <button onClick={() => goMonth(-1)} className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center hover:bg-accent"><ChevronLeft className="w-4 h-4" /></button>
+            <button onClick={() => { const d = new Date(); d.setDate(1); setMonth(d); setSelectedDay(null); }} className="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-accent whitespace-nowrap">Hoy</button>
+            <button onClick={() => goMonth(1)} className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center hover:bg-accent"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
-        <div className="grid grid-cols-7 gap-1.5 mb-1.5">
-          {WEEKDAYS.map(d => <div key={d} className="text-center text-[11px] font-semibold text-muted-foreground py-1">{d}</div>)}
+        <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
+          {WEEKDAYS.map(d => <div key={d} className="text-center text-[10px] sm:text-[11px] font-semibold text-muted-foreground py-1 truncate">{d}</div>)}
         </div>
-        <div className="grid grid-cols-7 gap-1.5">
+        <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
           {cells.map((day, i) => {
             if (!day) return <div key={i} />;
             const dayMeets = meetingsByDay(day).sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -210,11 +210,16 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
             return (
               <button key={i} onClick={() => setSelectedDay(day)}
                 className={cn(
-                  'min-h-[84px] rounded-xl p-1.5 flex flex-col items-start gap-1 transition-colors border text-left overflow-hidden',
+                  'min-h-[52px] sm:min-h-[84px] rounded-xl p-1 sm:p-1.5 flex flex-col items-start gap-1 transition-colors border text-left overflow-hidden',
                   isSelected ? 'bg-primary/10 border-primary' : isToday ? 'border-primary/40' : 'border-transparent hover:bg-accent/50'
                 )}>
-                <span className={cn('text-xs font-medium', isToday && 'text-primary font-bold')}>{day.getDate()}</span>
-                <div className="flex flex-col gap-0.5 w-full">
+                <span className={cn('text-[11px] sm:text-xs font-medium', isToday && 'text-primary font-bold')}>{day.getDate()}</span>
+                {dayMeets.length > 0 && (
+                  <span className="flex gap-0.5 flex-wrap sm:hidden">
+                    {dayMeets.slice(0, 3).map(m => <span key={m.id} className="w-1.5 h-1.5 rounded-full bg-primary" />)}
+                  </span>
+                )}
+                <div className="hidden sm:flex flex-col gap-0.5 w-full">
                   {visible.map(m => (
                     <span key={m.id} className="text-[10px] leading-tight px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium truncate w-full">
                       {new Date(m.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · {m.type}

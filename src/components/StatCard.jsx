@@ -12,23 +12,23 @@ export default function StatCard({ label, value, variation: v, icon: Icon, accen
     <div
       onClick={onClick}
       className={cn(
-        'bg-card rounded-2xl border border-border p-4 flex flex-col gap-3',
+        'bg-card rounded-2xl border border-border p-3 sm:p-4 flex flex-col gap-2 sm:gap-3 min-w-0',
         onClick && 'cursor-pointer hover:border-primary/30 transition-colors'
       )}
     >
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
         {Icon && (
-          <span className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={accent ? { background: accent + '1a', color: accent } : { background: 'hsl(var(--primary-soft))', color: 'hsl(var(--primary))' }}>
-            <Icon className="w-[18px] h-[18px]" />
+          <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0" style={accent ? { background: accent + '1a', color: accent } : { background: 'hsl(var(--primary-soft))', color: 'hsl(var(--primary))' }}>
+            <Icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
           </span>
         )}
-        <p className="text-sm text-muted-foreground truncate">{label}</p>
+        <p className="text-xs sm:text-sm text-muted-foreground truncate">{label}</p>
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[26px] font-bold tracking-tight leading-none">{value}</p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <p className="text-lg sm:text-[26px] font-bold tracking-tight leading-none truncate">{value}</p>
         {v !== undefined && v !== null && (
           <span className={cn(
-            'inline-flex items-center gap-0.5 text-[12px] font-semibold px-1.5 py-0.5 rounded-full shrink-0',
+            'inline-flex items-center gap-0.5 text-[11px] sm:text-[12px] font-semibold px-1.5 py-0.5 rounded-full shrink-0',
             positive ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
           )}>
             {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
