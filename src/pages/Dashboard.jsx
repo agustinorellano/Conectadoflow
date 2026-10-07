@@ -77,15 +77,21 @@ export default function Dashboard() {
     // product sold while the org's base is ARS, for example) — convert
     // every amount to the org's base currency up front so every stat
     // below can keep summing plain numbers without re-deriving this.
+    // `currency` is reset to the base here too — otherwise a consumer that
+    // converts again downstream (IncomeReportCard does its own conversion
+    // so it can be used outside Dashboard too) would see the stale
+    // original currency next to an amount that's already been converted,
+    // and apply the exchange rate a second time.
     const fSales = filterByCommerce(data.sales).map(s => ({
       ...s,
       total_amount: toBase(s.total_amount, s.currency),
       collected_amount: toBase(s.collected_amount, s.currency),
       balance: toBase(s.balance, s.currency),
+      currency,
     }));
     const fLeads = filterByCommerce(data.leads);
     const fClients = filterByCommerce(data.clients);
-    const fPayments = filterByCommerce(data.payments).map(p => ({ ...p, amount: toBase(p.amount, p.currency) }));
+    const fPayments = filterByCommerce(data.payments).map(p => ({ ...p, amount: toBase(p.amount, p.currency), currency }));
     const fOpps = filterByCommerce(data.opportunities);
     const fMeetings = filterByCommerce(data.meetings);
     const fActivities = filterByCommerce(data.activities);
@@ -120,8 +126,8 @@ export default function Dashboard() {
     // Breakdown needs every commerce's sales/payments, not just the
     // currently-selected one (that's what fSales/fPayments are filtered
     // to) — same currency conversion, kept unfiltered by commerce.
-    const allSalesBase = data.sales.map(s => ({ ...s, total_amount: toBase(s.total_amount, s.currency) }));
-    const allPaymentsBase = data.payments.map(p => ({ ...p, amount: toBase(p.amount, p.currency) }));
+    const allSalesBase = data.sales.map(s => ({ ...s, total_amount: toBase(s.total_amount, s.currency), currency }));
+    const allPaymentsBase = data.payments.map(p => ({ ...p, amount: toBase(p.amount, p.currency), currency }));
     const commerceBreakdown = commerces.map(c => {
       const cSales = allSalesBase.filter(s => s.status !== 'Cancelada' && (s.commerce_id === c.id || (!s.commerce_id && c.id === commerces[0]?.id)));
       const cRevenue = cSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
