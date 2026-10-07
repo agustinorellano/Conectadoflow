@@ -47,8 +47,17 @@ const GLASS_LABELS = [
 
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4 sm:p-6 lg:p-10">
-      <div className="w-full max-w-5xl bg-card rounded-3xl shadow-2xl border border-border/60 overflow-hidden flex flex-col lg:flex-row">
+    <div className="min-h-screen relative flex items-center justify-center bg-[#0a0e27] p-4 sm:p-6 lg:p-10 overflow-hidden">
+      {/* Page backdrop — the same constellation motif, blurred and zoomed
+          out, so the floating card has somewhere to "float" over. */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0a0e27] via-[#0d1240] to-[#141a52]" aria-hidden="true" />
+      <div className="absolute inset-0 scale-125 blur-2xl opacity-80" aria-hidden="true">
+        <ConstellationBackground />
+      </div>
+      <div className="absolute -top-40 -left-40 w-[40rem] h-[40rem] rounded-full bg-primary/25 blur-3xl" aria-hidden="true" />
+      <div className="absolute bottom-0 right-0 w-[40rem] h-[40rem] rounded-full bg-primary/25 blur-3xl translate-x-1/3 translate-y-1/3" aria-hidden="true" />
+
+      <div className="relative z-10 w-full max-w-5xl bg-card rounded-3xl shadow-2xl border border-border/60 overflow-hidden flex flex-col lg:flex-row">
         {/* Form panel */}
         <div className="flex-1 flex items-center justify-center px-6 py-10 sm:px-10 lg:px-12">
           <div className="w-full max-w-sm">
