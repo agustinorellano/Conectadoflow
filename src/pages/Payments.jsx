@@ -66,9 +66,10 @@ export default function Payments() {
       if (sale.client_id) {
         const client = await base44.entities.Client.get(sale.client_id).catch(() => null);
         if (client) {
+          const amountInBase = toBase(p.amount, p.currency);
           await base44.entities.Client.update(client.id, {
-            total_collected: (client.total_collected || 0) + (Number(p.amount) || 0),
-            balance: Math.max(0, (client.balance || 0) - (Number(p.amount) || 0)),
+            total_collected: (client.total_collected || 0) + amountInBase,
+            balance: Math.max(0, (client.balance || 0) - amountInBase),
           });
         }
       }
@@ -94,9 +95,10 @@ export default function Payments() {
         if (sale.client_id) {
           const client = await base44.entities.Client.get(sale.client_id).catch(() => null);
           if (client) {
+            const amountInBase = toBase(p.amount, p.currency);
             await base44.entities.Client.update(client.id, {
-              total_collected: Math.max(0, (Number(client.total_collected) || 0) - (Number(p.amount) || 0)),
-              balance: (Number(client.balance) || 0) + (Number(p.amount) || 0),
+              total_collected: Math.max(0, (Number(client.total_collected) || 0) - amountInBase),
+              balance: (Number(client.balance) || 0) + amountInBase,
             });
           }
         }

@@ -122,9 +122,9 @@ export default function Sales() {
       const client = clients.find(c => c.id === s.client_id);
       if (client) {
         await base44.entities.Client.update(client.id, {
-          total_sold: Math.max(0, (Number(client.total_sold) || 0) - (Number(s.total_amount) || 0)),
-          balance: Math.max(0, (Number(client.balance) || 0) - (Number(s.balance) || 0)),
-          total_collected: Math.max(0, (Number(client.total_collected) || 0) - (Number(s.collected_amount) || 0)),
+          total_sold: Math.max(0, (Number(client.total_sold) || 0) - toBase(s.total_amount, s.currency)),
+          balance: Math.max(0, (Number(client.balance) || 0) - toBase(s.balance, s.currency)),
+          total_collected: Math.max(0, (Number(client.total_collected) || 0) - toBase(s.collected_amount, s.currency)),
         });
       }
     }
@@ -400,6 +400,13 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
   const [warning, setWarning] = useState('');
   const taxRate = (config?.tax_rate || 0) / 100;
   const isEditing = !!sale;
+  // Client.total_sold/balance/total_collected are always kept in the org's
+  // base currency — a sale entered in a different one needs converting
+  // before it's added to those running totals, same as every other
+  // aggregate that touches multiple currencies.
+  const rates = useCurrencyRates();
+  const orgCurrency = config?.currency || 'ARS';
+  const toOrgBase = (amount, cur) => convertAmount(amount, cur || 'ARS', orgCurrency, rates);
 
   useEffect(() => {
     if (!open) return;
@@ -472,7 +479,10 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
         const failed = await syncProductStock(products, sale.items, computedItems);
         if (failed.length) setWarning(`La venta se guardó, pero no se pudo actualizar el stock de: ${failed.join(', ')}. Pedile a un administrador que lo ajuste.`);
 
-        const delta = total - oldTotal;
+        // oldTotal was recorded in the sale's previous currency (which may
+        // differ from the one just chosen), so each side of the delta is
+        // converted to the org base on its own before subtracting.
+        const delta = toOrgBase(total, form.currency) - toOrgBase(oldTotal, sale.currency);
         if (delta !== 0 && client.id === sale.client_id) {
           await base44.entities.Client.update(client.id, {
             total_sold: Math.max(0, (Number(client.total_sold) || 0) + delta),
@@ -507,8 +517,9 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
         }
         await base44.entities.Payment.bulkCreate(paymentRecords);
         // update client totals
-        const newSold = (client.total_sold || 0) + total;
-        const newBalance = (client.balance || 0) + total;
+        const totalInBase = toOrgBase(total, form.currency);
+        const newSold = (client.total_sold || 0) + totalInBase;
+        const newBalance = (client.balance || 0) + totalInBase;
         await base44.entities.Client.update(client.id, { total_sold: newSold, balance: newBalance, last_contact: new Date().toISOString() });
       }
 
