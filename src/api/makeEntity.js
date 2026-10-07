@@ -37,6 +37,26 @@ export function makeEntity(table) {
       return data || [];
     },
 
+    // Page-aware fetch for list screens: returns only `pageSize` rows plus
+    // the total row count, instead of makeEntity.list()'s "always fetch the
+    // whole table" behavior. Kept separate from list()/filter() because
+    // several pages (Dashboard, Reports, Analytics) need the full dataset
+    // to compute totals — switching those to a capped page would silently
+    // under-count revenue/stats.
+    async page({ filter = {}, sort, page = 1, pageSize = 25 } = {}) {
+      let q = supabase.from(table).select('*', { count: 'exact' });
+      Object.entries(filter).forEach(([key, value]) => {
+        q = q.eq(key, value);
+      });
+      const s = parseSort(sort || '-created_date');
+      if (s) q = q.order(s.column, { ascending: s.ascending });
+      const from = (page - 1) * pageSize;
+      q = q.range(from, from + pageSize - 1);
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return { rows: data || [], total: count || 0 };
+    },
+
     async get(id) {
       const { data, error } = await supabase.from(table).select('*').eq('id', id).single();
       if (error) throw error;

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   ShoppingCart, UserPlus, Wallet, Package, Award,
@@ -36,28 +37,32 @@ export default function Dashboard() {
   const { filterByCommerce, currentCommerceId, setCurrentCommerceId, commerces } = useCommerce();
   const [view, setView] = useState('general');
   const [hideAmounts, setHideAmounts] = useState(false);
-  const [data, setData] = useState({ sales: [], leads: [], clients: [], payments: [], opportunities: [], meetings: [], activities: [], products: [] });
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [sales, leads, clients, payments, opportunities, meetings, activities, products] = await Promise.all([
-        base44.entities.Sale.list().catch(() => []),
-        base44.entities.Lead.list().catch(() => []),
-        base44.entities.Client.list().catch(() => []),
-        base44.entities.Payment.list().catch(() => []),
-        base44.entities.Opportunity.list().catch(() => []),
-        base44.entities.Meeting.list().catch(() => []),
-        base44.entities.Activity.list().catch(() => []),
-        base44.entities.Product.list().catch(() => []),
-      ]);
-      setData({ sales, leads, clients, payments, opportunities, meetings, activities, products });
-    } finally { setLoading(false); }
+  // One cached query per entity instead of a single Promise.all fired on
+  // every mount: switching away from Dashboard and back reuses this data
+  // (per the shared staleTime in query-client.js) instead of re-fetching
+  // all 8 tables again.
+  const ENTITY_KEYS = ['Sale', 'Lead', 'Client', 'Payment', 'Opportunity', 'Meeting', 'Activity', 'Product'];
+  const results = useQueries({
+    queries: ENTITY_KEYS.map((name) => ({
+      queryKey: [name, 'list', { filter: undefined, sort: undefined, limit: undefined }],
+      queryFn: () => base44.entities[name].list().catch(() => []),
+    })),
+  });
+  const loading = results.some(r => r.isLoading);
+  const resultData = results.map(r => r.data || []);
+  const data = useMemo(() => {
+    const [sales, leads, clients, payments, opportunities, meetings, activities, products] = resultData;
+    return { sales, leads, clients, payments, opportunities, meetings, activities, products };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, resultData);
+
+  const patchEntity = (name, id, patch) => {
+    const key = [name, 'list', { filter: undefined, sort: undefined, limit: undefined }];
+    queryClient.setQueryData(key, (prev) => (prev || []).map(x => x.id === id ? { ...x, ...patch } : x));
   };
-
-  useEffect(() => { load(); }, []);
 
   const currency = config?.currency || 'ARS';
   const isAllCommerces = currentCommerceId === 'all' && commerces.length > 1;
@@ -146,12 +151,12 @@ export default function Dashboard() {
 
   const toggleActivity = async (act) => {
     await base44.entities.Activity.update(act.id, { status: 'Realizada' });
-    setData(prev => ({ ...prev, activities: prev.activities.map(a => a.id === act.id ? { ...a, status: 'Realizada' } : a) }));
+    patchEntity('Activity', act.id, { status: 'Realizada' });
   };
 
   const markPaid = async (p) => {
     await base44.entities.Payment.update(p.id, { status: 'Pagado', paid_date: new Date().toISOString().slice(0, 10) });
-    setData(prev => ({ ...prev, payments: prev.payments.map(x => x.id === p.id ? { ...x, status: 'Pagado' } : x) }));
+    patchEntity('Payment', p.id, { status: 'Pagado' });
   };
 
   const pendingPayments = useMemo(() => filterByCommerce(data.payments)

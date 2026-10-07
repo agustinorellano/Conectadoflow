@@ -2,9 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
-import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle, FileDown, FileText, LayoutGrid, Rows3 } from 'lucide-react';
+import { Package, Plus, Search, Pencil, Trash2, Box, Upload, ImageIcon, Layers, AlertTriangle, XCircle, FileDown, FileText, LayoutGrid, Rows3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
+import { useEntityList } from '@/lib/useEntityQuery';
+import { useQueryClient } from '@tanstack/react-query';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -16,24 +18,23 @@ import { cn } from '@/lib/utils';
 
 const LOW_STOCK_THRESHOLD = 5;
 
+const PAGE_SIZE = 24;
+
 export default function Products() {
   const { config } = useData();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: products = [], isLoading: loading } = useEntityList('Product');
   const [search, setSearch] = useState('');
   const [filterKind, setFilterKind] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [viewMode, setViewMode] = useState('cards');
+  const [page, setPage] = useState(1);
   const currency = config?.currency || 'ARS';
 
-  const load = async () => {
-    setLoading(true);
-    try { setProducts(await base44.entities.Product.list().catch(() => [])); }
-    finally { setLoading(false); }
-  };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['Product'] });
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(1); }, [search, filterKind]);
 
   const stockStats = useMemo(() => {
     const physical = products.filter(p => p.kind === 'Producto');
@@ -52,11 +53,14 @@ export default function Products() {
     return matchSearch && matchKind;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const handleEdit = (p) => { setEditProduct(p); setShowForm(true); };
   const handleNew = () => { setEditProduct(null); setShowForm(true); };
   const toggleActive = async (p) => {
     await base44.entities.Product.update(p.id, { is_active: !p.is_active });
-    load();
+    invalidate();
   };
 
   const stockSituation = (p) => {
@@ -168,7 +172,7 @@ export default function Products() {
             action={<button onClick={handleNew} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium"><Plus className="w-4 h-4" /> Nuevo producto</button>} />
         ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map(p => (
+            {paged.map(p => (
               <motion.div key={p.id} layout className="bg-card rounded-2xl border border-border card-shadow p-5 hover:card-shadow-lg transition-shadow group">
                 <div className="flex items-start gap-3 mb-3">
                   {p.image_url ? (
@@ -208,9 +212,9 @@ export default function Products() {
           </div>
         ) : (
           <div className="bg-card rounded-2xl border border-border card-shadow overflow-hidden">
-            {filtered.map((p, i) => (
+            {paged.map((p, i) => (
               <motion.div key={p.id} layout
-                className={cn('flex items-center gap-3 p-3 sm:p-4 hover:bg-accent/50 transition-colors', i !== filtered.length - 1 && 'border-b border-border')}>
+                className={cn('flex items-center gap-3 p-3 sm:p-4 hover:bg-accent/50 transition-colors', i !== paged.length - 1 && 'border-b border-border')}>
                 {p.image_url ? (
                   <UIImage src={p.image_url} alt={p.name} className="w-10 h-10 rounded-xl shrink-0 object-cover" />
                 ) : (
@@ -239,7 +243,23 @@ export default function Products() {
         )
       }
 
-      <ProductForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} product={editProduct} />
+      {!loading && filtered.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-xs text-muted-foreground">Página {page} de {totalPages} · {filtered.length} productos</p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="w-9 h-9 rounded-xl border border-border flex items-center justify-center disabled:opacity-40 hover:bg-accent">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="w-9 h-9 rounded-xl border border-border flex items-center justify-center disabled:opacity-40 hover:bg-accent">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ProductForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} product={editProduct} />
     </div>
   );
 }

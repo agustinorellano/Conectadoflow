@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock } from 'lucide-react';
+import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useEntityList } from '@/lib/useEntityQuery';
+import { useQueryClient } from '@tanstack/react-query';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -36,35 +38,38 @@ function getStanding(c) {
   return { key: stage.key, label: stage.key, variant: stage.variant, template: stage.template(c) };
 }
 
+const PAGE_SIZE = 24;
+
 export default function Clients() {
   const { user } = useAuth();
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: clients = [], isLoading: loading } = useEntityList('Client', { sort: '-created_date', limit: 200 });
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [viewMode, setViewMode] = useState('rows');
   const [messageClient, setMessageClient] = useState(null);
+  const [page, setPage] = useState(1);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const load = async () => {
-    setLoading(true);
-    try { setClients(await base44.entities.Client.list('-created_date', 200)); }
-    finally { setLoading(false); }
-  };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['Client'] });
 
   const updateSituation = async (client, situation_status) => {
-    setClients(prev => prev.map(c => c.id === client.id ? { ...c, situation_status } : c));
+    queryClient.setQueryData(['Client', 'list', { filter: undefined, sort: '-created_date', limit: 200 }],
+      (prev) => (prev || []).map(c => c.id === client.id ? { ...c, situation_status } : c));
     await base44.entities.Client.update(client.id, { situation_status });
   };
 
-  useEffect(() => { load(); }, []);
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
+  useEffect(() => { setPage(1); }, [search]);
 
   const filtered = clients.filter(c => {
     const q = search.toLowerCase();
     return !q || [c.name, c.company, c.email, c.phone].some(v => (v || '').toLowerCase().includes(q));
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const kpis = {
     total: clients.length,
@@ -116,7 +121,7 @@ export default function Clients() {
         ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             <AnimatePresence>
-              {filtered.map(c => {
+              {paged.map(c => {
                 const standing = getStanding(c);
                 return (
                   <motion.div key={c.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -165,11 +170,11 @@ export default function Clients() {
         ) : (
           <div className="bg-card rounded-2xl border border-border card-shadow overflow-hidden">
             <AnimatePresence>
-              {filtered.map((c, i) => {
+              {paged.map((c, i) => {
                 return (
                   <motion.div key={c.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     onClick={() => navigate(`/clientes/${c.id}`)}
-                    className={cn('cursor-pointer flex items-center gap-3 p-3 sm:p-4 hover:bg-accent/50 transition-colors', i !== filtered.length - 1 && 'border-b border-border')}>
+                    className={cn('cursor-pointer flex items-center gap-3 p-3 sm:p-4 hover:bg-accent/50 transition-colors', i !== paged.length - 1 && 'border-b border-border')}>
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 text-white flex items-center justify-center font-semibold shrink-0 text-sm">
                       {c.name?.charAt(0).toUpperCase()}
                     </div>
@@ -208,7 +213,23 @@ export default function Clients() {
           </div>
         )}
 
-      <ClientForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} user={user} />
+      {!loading && filtered.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-xs text-muted-foreground">Página {page} de {totalPages} · {filtered.length} clientes</p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="w-9 h-9 rounded-xl border border-border flex items-center justify-center disabled:opacity-40 hover:bg-accent">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="w-9 h-9 rounded-xl border border-border flex items-center justify-center disabled:opacity-40 hover:bg-accent">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ClientForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} user={user} />
       <ClientMessageModal client={messageClient} onClose={() => setMessageClient(null)} />
     </div>
   );
