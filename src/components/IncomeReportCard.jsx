@@ -6,10 +6,12 @@ import { buildPeriodSeries } from '@/lib/salesSeries';
 import { inPeriod, previousPeriodAmount, variation as calcVariation } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
+const BASE_FLAGS = { ARS: '🇦🇷', USD: '🇺🇸', EUR: '🇪🇺' };
+
 const CONVERTIBLE_CURRENCIES = [
-  { key: 'USD', label: 'USD' },
-  { key: 'USD_BLUE', label: 'USD blue' },
-  { key: 'BRL', label: 'BRL' },
+  { key: 'USD', label: 'USD', flag: '🇺🇸' },
+  { key: 'USD_BLUE', label: 'USD blue', flag: '🇺🇸' },
+  { key: 'BRL', label: 'BRL', flag: '🇧🇷' },
 ];
 
 const CHART_PERIODS = [
@@ -43,7 +45,7 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
   const [selectedCurrency, setSelectedCurrency] = useState('BASE');
 
   const canConvert = baseCurrency === 'ARS';
-  const currencies = useMemo(() => [{ key: 'BASE', label: baseCurrency }, ...(canConvert ? CONVERTIBLE_CURRENCIES : [])], [baseCurrency, canConvert]);
+  const currencies = useMemo(() => [{ key: 'BASE', label: baseCurrency, flag: BASE_FLAGS[baseCurrency] || '💰' }, ...(canConvert ? CONVERTIBLE_CURRENCIES : [])], [baseCurrency, canConvert]);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,10 +105,11 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
               key={c.key}
               onClick={() => setSelectedCurrency(c.key)}
               className={cn(
-                'px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors',
+                'px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors inline-flex items-center gap-1',
                 selectedCurrency === c.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               )}
             >
+              <span>{c.flag}</span>
               {c.label}
             </button>
           ))}

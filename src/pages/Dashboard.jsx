@@ -16,7 +16,6 @@ import SalesByEntityChart from '@/components/SalesByEntityChart';
 import DashboardPills from '@/components/DashboardPills';
 import MonthlyGoalCard from '@/components/MonthlyGoalCard';
 import IncomeReportCard from '@/components/IncomeReportCard';
-import TopProductCard from '@/components/TopProductCard';
 import RecentSalesTable from '@/components/RecentSalesTable';
 import DateWeatherWidget from '@/components/DateWeatherWidget';
 import ProgressBar from '@/components/ProgressBar';
@@ -195,7 +194,43 @@ export default function Dashboard() {
           />
           <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
         </div>
-        <TopProductCard product={stats.topProduct} />
+        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+          <h2 className="font-semibold mb-2.5 text-sm">Cobros pendientes</h2>
+          <div className="space-y-1">
+            {pendingPayments.length === 0 && <p className="text-sm text-muted-foreground py-3 text-center">Sin cobros pendientes</p>}
+            {pendingPayments.map(p => (
+              <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-accent/50 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{p.client_name}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xs text-muted-foreground">{amount(p.amount)}</span>
+                    {isOverdue(p.due_date) ? (
+                      <Badge variant="destructive" dot>Vencido</Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">· Vence {new Date(p.due_date).toLocaleDateString('es-AR')}</span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => markPaid(p)} className="shrink-0 px-2 py-1 rounded-lg bg-success text-white text-xs font-medium hover:opacity-90">Cobrado</button>
+              </div>
+            ))}
+          </div>
+
+          <h2 className="font-semibold mt-4 mb-2 text-sm">Próximas reuniones</h2>
+          <div className="space-y-1">
+            {stats.upcomingMeetings.length === 0 && <p className="text-sm text-muted-foreground py-2 text-center">Sin reuniones programadas</p>}
+            {stats.upcomingMeetings.map(m => (
+              <div key={m.id} className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-accent/50 transition-colors">
+                <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 text-sm">📅</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{m.title}</p>
+                  <p className="text-xs text-muted-foreground">{m.client_name} · {formatDateTime(m.date)}</p>
+                </div>
+                <Badge variant="primary">{m.type}</Badge>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -244,67 +279,27 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
-        <div className="lg:col-span-2 bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-3.5">
-            <h2 className="font-semibold text-sm">Funnel comercial</h2>
-            <button onClick={() => navigate('/pipeline')} className="text-xs text-primary font-medium inline-flex items-center gap-1 hover:gap-1.5 transition-all">Ver pipeline <ArrowRight className="w-3 h-3" /></button>
-          </div>
-          <div className="space-y-1.5">
-            {stats.funnel.map((f, i) => (
-              <div key={f.stage} className="flex items-center gap-2.5">
-                <span className="w-20 sm:w-24 text-xs text-muted-foreground shrink-0">{f.stage}</span>
-                <div className="flex-1 h-6 bg-secondary/50 rounded-lg overflow-hidden relative">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${(f.count / maxFunnel) * 100}%` }} transition={{ delay: i * 0.06, duration: 0.5, ease: 'easeOut' }}
-                    className="h-full rounded-lg flex items-center justify-end pr-2" style={{ background: `linear-gradient(90deg, hsl(var(--primary)/0.5), hsl(var(--primary)))` }}>
-                    <span className="text-[11px] font-semibold text-white">{f.count}</span>
-                  </motion.div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3.5 pt-3.5 border-t border-border grid grid-cols-2 gap-3">
-            <div><p className="text-xs text-muted-foreground">En proceso (pipeline)</p><p className="text-lg font-bold">{amount(stats.inPipeline)}</p></div>
-            <div><p className="text-xs text-muted-foreground">Cobrado en período</p><p className="text-lg font-bold text-success">{amount(stats.collected)}</p></div>
-          </div>
+      <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-4">
+        <div className="flex items-center justify-between mb-3.5">
+          <h2 className="font-semibold text-sm">Funnel comercial</h2>
+          <button onClick={() => navigate('/pipeline')} className="text-xs text-primary font-medium inline-flex items-center gap-1 hover:gap-1.5 transition-all">Ver pipeline <ArrowRight className="w-3 h-3" /></button>
         </div>
-
-        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-          <h2 className="font-semibold mb-2.5 text-sm">Cobros pendientes</h2>
-          <div className="space-y-1">
-            {pendingPayments.length === 0 && <p className="text-sm text-muted-foreground py-3 text-center">Sin cobros pendientes</p>}
-            {pendingPayments.map(p => (
-              <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-accent/50 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{p.client_name}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xs text-muted-foreground">{amount(p.amount)}</span>
-                    {isOverdue(p.due_date) ? (
-                      <Badge variant="destructive" dot>Vencido</Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">· Vence {new Date(p.due_date).toLocaleDateString('es-AR')}</span>
-                    )}
-                  </div>
-                </div>
-                <button onClick={() => markPaid(p)} className="shrink-0 px-2 py-1 rounded-lg bg-success text-white text-xs font-medium hover:opacity-90">Cobrado</button>
+        <div className="space-y-1.5">
+          {stats.funnel.map((f, i) => (
+            <div key={f.stage} className="flex items-center gap-2.5">
+              <span className="w-20 sm:w-24 text-xs text-muted-foreground shrink-0">{f.stage}</span>
+              <div className="flex-1 h-6 bg-secondary/50 rounded-lg overflow-hidden relative">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${(f.count / maxFunnel) * 100}%` }} transition={{ delay: i * 0.06, duration: 0.5, ease: 'easeOut' }}
+                  className="h-full rounded-lg flex items-center justify-end pr-2" style={{ background: `linear-gradient(90deg, hsl(var(--primary)/0.5), hsl(var(--primary)))` }}>
+                  <span className="text-[11px] font-semibold text-white">{f.count}</span>
+                </motion.div>
               </div>
-            ))}
-          </div>
-
-          <h2 className="font-semibold mt-4 mb-2 text-sm">Próximas reuniones</h2>
-          <div className="space-y-1">
-            {stats.upcomingMeetings.length === 0 && <p className="text-sm text-muted-foreground py-2 text-center">Sin reuniones programadas</p>}
-            {stats.upcomingMeetings.map(m => (
-              <div key={m.id} className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-accent/50 transition-colors">
-                <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 text-sm">📅</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{m.title}</p>
-                  <p className="text-xs text-muted-foreground">{m.client_name} · {formatDateTime(m.date)}</p>
-                </div>
-                <Badge variant="primary">{m.type}</Badge>
-              </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3.5 pt-3.5 border-t border-border grid grid-cols-2 gap-3">
+          <div><p className="text-xs text-muted-foreground">En proceso (pipeline)</p><p className="text-lg font-bold">{amount(stats.inPipeline)}</p></div>
+          <div><p className="text-xs text-muted-foreground">Cobrado en período</p><p className="text-lg font-bold text-success">{amount(stats.collected)}</p></div>
         </div>
       </div>
 
