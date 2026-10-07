@@ -14,6 +14,22 @@ import { formatCurrency, formatDate, PAYMENT_METHODS, SALE_STATUS, isOverdue, CA
 import { useCommerce } from '@/lib/CommerceContext';
 import { cn } from '@/lib/utils';
 
+// Nets out stock changes between a sale's old and new line items in one
+// pass per product (avoids a stale-read bug if the same product appears
+// in both with different quantities). Only affects kind='Producto' items
+// that carry a product_id — free-text/service line items never touch stock.
+async function syncProductStock(products, oldItems, newItems) {
+  const deltas = {};
+  (oldItems || []).forEach(it => { if (it.product_id) deltas[it.product_id] = (deltas[it.product_id] || 0) + (Number(it.quantity) || 0); });
+  (newItems || []).forEach(it => { if (it.product_id) deltas[it.product_id] = (deltas[it.product_id] || 0) - (Number(it.quantity) || 0); });
+  const updates = Object.entries(deltas).filter(([, d]) => d !== 0).map(([productId, delta]) => {
+    const p = products.find(x => x.id === productId);
+    if (!p || p.kind !== 'Producto') return null;
+    return base44.entities.Product.update(productId, { stock: Math.max(0, (Number(p.stock) || 0) + delta) });
+  }).filter(Boolean);
+  await Promise.all(updates);
+}
+
 export default function Sales() {
   const { user } = useAuth();
   const { config } = useData();
@@ -68,6 +84,7 @@ export default function Sales() {
     const salePayments = payments.filter(p => p.sale_id === s.id);
     await Promise.all(salePayments.map(p => base44.entities.Payment.delete(p.id)));
     await base44.entities.Sale.delete(s.id);
+    await syncProductStock(products, s.items, []);
     if (s.client_id) {
       const client = clients.find(c => c.id === s.client_id);
       if (client) {
@@ -273,7 +290,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
         bank_entity: sale.bank_entity || '', card_type: sale.card_type || '', card_brand: sale.card_brand || '',
         installments_count: sale.installments_count || 1,
       });
-      setItems(sale.items?.length ? sale.items.map(it => ({ description: it.description, quantity: it.quantity, unit_price: it.unit_price })) : [{ description: '', quantity: 1, unit_price: '' }]);
+      setItems(sale.items?.length ? sale.items.map(it => ({ description: it.description, quantity: it.quantity, unit_price: it.unit_price, product_id: it.product_id })) : [{ description: '', quantity: 1, unit_price: '' }]);
     } else {
       setForm({ ...emptySaleForm, client_id: clients[0]?.id || '' });
       setItems([{ description: '', quantity: 1, unit_price: '' }]);
@@ -317,6 +334,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
           status: form.status, observations: form.observations,
           balance: newBalance, payment_status: paymentStatus,
         });
+        await syncProductStock(products, sale.items, computedItems);
 
         const delta = total - oldTotal;
         if (delta !== 0 && client.id === sale.client_id) {
@@ -335,6 +353,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
           collected_amount: 0, balance: total, payment_status: 'Pendiente', observations: form.observations,
           owner_id: user?.id, owner_name: user?.full_name,
         });
+        await syncProductStock(products, [], computedItems);
         // create payment plan
         const inst = Number(form.installments_count) || Number(form.installments) || 1;
         const installmentAmount = total / inst;
@@ -391,7 +410,11 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
           <div className="space-y-2">
             {items.map((it, i) => (
               <div key={i} className="flex items-center gap-2">
-                <input list="products-list" value={it.description} onChange={e => { updateItem(i, 'description', e.target.value); const p = products.find(x => x.name === e.target.value); if (p) updateItem(i, 'unit_price', p.price); }}
+                <input list="products-list" value={it.description} onChange={e => {
+                  const val = e.target.value;
+                  const p = products.find(x => x.name === val);
+                  setItems(items.map((x, idx) => idx === i ? { ...x, description: val, unit_price: p ? p.price : x.unit_price, product_id: p?.id } : x));
+                }}
                   placeholder="Descripción" className="inp flex-1" />
                 <datalist id="products-list">{products.map(p => <option key={p.id} value={p.name} />)}</datalist>
                 <input type="number" value={it.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} className="inp w-16" placeholder="Cant" />
