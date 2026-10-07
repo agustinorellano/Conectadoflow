@@ -167,6 +167,9 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
+function startOfWeek(date) { const d = new Date(date); const offset = (d.getDay() + 6) % 7; d.setDate(d.getDate() - offset); d.setHours(0, 0, 0, 0); return d; }
+function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
+
 function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay }) {
   const year = month.getFullYear();
   const monthIdx = month.getMonth();
@@ -174,6 +177,7 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
   const startOffset = (firstOfMonth.getDay() + 6) % 7; // Monday-first
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
   const today = new Date();
+  const [rangeFilter, setRangeFilter] = useState('month');
 
   const cells = [];
   for (let i = 0; i < startOffset; i++) cells.push(null);
@@ -183,7 +187,23 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
 
   const goMonth = (delta) => { const d = new Date(year, monthIdx + delta, 1); setMonth(d); setSelectedDay(null); };
 
-  const dayMeetings = selectedDay ? meetingsByDay(selectedDay).sort((a, b) => new Date(a.date) - new Date(b.date)) : [];
+  const pickDay = (day) => { setSelectedDay(day); setRangeFilter('day'); };
+
+  const anchorDay = selectedDay || today;
+  const weekStart = startOfWeek(anchorDay);
+  const weekEnd = addDays(weekStart, 6);
+
+  const panelMeetings = (() => {
+    if (rangeFilter === 'day') return meetingsByDay(anchorDay);
+    if (rangeFilter === 'week') return meetings.filter(m => { const d = new Date(m.date); return d >= weekStart && d <= addDays(weekEnd, 1); });
+    return meetings.filter(m => { const d = new Date(m.date); return d.getFullYear() === year && d.getMonth() === monthIdx; });
+  })().sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const panelTitle = rangeFilter === 'day'
+    ? anchorDay.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+    : rangeFilter === 'week'
+      ? `Semana del ${weekStart.getDate()} al ${weekEnd.getDate()} de ${weekEnd.toLocaleDateString('es-AR', { month: 'long' })}`
+      : `Reuniones de ${month.toLocaleDateString('es-AR', { month: 'long' })}`;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -208,7 +228,7 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
             const visible = dayMeets.slice(0, 2);
             const extra = dayMeets.length - visible.length;
             return (
-              <button key={i} onClick={() => setSelectedDay(day)}
+              <button key={i} onClick={() => pickDay(day)}
                 className={cn(
                   'min-h-[52px] sm:min-h-[84px] rounded-xl p-1 sm:p-1.5 flex flex-col items-start gap-1 transition-colors border text-left overflow-hidden',
                   isSelected ? 'bg-primary/10 border-primary' : isToday ? 'border-primary/40' : 'border-transparent hover:bg-accent/50'
@@ -236,24 +256,38 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
       </div>
 
       <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-        <h2 className="font-semibold mb-3 text-sm">
-          {selectedDay ? selectedDay.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Seleccioná un día'}
-        </h2>
-        {!selectedDay ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">Tocá un día del calendario para ver sus reuniones.</p>
-        ) : dayMeetings.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">Sin reuniones ese día.</p>
+        <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-lg w-fit mb-3">
+          {[{ key: 'day', label: 'Hoy' }, { key: 'week', label: 'Semana' }, { key: 'month', label: 'Mes' }].map(f => (
+            <button
+              key={f.key}
+              onClick={() => { setRangeFilter(f.key); if (f.key === 'day') setSelectedDay(today); }}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors',
+                rangeFilter === f.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <h2 className="font-semibold mb-3 text-sm capitalize truncate">{panelTitle}</h2>
+        {panelMeetings.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">Sin reuniones en este período.</p>
         ) : (
           <div className="space-y-2">
-            {dayMeetings.map(m => {
+            {panelMeetings.map(m => {
               const Icon = TYPE_ICONS[m.type] || Clock;
+              const mDate = new Date(m.date);
+              const showDate = rangeFilter !== 'day';
               return (
                 <div key={m.id} className="p-3 rounded-xl border border-border">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><Icon className="w-3.5 h-3.5" /></span>
                     <p className="text-sm font-medium truncate">{m.title}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">{m.client_name} · {formatDateTime(m.date)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {m.client_name} · {showDate ? formatDateTime(m.date) : mDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                   {m.meeting_link && (
                     <a href={m.meeting_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
                       <LinkIcon className="w-3.5 h-3.5" /> Unirse
