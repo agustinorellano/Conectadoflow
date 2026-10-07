@@ -17,6 +17,7 @@ import { formatCurrency } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
 const LOW_STOCK_THRESHOLD = 5;
+const CURRENCY_OPTIONS = ['ARS', 'USD', 'EUR'];
 
 const PAGE_SIZE = 24;
 
@@ -200,7 +201,7 @@ export default function Products() {
                 <div className="flex items-center justify-between pt-3 border-t border-border">
                   <div>
                     <p className="text-xs text-muted-foreground">Precio unitario</p>
-                    <p className="text-lg font-bold">{formatCurrency(p.price, currency)}</p>
+                    <p className="text-lg font-bold">{formatCurrency(p.price, p.currency || currency)}</p>
                   </div>
                   {p.code && <span className="text-xs text-muted-foreground">Cód: {p.code}</span>}
                   <div className="flex items-center gap-1">
@@ -236,7 +237,7 @@ export default function Products() {
                   </Badge>
                 )}
                 <Badge variant={p.is_active ? 'success' : 'muted'} className="shrink-0 hidden md:inline-flex">{p.is_active ? 'Activo' : 'Inactivo'}</Badge>
-                <p className="text-sm font-semibold shrink-0 w-24 text-right">{formatCurrency(p.price, currency)}</p>
+                <p className="text-sm font-semibold shrink-0 w-24 text-right">{formatCurrency(p.price, p.currency || currency)}</p>
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={() => handleEdit(p)} title="Editar" className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Pencil className="w-4 h-4" /></button>
                   <button onClick={() => toggleActive(p)} title={p.is_active ? 'Desactivar' : 'Activar'} className={cn('w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center', p.is_active ? 'text-success' : 'text-muted-foreground')}>
@@ -316,19 +317,20 @@ function DeleteProductModal({ product, onClose, onDeleted }) {
 }
 
 function ProductForm({ open, onClose, onSaved, product }) {
-  const [form, setForm] = useState({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', description: '', image_url: '', stock: '', is_active: true });
+  const { config } = useData();
+  const [form, setForm] = useState({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (open) {
       if (product) {
-        setForm({ ...product, price: String(product.price || ''), cost: String(product.cost || ''), stock: String(product.stock || '') });
+        setForm({ ...product, price: String(product.price || ''), cost: String(product.cost || ''), stock: String(product.stock || ''), currency: product.currency || config?.currency || 'ARS' });
       } else {
-        setForm({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', description: '', image_url: '', stock: '', is_active: true });
+        setForm({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true });
       }
     }
-  }, [open, product]);
+  }, [open, product, config]);
 
   const uploadImage = async (file) => {
     setUploading(true);
@@ -400,11 +402,17 @@ function ProductForm({ open, onClose, onSaved, product }) {
           <input type="number" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} className="inp" />
         </div>
         <div>
-          <label className="text-sm font-medium mb-1.5 block">Precio *</label>
+          <label className="text-sm font-medium mb-1.5 block">Moneda</label>
+          <StyledSelect value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} className="inp">
+            {CURRENCY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+          </StyledSelect>
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Precio * ({form.currency})</label>
           <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} className="inp" />
         </div>
         <div>
-          <label className="text-sm font-medium mb-1.5 block">Costo</label>
+          <label className="text-sm font-medium mb-1.5 block">Costo ({form.currency})</label>
           <input type="number" value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })} className="inp" />
         </div>
         <div className="col-span-2">
