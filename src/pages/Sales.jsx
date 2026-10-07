@@ -22,16 +22,30 @@ import { cn } from '@/lib/utils';
 // pass per product (avoids a stale-read bug if the same product appears
 // in both with different quantities). Only affects kind='Producto' items
 // that carry a product_id — free-text/service line items never touch stock.
+//
+// Deliberately never throws: a role without permission to edit Products
+// (RLS blocks the stock update) must not make the sale itself look like it
+// failed to save — the sale already exists by the time this runs. Instead
+// it returns the names of any products whose stock could not be updated,
+// so the caller can show a non-blocking warning.
 async function syncProductStock(products, oldItems, newItems) {
   const deltas = {};
   (oldItems || []).forEach(it => { if (it.product_id) deltas[it.product_id] = (deltas[it.product_id] || 0) + (Number(it.quantity) || 0); });
   (newItems || []).forEach(it => { if (it.product_id) deltas[it.product_id] = (deltas[it.product_id] || 0) - (Number(it.quantity) || 0); });
-  const updates = Object.entries(deltas).filter(([, d]) => d !== 0).map(([productId, delta]) => {
+  const jobs = Object.entries(deltas).filter(([, d]) => d !== 0).map(([productId, delta]) => {
     const p = products.find(x => x.id === productId);
     if (!p || p.kind !== 'Producto') return null;
-    return base44.entities.Product.update(productId, { stock: Math.max(0, (Number(p.stock) || 0) + delta) });
+    return { p, delta };
   }).filter(Boolean);
-  await Promise.all(updates);
+  const failed = [];
+  await Promise.all(jobs.map(async ({ p, delta }) => {
+    try {
+      await base44.entities.Product.update(p.id, { stock: Math.max(0, (Number(p.stock) || 0) + delta) });
+    } catch {
+      failed.push(p.name);
+    }
+  }));
+  return failed;
 }
 
 export default function Sales() {
@@ -241,7 +255,7 @@ export default function Sales() {
                         <p className="text-sm text-muted-foreground">{formatDate(s.date)} · {s.items?.length || 0} ítem(s){s.channel ? ` · ${s.channel}` : ''}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold">{formatCurrency(s.total_amount, currency)}</p>
+                        <p className="font-bold">{formatCurrency(s.total_amount, s.currency || currency)}</p>
                         <div className="flex items-center gap-1.5 justify-end mt-0.5">
                            <Badge variant={statusVariant(s.status)}>Venta: {s.status}</Badge>
                            <Badge variant={payVariant(s.payment_status)} dot>Cobro: {s.payment_status}</Badge>
@@ -282,22 +296,22 @@ export default function Sales() {
                                 {(s.items || []).map((it, i) => (
                                   <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-border/50">
                                     <span className="flex-1">{it.description} <span className="text-muted-foreground">× {it.quantity}</span></span>
-                                    <span className="font-medium">{formatCurrency(it.subtotal || (it.unit_price * it.quantity), currency)}</span>
+                                    <span className="font-medium">{formatCurrency(it.subtotal || (it.unit_price * it.quantity), s.currency || currency)}</span>
                                   </div>
                                 ))}
                                 <div className="flex justify-between pt-2 text-sm">
-                                  <span className="text-muted-foreground">Bruto</span><span>{formatCurrency(s.gross_amount, currency)}</span>
+                                  <span className="text-muted-foreground">Bruto</span><span>{formatCurrency(s.gross_amount, s.currency || currency)}</span>
                                 </div>
-                                {s.discount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Descuento</span><span>-{formatCurrency(s.discount, currency)}</span></div>}
-                                {s.tax > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Impuestos</span><span>{formatCurrency(s.tax, currency)}</span></div>}
-                                <div className="flex justify-between font-bold pt-1"><span>Total</span><span>{formatCurrency(s.total_amount, currency)}</span></div>
+                                {s.discount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Descuento</span><span>-{formatCurrency(s.discount, s.currency || currency)}</span></div>}
+                                {s.tax > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Impuestos</span><span>{formatCurrency(s.tax, s.currency || currency)}</span></div>}
+                                <div className="flex justify-between font-bold pt-1"><span>Total</span><span>{formatCurrency(s.total_amount, s.currency || currency)}</span></div>
                               </div>
                             </div>
                             {/* Payments */}
                             <div>
                               <div className="flex items-center justify-between mb-2">
                                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pagos</p>
-                                <span className="text-xs text-muted-foreground">{formatCurrency(s.collected_amount, currency)} / {formatCurrency(s.total_amount, currency)}</span>
+                                <span className="text-xs text-muted-foreground">{formatCurrency(s.collected_amount, s.currency || currency)} / {formatCurrency(s.total_amount, s.currency || currency)}</span>
                               </div>
                               <PaymentPlan sale={s} payments={salePayments} currency={currency} onPaid={invalidate} />
                             </div>
@@ -356,39 +370,55 @@ function PaymentPlan({ sale, payments, currency, onPaid }) {
   );
 }
 
-const emptySaleForm = { client_id: '', date: new Date().toISOString().slice(0, 10), discount: '', tax: '', payment_method: 'Transferencia', status: 'Confirmada', installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1, channel: '' };
+const CURRENCY_OPTIONS = ['ARS', 'USD', 'EUR'];
+
+function emptySaleFormFor(config) {
+  return {
+    client_id: '', client_mode: 'existing', new_client_name: '', new_client_phone: '',
+    date: new Date().toISOString().slice(0, 10), currency: config?.currency || 'ARS',
+    discount_pct: '', apply_tax: !!config?.tax_rate, payment_method: 'Transferencia', status: 'Confirmada',
+    installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1, channel: '',
+  };
+}
 const CUSTOM_ITEM = '__custom__';
 
 function SaleForm({ open, onClose, onSaved, clients, products, user, config, sale }) {
-  const [form, setForm] = useState(emptySaleForm);
+  const [form, setForm] = useState(() => emptySaleFormFor(config));
   const { currentCommerceId: curCommerceId } = useCommerce();
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: '' }]);
   const [saving, setSaving] = useState(false);
-  const currency = config?.currency || 'ARS';
+  const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const taxRate = (config?.tax_rate || 0) / 100;
   const isEditing = !!sale;
 
   useEffect(() => {
     if (!open) return;
+    setError(''); setWarning('');
     if (sale) {
       setForm({
-        client_id: sale.client_id || '', date: (sale.date || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
-        discount: sale.discount || '', tax: sale.tax || '', payment_method: sale.payment_method || 'Transferencia',
+        client_id: sale.client_id || '', client_mode: 'existing', new_client_name: '', new_client_phone: '',
+        date: (sale.date || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+        currency: sale.currency || config?.currency || 'ARS',
+        discount_pct: sale.gross_amount ? String(((Number(sale.discount) || 0) / sale.gross_amount * 100).toFixed(2)).replace(/\.00$/, '') : '',
+        apply_tax: Number(sale.tax) > 0,
+        payment_method: sale.payment_method || 'Transferencia',
         status: sale.status || 'Confirmada', installments: sale.installments_count || 1, observations: sale.observations || '',
         bank_entity: sale.bank_entity || '', card_type: sale.card_type || '', card_brand: sale.card_brand || '',
         installments_count: sale.installments_count || 1, channel: sale.channel || '',
       });
-      setItems(sale.items?.length ? sale.items.map(it => ({ description: it.description, quantity: it.quantity, unit_price: it.unit_price, product_id: it.product_id })) : [{ description: '', quantity: 1, unit_price: '' }]);
+      setItems(sale.items?.length ? sale.items.map(it => ({ description: it.description, quantity: it.quantity, unit_price: it.unit_price, product_id: it.product_id, custom: !it.product_id })) : [{ description: '', quantity: 1, unit_price: '' }]);
     } else {
       const firstClient = clients[0];
-      setForm({ ...emptySaleForm, client_id: firstClient?.id || '', channel: firstClient?.lead_source || '' });
+      setForm({ ...emptySaleFormFor(config), client_id: firstClient?.id || '', channel: firstClient?.lead_source || '' });
       setItems([{ description: '', quantity: 1, unit_price: '' }]);
     }
-  }, [open, sale, clients]);
+  }, [open, sale, clients, config]);
 
   const gross = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 1), 0);
-  const discount = Number(form.discount) || 0;
-  const tax = Number(form.tax) || (gross - discount) * taxRate;
+  const discountPct = Math.min(100, Math.max(0, Number(form.discount_pct) || 0));
+  const discount = gross * (discountPct / 100);
+  const tax = form.apply_tax ? (gross - discount) * taxRate : 0;
   const total = gross - discount + tax;
 
   const addItem = () => setItems([...items, { description: '', quantity: 1, unit_price: '' }]);
@@ -396,10 +426,22 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
   const updateItem = (i, field, val) => setItems(items.map((it, idx) => idx === i ? { ...it, [field]: val } : it));
 
   const save = async () => {
-    const client = clients.find(c => c.id === form.client_id);
-    if (!client || items.length === 0) return;
+    setError('');
+    if (form.client_mode === 'existing' && !form.client_id) { setError('Elegí un cliente.'); return; }
+    if (form.client_mode === 'new' && !form.new_client_name.trim()) { setError('Ingresá el nombre del cliente nuevo.'); return; }
+    if (items.length === 0 || gross <= 0) { setError('Agregá al menos un producto o servicio con precio.'); return; }
     setSaving(true);
     try {
+      let client = clients.find(c => c.id === form.client_id);
+      if (form.client_mode === 'new') {
+        client = await base44.entities.Client.create({
+          name: form.new_client_name.trim(), phone: form.new_client_phone.trim(), type: 'Consumidor',
+          status: 'Activo', total_sold: 0, total_collected: 0, balance: 0,
+          owner_id: user?.id, owner_name: user?.full_name,
+        });
+      }
+      if (!client) { setError('No se encontró el cliente seleccionado.'); setSaving(false); return; }
+
       const computedItems = items.map(it => ({ ...it, subtotal: (Number(it.unit_price) || 0) * (Number(it.quantity) || 1) }));
 
       if (isEditing) {
@@ -412,13 +454,14 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
 
         await base44.entities.Sale.update(sale.id, {
           client_id: client.id, client_name: client.name,
-          items: computedItems, gross_amount: gross, discount, tax, total_amount: total,
+          items: computedItems, gross_amount: gross, discount, tax, total_amount: total, currency: form.currency,
           date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity,
           card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1,
           status: form.status, observations: form.observations, channel: form.channel || null,
           balance: newBalance, payment_status: paymentStatus,
         });
-        await syncProductStock(products, sale.items, computedItems);
+        const failed = await syncProductStock(products, sale.items, computedItems);
+        if (failed.length) setWarning(`La venta se guardó, pero no se pudo actualizar el stock de: ${failed.join(', ')}. Pedile a un administrador que lo ajuste.`);
 
         const delta = total - oldTotal;
         if (delta !== 0 && client.id === sale.client_id) {
@@ -431,14 +474,15 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
         const num = `V-${Date.now().toString().slice(-6)}`;
         const newSale = await base44.entities.Sale.create({
           number: num, client_id: client.id, client_name: client.name,
-          items: computedItems, gross_amount: gross, discount, tax, total_amount: total,
+          items: computedItems, gross_amount: gross, discount, tax, total_amount: total, currency: form.currency,
           date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity, card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1, status: form.status,
           channel: form.channel || null,
           commerce_id: curCommerceId !== 'all' ? curCommerceId : undefined,
           collected_amount: 0, balance: total, payment_status: 'Pendiente', observations: form.observations,
           owner_id: user?.id, owner_name: user?.full_name,
         });
-        await syncProductStock(products, [], computedItems);
+        const failed = await syncProductStock(products, [], computedItems);
+        if (failed.length) setWarning(`La venta se registró, pero no se pudo actualizar el stock de: ${failed.join(', ')}. Pedile a un administrador que lo ajuste.`);
         // create payment plan
         const inst = Number(form.installments_count) || Number(form.installments) || 1;
         const installmentAmount = total / inst;
@@ -459,9 +503,12 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
         await base44.entities.Client.update(client.id, { total_sold: newSold, balance: newBalance, last_contact: new Date().toISOString() });
       }
 
-      onSaved(); onClose();
+      onSaved();
       setItems([{ description: '', quantity: 1, unit_price: '' }]);
-      setForm(emptySaleForm);
+      setForm(emptySaleFormFor(config));
+      if (!warning) onClose();
+    } catch (err) {
+      setError(err?.message || 'No se pudo registrar la venta. Probá de nuevo.');
     } finally { setSaving(false); }
   };
 
@@ -470,21 +517,48 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
       footer={<>
         <div className="mr-auto text-right">
           <p className="text-xs text-muted-foreground">Total</p>
-          <p className="text-lg font-bold">{formatCurrency(total, currency)}</p>
+          <p className="text-lg font-bold">{formatCurrency(total, form.currency)}</p>
         </div>
-        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
-        <button onClick={save} disabled={saving || !form.client_id} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : isEditing ? 'Guardar cambios' : 'Registrar venta'}</button>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">{warning ? 'Cerrar' : 'Cancelar'}</button>
+        {!warning && <button onClick={save} disabled={saving} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : isEditing ? 'Guardar cambios' : 'Registrar venta'}</button>}
       </>}>
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Cliente *</label>
+        {error && <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>}
+        {warning && <div className="p-3 rounded-xl bg-warning/10 text-warning text-sm">{warning}</div>}
+
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Cliente *</label>
+          <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-xl w-fit mb-2">
+            <button type="button" onClick={() => setForm({ ...form, client_mode: 'existing' })}
+              className={cn('px-3 h-8 rounded-lg text-xs font-medium transition-colors', form.client_mode === 'existing' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              Cliente existente (B2B)
+            </button>
+            <button type="button" onClick={() => setForm({ ...form, client_mode: 'new' })}
+              className={cn('px-3 h-8 rounded-lg text-xs font-medium transition-colors', form.client_mode === 'new' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              Cliente nuevo (B2C)
+            </button>
+          </div>
+          {form.client_mode === 'existing' ? (
             <StyledSelect value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className="inp">
               <option value="">Seleccionar…</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </StyledSelect>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <input value={form.new_client_name} onChange={e => setForm({ ...form, new_client_name: e.target.value })} placeholder="Nombre del cliente *" className="inp" />
+              <input value={form.new_client_phone} onChange={e => setForm({ ...form, new_client_phone: e.target.value })} placeholder="Teléfono (opcional)" className="inp" />
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
           <Inp label="Fecha" type="date" value={form.date} onChange={v => setForm({ ...form, date: v })} />
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Moneda</label>
+            <StyledSelect value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} className="inp">
+              {CURRENCY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+            </StyledSelect>
+          </div>
         </div>
 
         <div>
@@ -503,35 +577,41 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
             {items.map((it, i) => {
               const linkedProduct = it.product_id ? products.find(x => x.id === it.product_id) : null;
               const overStock = linkedProduct?.kind === 'Producto' && Number(it.quantity) > (Number(linkedProduct.stock) || 0);
+              const showCustomInput = it.custom && !it.product_id;
               return (
               <div key={i}>
                 <div className="flex items-center gap-2">
-                  <StyledSelect
-                    value={it.product_id || (it.description ? CUSTOM_ITEM : '')}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === CUSTOM_ITEM) {
-                        setItems(items.map((x, idx) => idx === i ? { ...x, product_id: undefined, description: x.description || '' } : x));
-                      } else {
-                        const p = products.find(x => x.id === val);
-                        setItems(items.map((x, idx) => idx === i ? { ...x, description: p?.name || '', unit_price: p ? p.price : x.unit_price, product_id: p?.id } : x));
-                      }
-                    }}
-                    className="inp flex-1"
-                  >
-                    <option value="">Seleccionar producto…</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}{p.kind === 'Producto' ? ` (stock: ${p.stock ?? 0})` : ''}</option>
-                    ))}
-                    <option value={CUSTOM_ITEM}>Personalizado / otro…</option>
-                  </StyledSelect>
-                  {!it.product_id && (
-                    <input value={it.description} onChange={e => updateItem(i, 'description', e.target.value)}
-                      placeholder="Descripción" className="inp flex-1" />
+                  {showCustomInput ? (
+                    <div className="flex-1 flex items-center gap-1.5">
+                      <input value={it.description} onChange={e => updateItem(i, 'description', e.target.value)} autoFocus
+                        placeholder="Descripción del producto o servicio" className="inp flex-1" />
+                      <button type="button" onClick={() => setItems(items.map((x, idx) => idx === i ? { ...x, custom: false, description: '' } : x))}
+                        className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap px-1">Elegir del catálogo</button>
+                    </div>
+                  ) : (
+                    <StyledSelect
+                      value={it.product_id || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === CUSTOM_ITEM) {
+                          setItems(items.map((x, idx) => idx === i ? { ...x, product_id: undefined, description: '', custom: true } : x));
+                        } else {
+                          const p = products.find(x => x.id === val);
+                          setItems(items.map((x, idx) => idx === i ? { ...x, description: p?.name || '', unit_price: p ? p.price : x.unit_price, product_id: p?.id, custom: false } : x));
+                        }
+                      }}
+                      className="inp flex-1"
+                    >
+                      <option value="">Seleccionar producto o servicio…</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}{p.kind === 'Producto' ? ` (stock: ${p.stock ?? 0})` : ''}</option>
+                      ))}
+                      <option value={CUSTOM_ITEM}>Personalizado / otro…</option>
+                    </StyledSelect>
                   )}
                   <input type="number" value={it.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} className="inp w-16" placeholder="Cant" />
                   <input type="number" value={it.unit_price} onChange={e => updateItem(i, 'unit_price', e.target.value)} className="inp w-28" placeholder="Precio" />
-                  <span className="text-sm font-medium w-24 text-right">{formatCurrency((Number(it.unit_price) || 0) * (Number(it.quantity) || 1), currency)}</span>
+                  <span className="text-sm font-medium w-24 text-right">{formatCurrency((Number(it.unit_price) || 0) * (Number(it.quantity) || 1), form.currency)}</span>
                   {items.length > 1 && <button onClick={() => removeItem(i)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>}
                 </div>
                 {overStock && <p className="text-xs text-warning mt-1 ml-1">Supera el stock disponible ({linkedProduct.stock ?? 0} unidades)</p>}
@@ -542,8 +622,14 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <Inp label="Descuento" type="number" value={form.discount} onChange={v => setForm({ ...form, discount: v })} />
-          <Inp label="Impuestos" type="number" value={form.tax} onChange={v => setForm({ ...form, tax: v })} placeholder={`Auto ${config?.tax_rate || 0}%`} />
+          <Inp label="Descuento (%)" type="number" value={form.discount_pct} onChange={v => setForm({ ...form, discount_pct: v })} placeholder="0" />
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Impuestos</label>
+            <label className="inp flex items-center gap-2 cursor-pointer select-none h-[38px]">
+              <input type="checkbox" checked={form.apply_tax} onChange={e => setForm({ ...form, apply_tax: e.target.checked })} className="w-4 h-4 accent-primary" />
+              <span className="text-sm">Aplicar {config?.tax_rate || 0}%</span>
+            </label>
+          </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Cuotas</label>
             <StyledSelect value={form.installments_count} onChange={e => setForm({ ...form, installments_count: e.target.value, installments: e.target.value })} className="inp">{INSTALLMENT_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}</StyledSelect>
