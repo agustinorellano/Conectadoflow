@@ -165,9 +165,7 @@ export default function Communication() {
         )}
       </div>
 
-      {loading ? <div className="text-center py-16 text-muted-foreground">Cargando…</div> : !selectedPhase ? (
-        <EmptyState icon={MessageCircle} title="Elegí una etapa" subtitle="Tocá una de las etapas de arriba para ver sus plantillas de mensaje." />
-      ) : (
+      {loading ? <div className="text-center py-10 text-muted-foreground">Cargando…</div> : !selectedPhase ? null : (
         <div className="space-y-6">
           {JOURNEY_PHASES.find(p => p.key === selectedPhase).categories.map(cat => {
             const items = channelTemplates.filter(t => t.category === cat);
@@ -243,9 +241,7 @@ export default function Communication() {
           )}
         </div>
 
-        {loadingDocTemplates ? <div className="text-center py-10 text-muted-foreground text-sm">Cargando…</div> : !selectedDocType ? (
-          <EmptyState icon={FileSignature} title="Elegí un tipo de documento" subtitle="Tocá uno de los tipos de arriba para ver y editar sus modelos." />
-        ) : (
+        {loadingDocTemplates ? <div className="text-center py-10 text-muted-foreground text-sm">Cargando…</div> : !selectedDocType ? null : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {docTemplates.filter(t => t.doc_type === selectedDocType).map(t => (
               <div key={t.id} className="bg-card rounded-2xl border border-border card-shadow p-4">
