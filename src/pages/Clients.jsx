@@ -328,6 +328,8 @@ function SituationSelect({ client, onChange }) {
 }
 
 function ClientMessageModal({ client, initialChannel, onClose }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [text, setText] = useState('');
   const [subject, setSubject] = useState('');
   const [channel, setChannel] = useState('WhatsApp');
@@ -352,6 +354,11 @@ function ClientMessageModal({ client, initialChannel, onClose }) {
     if (!canSend) return;
     const url = channel === 'WhatsApp' ? buildWhatsAppUrl(client.phone, text) : buildMailtoUrl(client.email, subject, text);
     window.open(url, channel === 'WhatsApp' ? '_blank' : '_self');
+    base44.entities.Activity.create({
+      client_id: client.id, client_name: client.name, type: channel, title: `Mensaje por ${channel === 'WhatsApp' ? 'WhatsApp' : 'mail'}`,
+      description: channel === 'Email' ? `Asunto: ${subject}\n\n${text}` : text, date: new Date().toISOString(), status: 'Realizada',
+      owner_id: user?.id, owner_name: user?.full_name,
+    }).then(() => queryClient.invalidateQueries({ queryKey: ['Activity'] })).catch(() => {});
     onClose();
   };
 

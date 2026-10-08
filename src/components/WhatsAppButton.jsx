@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Edit3 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { buildWhatsAppUrl, fillTemplate } from '@/lib/flowUtils';
 import Modal from '@/components/Modal';
 
 export default function WhatsAppButton({ phone, client, opportunity, stage, compact }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [message, setMessage] = useState('');
@@ -56,6 +60,16 @@ export default function WhatsAppButton({ phone, client, opportunity, stage, comp
     const url = buildWhatsAppUrl(phone, message);
     window.open(url, '_blank');
     setOpen(false);
+    // Logged only when this is a real client (has an id) — the lead
+    // shortcut in Leads.jsx passes a plain { name } with no id, and an
+    // orphaned Activity with no client_id would never show up anywhere.
+    if (client?.id) {
+      base44.entities.Activity.create({
+        client_id: client.id, client_name: client.name, type: 'WhatsApp', title: 'Mensaje por WhatsApp',
+        description: message, date: new Date().toISOString(), status: 'Realizada',
+        owner_id: user?.id, owner_name: user?.full_name,
+      }).then(() => queryClient.invalidateQueries({ queryKey: ['Activity'] })).catch(() => {});
+    }
   };
 
   return (
