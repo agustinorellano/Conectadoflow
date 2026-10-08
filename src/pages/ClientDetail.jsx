@@ -7,6 +7,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import SituationStatus from '@/components/SituationStatus';
 import WhatsAppButton from '@/components/WhatsAppButton';
+import DocumentGeneratorModal from '@/components/DocumentGeneratorModal';
 import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
 import { ClientForm } from '@/pages/Clients';
@@ -25,6 +26,7 @@ export default function ClientDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [oppForm, setOppForm] = useState(false);
   const [meetingForm, setMeetingForm] = useState(false);
+  const [docModal, setDocModal] = useState(false);
   const [note, setNote] = useState('');
 
   const { data: client, isLoading: loadingClient } = useQuery({
@@ -85,6 +87,9 @@ export default function ClientDetail() {
         </div>
         <div className="flex items-center gap-2">
           <WhatsAppButton phone={client.phone} client={client} />
+          <button onClick={() => setDocModal(true)} className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-violet-500 text-white text-sm font-medium hover:opacity-90">
+            <FileText className="w-4 h-4" /> Documentos
+          </button>
           <button onClick={() => setEditOpen(true)} className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-accent">
             <Edit3 className="w-4 h-4" /> Editar
           </button>
@@ -184,6 +189,7 @@ export default function ClientDetail() {
       <ClientForm open={editOpen} onClose={() => setEditOpen(false)} onSaved={() => invalidate(['Client'])} editClient={client} user={user} />
       <OppFormModal open={oppForm} onClose={() => setOppForm(false)} onSaved={() => invalidate(['Opportunity'])} client={client} user={user} />
       <MeetingFormModal open={meetingForm} onClose={() => setMeetingForm(false)} onSaved={() => invalidate(['Meeting', 'Client'])} client={client} user={user} />
+      <DocumentGeneratorModal client={docModal ? client : null} onClose={() => setDocModal(false)} />
     </div>
   );
 }
