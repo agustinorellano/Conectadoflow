@@ -68,6 +68,11 @@ export default function Dashboard() {
 
   const currency = config?.currency || 'ARS';
   const isAllCommerces = currentCommerceId === 'all' && commerces.length > 1;
+  // "Mejor vendedor" only makes sense when there's a team to rank — in
+  // modo independiente there's only one seller, so comparing them to
+  // themselves is noise, not signal. Managers see it to track their team;
+  // a vendedor doesn't need (or shouldn't see) a ranking of their peers.
+  const showTopSeller = config?.mode === 'Equipo' && (user?.role === 'admin' || user?.role === 'manager');
   const amount = (v) => hideAmounts ? '••••••' : formatCurrency(v, currency);
   const rates = useCurrencyRates();
 
@@ -288,24 +293,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+      <div className={cn('grid grid-cols-1 gap-3 mb-4', showTopSeller ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
         <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.revenue} formatValue={amount} />
-        <div className="bg-card rounded-2xl border border-border card-shadow p-3.5 h-full flex flex-col justify-center">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Trophy className="w-3 h-3" />
-            </span>
-            <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Mejor vendedor</p>
+        {showTopSeller && (
+          <div className="bg-card rounded-2xl border border-border card-shadow p-3.5 h-full flex flex-col justify-center">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Trophy className="w-3 h-3" />
+              </span>
+              <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Mejor vendedor</p>
+            </div>
+            {stats.topSeller ? (
+              <>
+                <p className="text-base font-bold tracking-tight truncate">{stats.topSeller.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{amount(stats.topSeller.revenue)} · {stats.topSeller.count} ventas</p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin ventas en el período</p>
+            )}
           </div>
-          {stats.topSeller ? (
-            <>
-              <p className="text-base font-bold tracking-tight truncate">{stats.topSeller.name}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{amount(stats.topSeller.revenue)} · {stats.topSeller.count} ventas</p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin ventas en el período</p>
-          )}
-        </div>
+        )}
         <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} sparkline={stats.leadsSparkline} />
       </div>
 
