@@ -86,6 +86,20 @@ export function isStaleClient(client) {
   return days === null || days > STALE_CONTACT_DAYS;
 }
 
+// Same idea for Pipeline: an open opportunity nobody has touched (moved
+// stage, edited) in this many days is probably being forgotten, not
+// deliberately parked. updated_date is the closest thing to "last touched"
+// Opportunity has — every stage change goes through .update().
+export const STALE_OPP_DAYS = 10;
+
+export function isStaleOpportunity(opp) {
+  if (opp.is_won || opp.is_lost) return false;
+  const ref = opp.updated_date || opp.created_date;
+  if (!ref) return false;
+  const days = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+  return days > STALE_OPP_DAYS;
+}
+
 // Period filter helpers. `period` is either a preset key ('month', '7d', …)
 // or a custom { start, end } range (Date instances or date strings) picked
 // from DateRangePicker — both go through the same inPeriod()/variation()

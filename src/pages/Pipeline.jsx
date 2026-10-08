@@ -3,14 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { motion, AnimatePresence } from 'framer-motion';
-import { KanbanSquare, Plus, X, TrendingUp, Trophy, XCircle } from 'lucide-react';
+import { KanbanSquare, Plus, X, TrendingUp, Trophy, XCircle, BellRing, Clock3 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
-import { formatCurrency, formatDate, stageColor } from '@/lib/flowUtils';
+import { formatCurrency, formatDate, stageColor, isStaleOpportunity, STALE_OPP_DAYS } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
@@ -75,6 +75,7 @@ export default function Pipeline() {
 
   const oppsByStage = (stageName) => opps.filter(o => o.stage === stageName);
   const totalByStage = (stageName) => oppsByStage(stageName).reduce((s, o) => s + (Number(o.amount) || 0), 0);
+  const staleOpps = opps.filter(isStaleOpportunity);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -89,6 +90,19 @@ export default function Pipeline() {
           <Plus className="w-4 h-4" /> Nueva oportunidad
         </button>
       </div>
+
+      {staleOpps.length > 0 && (
+        <div className="w-full flex items-center gap-3 bg-warning/10 border border-warning/30 rounded-2xl p-3.5 sm:p-4 mb-4">
+          <span className="w-9 h-9 rounded-xl bg-warning/20 text-warning flex items-center justify-center shrink-0">
+            <BellRing className="w-4 h-4" />
+          </span>
+          <p className="text-sm flex-1 min-w-0">
+            <span className="font-semibold">{staleOpps.length} oportunidad{staleOpps.length === 1 ? '' : 'es'} estancada{staleOpps.length === 1 ? '' : 's'}</span>{' '}
+            sin movimiento hace más de {STALE_OPP_DAYS} días
+            <span className="text-muted-foreground"> — {staleOpps.slice(0, 3).map(o => o.title).join(', ')}{staleOpps.length > 3 ? '…' : ''}</span>
+          </p>
+        </div>
+      )}
 
       {loading ? <div className="text-center py-16 text-muted-foreground">Cargando…</div> :
         <DragDropContext onDragEnd={onDragEnd}>
@@ -111,14 +125,18 @@ export default function Pipeline() {
                           {items.length > 0 && <span className="text-xs text-muted-foreground">{formatCurrency(totalByStage(stage.name))}</span>}
                         </div>
                         <div className="space-y-2 min-h-[40px]">
-                          {items.map((o, idx) => (
+                          {items.map((o, idx) => {
+                            const stale = isStaleOpportunity(o);
+                            return (
                             <Draggable key={o.id} draggableId={o.id} index={idx}>
                               {(p, s) => (
                                 <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}
-                                  className={cn('bg-card rounded-xl border border-border p-3 cursor-grab active:cursor-grabbing transition-shadow',
+                                  className={cn('bg-card rounded-xl border p-3 cursor-grab active:cursor-grabbing transition-shadow',
+                                    stale ? 'border-warning/40' : 'border-border',
                                     s.isDragging && 'shadow-lg ring-2 ring-primary/30')}>
                                   <div className="flex items-start justify-between gap-2 mb-1.5">
                                     <p className="text-sm font-medium leading-tight">{o.title}</p>
+                                    {stale && <Clock3 className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />}
                                   </div>
                                   <p className="text-xs text-muted-foreground mb-2 truncate">{o.client_name}</p>
                                   <div className="flex items-center justify-between">
@@ -131,7 +149,8 @@ export default function Pipeline() {
                                 </div>
                               )}
                             </Draggable>
-                          ))}
+                            );
+                          })}
                           {provided.placeholder}
                         </div>
                       </div>

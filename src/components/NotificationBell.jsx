@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { useCommerce } from '@/lib/CommerceContext';
 import { useEntityList } from '@/lib/useEntityQuery';
-import { isOverdue, formatDate, isStaleClient, STALE_CONTACT_DAYS } from '@/lib/flowUtils';
+import { isOverdue, formatDate, isStaleClient, STALE_CONTACT_DAYS, isStaleOpportunity, STALE_OPP_DAYS } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
 const NOTIF_KEY = (userId) => ['Notification', 'list', { filter: { owner_id: userId, is_read: false }, sort: '-created_date', limit: 20 }];
@@ -28,6 +28,7 @@ export default function NotificationBell() {
   const { data: leads = [] } = useEntityList('Lead', { enabled: !!user });
   const { data: activities = [] } = useEntityList('Activity', { enabled: !!user });
   const { data: clients = [] } = useEntityList('Client', { enabled: !!user });
+  const { data: opportunities = [] } = useEntityList('Opportunity', { enabled: !!user });
   const { data: notifications = [] } = useEntityList('Notification', {
     filter: user ? { owner_id: user.id, is_read: false } : undefined,
     sort: '-created_date', limit: 20, enabled: !!user,
@@ -61,6 +62,17 @@ export default function NotificationBell() {
       title: `${staleClients.length} cliente${staleClients.length === 1 ? '' : 's'} sin seguimiento`,
       subtitle: `Llevan más de ${STALE_CONTACT_DAYS} días sin contacto`,
       link: '/clientes',
+    }];
+
+    const staleOpps = filterByCommerce(opportunities).filter(isStaleOpportunity);
+    const staleOppsAlert = staleOpps.length === 0 ? [] : [{
+      id: 'stale-opps',
+      type: 'stale-opp',
+      icon: BellRing,
+      color: 'text-warning bg-warning/10',
+      title: `${staleOpps.length} oportunidad${staleOpps.length === 1 ? '' : 'es'} estancada${staleOpps.length === 1 ? '' : 's'}`,
+      subtitle: `Sin movimiento hace más de ${STALE_OPP_DAYS} días`,
+      link: '/pipeline',
     }];
 
     const overduePayments = fPayments
@@ -102,8 +114,8 @@ export default function NotificationBell() {
         link: '/clientes',
       }));
 
-    return [...adminNotifications, ...staleAlert, ...overduePayments, ...untouchedLeads, ...todayActivities];
-  }, [user, notifications, payments, leads, activities, clients, filterByCommerce]);
+    return [...adminNotifications, ...staleAlert, ...staleOppsAlert, ...overduePayments, ...untouchedLeads, ...todayActivities];
+  }, [user, notifications, payments, leads, activities, clients, opportunities, filterByCommerce]);
 
   const count = items.length;
 
