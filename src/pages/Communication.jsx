@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight, Mail, FileSignature } from 'lucide-react';
+import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight, Mail, FileSignature, PackageCheck, Truck, ClipboardCheck, Handshake, FileEdit } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
@@ -26,6 +26,15 @@ const JOURNEY_PHASES = [
   { key: 'postventa', label: 'Post venta', icon: RefreshCw, color: '#22c55e', categories: ['Cierre', 'Agradecimiento', 'Reactivación', 'Postventa'] },
 ];
 
+const DOC_TYPE_META = {
+  'Constancia de entrega': { icon: PackageCheck, color: '#465BE8' },
+  'Comprobante de entrega de mercadería': { icon: Truck, color: '#0ea5e9' },
+  'Constancia de prestación de servicios': { icon: ClipboardCheck, color: '#8b5cf6' },
+  'Acuerdo comercial de venta': { icon: Handshake, color: '#f59e0b' },
+  'Conformidad de recepción': { icon: FileSignature, color: '#22c55e' },
+  'Documento personalizado': { icon: FileEdit, color: '#64748b' },
+};
+
 const DEFAULT_TEMPLATES = [
   { name: 'Primer contacto', category: 'Primer contacto', body: 'Hola {nombre}, ¿cómo estás? Soy {vendedor} de Conectado. Vi tu interés en {producto} y quería presentarme. ¿Tenés unos minutos para charlar?' },
   { name: 'Seguimiento general', category: 'Seguimiento', body: 'Hola {nombre}, ¿cómo estás? Quería saber si tenés alguna duda sobre {producto} o si avanzamos con la propuesta. Quedo a disposición.' },
@@ -45,6 +54,7 @@ export default function Communication() {
   const [preview, setPreview] = useState(null);
   const [selectedPhase, setSelectedPhase] = useState(null);
   const [editDocT, setEditDocT] = useState(null);
+  const [selectedDocType, setSelectedDocType] = useState(null);
 
   const countFor = (phase) => templates.filter(t => phase.categories.includes(t.category)).length;
 
@@ -158,28 +168,51 @@ export default function Communication() {
         <p className="text-sm text-muted-foreground mb-4 flex items-center gap-1.5">
           <FileSignature className="w-3.5 h-3.5 shrink-0" /> El texto por defecto de cada tipo de documento (constancias, acuerdos, etc.) que se genera desde Clientes. Editalo acá una vez y queda así para todos los clientes — no hace falta rearmarlo cada vez.
         </p>
-        {loadingDocTemplates ? <div className="text-center py-10 text-muted-foreground text-sm">Cargando…</div> : (
-          <div className="space-y-4">
-            {DOC_TYPES.filter(dt => dt !== 'Documento personalizado').map(docType => {
-              const items = docTemplates.filter(t => t.doc_type === docType);
-              if (items.length === 0) return null;
-              return (
-                <div key={docType}>
-                  <h3 className="text-sm font-semibold mb-2">{docType}</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {items.map(t => (
-                      <div key={t.id} className="bg-card rounded-2xl border border-border card-shadow p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <Badge variant={t.operation_type === 'B2B' ? 'primary' : t.operation_type === 'B2C' ? 'blue' : 'muted'}>{t.operation_type}</Badge>
-                          <button onClick={() => setEditDocT(t)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
-                        </div>
-                        <p className="text-sm text-muted-foreground line-clamp-3">{t.intro_text}</p>
-                      </div>
-                    ))}
-                  </div>
+
+        <div className={cn('mb-6', !selectedDocType && 'bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5')}>
+          {selectedDocType ? (
+            <button onClick={() => setSelectedDocType(null)} className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:gap-2 transition-all">
+              <ChevronLeft className="w-4 h-4" /> Todos los tipos de documento
+            </button>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              {DOC_TYPES.map(docType => {
+                const meta = DOC_TYPE_META[docType];
+                const count = docTemplates.filter(t => t.doc_type === docType).length;
+                return (
+                  <button key={docType} onClick={() => setSelectedDocType(docType)}
+                    className="group flex flex-col items-center gap-2 p-4 rounded-2xl border border-border hover:border-current hover:-translate-y-0.5 hover:card-shadow transition-all text-center"
+                    style={{ color: meta.color }}>
+                    <span className="w-11 h-11 rounded-full flex items-center justify-center transition-transform group-hover:scale-105" style={{ background: meta.color + '1a' }}>
+                      <meta.icon className="w-5 h-5" />
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{docType}</span>
+                    <span className="text-xs text-muted-foreground">{count} plantilla{count === 1 ? '' : 's'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {loadingDocTemplates ? <div className="text-center py-10 text-muted-foreground text-sm">Cargando…</div> : !selectedDocType ? (
+          <EmptyState icon={FileSignature} title="Elegí un tipo de documento" subtitle="Tocá uno de los tipos de arriba para ver y editar sus modelos." />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {docTemplates.filter(t => t.doc_type === selectedDocType).map(t => (
+              <div key={t.id} className="bg-card rounded-2xl border border-border card-shadow p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <Badge variant={t.operation_type === 'B2B' ? 'primary' : t.operation_type === 'B2C' ? 'blue' : 'muted'}>{t.operation_type}</Badge>
+                  <button onClick={() => setEditDocT(t)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
                 </div>
-              );
-            })}
+                <p className="text-sm text-muted-foreground line-clamp-3">{t.intro_text}</p>
+              </div>
+            ))}
+            {docTemplates.filter(t => t.doc_type === selectedDocType).length === 0 && (
+              <div className="md:col-span-2">
+                <EmptyState icon={FileSignature} title="Sin modelos para este tipo" subtitle="Este tipo de documento todavía no tiene plantillas B2B/B2C cargadas." />
+              </div>
+            )}
           </div>
         )}
       </div>
