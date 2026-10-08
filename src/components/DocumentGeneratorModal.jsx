@@ -169,20 +169,40 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
     queryClient.invalidateQueries({ queryKey: ['ClientDocument'] });
   };
 
+  const markSendError = async (message) => {
+    setError(message);
+    if (!result) return;
+    try {
+      await base44.entities.ClientDocument.update(result.id, { status: 'Error de envío' });
+      setResult(r => ({ ...r, status: 'Error de envío' }));
+      queryClient.invalidateQueries({ queryKey: ['ClientDocument'] });
+    } catch { /* best-effort status flag — the error message already reached the user */ }
+  };
+
   const sendWhatsApp = async () => {
     if (!result || !client.phone) return;
-    const { signed_url } = await base44.integrations.Core.CreateDocumentSignedUrl({ file_uri: result.file_uri });
-    const msg = `Hola ${client.name?.split(' ')[0] || ''}! Te comparto el documento ${result.document_number} (${docType}): ${signed_url}`;
-    window.open(buildWhatsAppUrl(client.phone, msg), '_blank');
-    markSent('WhatsApp', client.phone);
+    setError('');
+    try {
+      const { signed_url } = await base44.integrations.Core.CreateDocumentSignedUrl({ file_uri: result.file_uri });
+      const msg = `Hola ${client.name?.split(' ')[0] || ''}! Te comparto el documento ${result.document_number} (${docType}): ${signed_url}`;
+      window.open(buildWhatsAppUrl(client.phone, msg), '_blank');
+      await markSent('WhatsApp', client.phone);
+    } catch (err) {
+      await markSendError(err?.message || 'No se pudo generar el link para enviar por WhatsApp. Probá de nuevo.');
+    }
   };
 
   const sendEmail = async () => {
     if (!result || !client.email) return;
-    const { signed_url } = await base44.integrations.Core.CreateDocumentSignedUrl({ file_uri: result.file_uri });
-    const msg = `Hola ${client.name?.split(' ')[0] || ''},\n\nTe compartimos el documento ${result.document_number} (${docType}).\n\nPodés verlo acá: ${signed_url}\n\nSaludos.`;
-    window.open(buildMailtoUrl(client.email, `${docType} ${result.document_number}`, msg), '_self');
-    markSent('Email', client.email);
+    setError('');
+    try {
+      const { signed_url } = await base44.integrations.Core.CreateDocumentSignedUrl({ file_uri: result.file_uri });
+      const msg = `Hola ${client.name?.split(' ')[0] || ''},\n\nTe compartimos el documento ${result.document_number} (${docType}).\n\nPodés verlo acá: ${signed_url}\n\nSaludos.`;
+      window.open(buildMailtoUrl(client.email, `${docType} ${result.document_number}`, msg), '_self');
+      await markSent('Email', client.email);
+    } catch (err) {
+      await markSendError(err?.message || 'No se pudo generar el link para enviar por mail. Probá de nuevo.');
+    }
   };
 
   const downloadHistoryDoc = async (d) => {
@@ -221,6 +241,12 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
               {result.status === 'Enviado' && ` Enviado por ${result.sent_channel} a ${result.sent_to}.`}
             </p>
           </div>
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+              <XCircle className="w-5 h-5 text-destructive shrink-0" />
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
           {!client.phone && !client.email && (
             <p className="text-xs text-muted-foreground">Este cliente no tiene teléfono ni email cargado, así que no se puede enviar desde acá todavía — podés descargarlo igual.</p>
           )}
