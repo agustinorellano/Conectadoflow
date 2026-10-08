@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Plus, Trash2, Eye, Download, Send, Mail, MessageCircle,
-  AlertTriangle, History, ArrowLeft, CheckCircle2, XCircle,
+  AlertTriangle, History, ArrowLeft, CheckCircle2, XCircle, Ban,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
@@ -211,6 +211,22 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
     window.open(signed_url, '_blank');
   };
 
+  // Anular: marca el documento como inválido sin borrarlo — el PDF ya
+  // entregado/enviado no desaparece, pero deja de contar como vigente
+  // (por ejemplo, si se generó con datos equivocados o la operación se
+  // canceló). Nunca se anula un documento que ya figura anulado.
+  const [voidingId, setVoidingId] = useState(null);
+  const voidHistoryDoc = async (d) => {
+    if (d.status === 'Anulado') return;
+    if (!confirm(`¿Anular el documento ${d.document_number}? Va a dejar de considerarse vigente, pero el historial se conserva.`)) return;
+    setVoidingId(d.id);
+    try {
+      await base44.entities.ClientDocument.update(d.id, { status: 'Anulado' });
+      queryClient.invalidateQueries({ queryKey: ['ClientDocument'] });
+      if (result?.id === d.id) setResult(r => ({ ...r, status: 'Anulado' }));
+    } finally { setVoidingId(null); }
+  };
+
   return (
     <Modal open={open} onClose={onClose} title={client ? `Documentos — ${client.name}` : ''}
       subtitle={sale ? `A partir de la venta ${sale.number || ''}` : undefined} size="lg"
@@ -250,6 +266,14 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
           {!client.phone && !client.email && (
             <p className="text-xs text-muted-foreground">Este cliente no tiene teléfono ni email cargado, así que no se puede enviar desde acá todavía — podés descargarlo igual.</p>
           )}
+          {result.status !== 'Anulado' ? (
+            <button onClick={() => voidHistoryDoc(result)} disabled={voidingId === result.id}
+              className="text-xs text-muted-foreground hover:text-destructive underline disabled:opacity-50">
+              {voidingId === result.id ? 'Anulando…' : 'Anular este documento'}
+            </button>
+          ) : (
+            <p className="text-xs text-muted-foreground">Este documento está anulado.</p>
+          )}
         </div>
       ) : (
         <>
@@ -274,7 +298,13 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
                   </div>
                   <Badge variant={STATUS_VARIANT[d.status] || 'muted'}>{d.status}</Badge>
                   {d.file_uri && (
-                    <button onClick={() => downloadHistoryDoc(d)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground shrink-0"><Download className="w-4 h-4" /></button>
+                    <button onClick={() => downloadHistoryDoc(d)} title="Descargar" className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground shrink-0"><Download className="w-4 h-4" /></button>
+                  )}
+                  {d.status !== 'Anulado' && (
+                    <button onClick={() => voidHistoryDoc(d)} disabled={voidingId === d.id} title="Anular"
+                      className="w-8 h-8 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-muted-foreground shrink-0 disabled:opacity-50">
+                      <Ban className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
               ))}
