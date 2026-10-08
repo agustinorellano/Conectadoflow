@@ -18,6 +18,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import Onboarding from '@/pages/Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import Leads from '@/pages/Leads';
+import Import from '@/pages/Import';
 import Clients from '@/pages/Clients';
 import ClientDetail from '@/pages/ClientDetail';
 import Pipeline from '@/pages/Pipeline';
@@ -53,6 +54,7 @@ const AuthenticatedApp = () => {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/leads" element={<Leads />} />
+          <Route path="/importar" element={<Import />} />
           <Route path="/clientes" element={<Clients />} />
           <Route path="/clientes/:id" element={<ClientDetail />} />
           <Route path="/pipeline" element={<Pipeline />} />

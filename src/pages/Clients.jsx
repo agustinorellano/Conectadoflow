@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight, Package, FileText } from 'lucide-react';
+import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight, Package, FileText, Upload } from 'lucide-react';
 import DocumentGeneratorModal from '@/components/DocumentGeneratorModal';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -118,10 +118,16 @@ export default function Clients() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Clientes</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{clients.length} clientes</p>
         </div>
-        <button onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
-          <Plus className="w-4 h-4" /> Nuevo cliente
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate('/importar?entity=Client')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-accent">
+            <Upload className="w-4 h-4" /> Importar
+          </button>
+          <button onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+            <Plus className="w-4 h-4" /> Nuevo cliente
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter } from 'lucide-react';
+import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter, Upload } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -54,10 +54,16 @@ export default function Leads() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Leads</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{leads.length} leads · {leads.filter(l => l.status === 'Nuevo').length} nuevos</p>
         </div>
-        <button onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
-          <UserPlus className="w-4 h-4" /> Nuevo lead
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate('/importar?entity=Lead')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-accent">
+            <Upload className="w-4 h-4" /> Importar
+          </button>
+          <button onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
+            <UserPlus className="w-4 h-4" /> Nuevo lead
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-5">

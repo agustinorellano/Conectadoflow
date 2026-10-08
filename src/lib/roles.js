@@ -29,6 +29,7 @@ const PAGE_ROLES = {
   '/reportes': ['admin', 'manager'],
   '/equipo': ['admin', 'manager'],
   '/configuracion': ['admin'],
+  '/importar': ['admin', 'manager', 'user'], // viewer never writes, same as everywhere else
 };
 
 export function canAccessPath(role, path) {
