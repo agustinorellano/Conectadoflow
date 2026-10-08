@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight, Mail } from 'lucide-react';
+import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight, Mail, FileSignature } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
@@ -9,6 +9,7 @@ import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { buildWhatsAppUrl, buildMailtoUrl, fillTemplate, COMMUNICATION_CHANNELS } from '@/lib/flowUtils';
+import { DOC_TYPES, DEFAULT_DOCUMENT_TEMPLATES } from '@/lib/documentEngine';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = ['Primer contacto','Seguimiento','Confirmación de reunión','Recordatorio','Envío de propuesta','Seguimiento de propuesta','Cierre','Agradecimiento','Facturación','Recordatorio de pago','Pago vencido','Reactivación','Postventa'];
@@ -38,14 +39,17 @@ const DEFAULT_TEMPLATES = [
 export default function Communication() {
   const queryClient = useQueryClient();
   const { data: templates = [], isLoading: loading } = useEntityList('MessageTemplate');
+  const { data: docTemplates = [], isLoading: loadingDocTemplates } = useEntityList('DocumentTemplate');
   const [showForm, setShowForm] = useState(false);
   const [editT, setEditT] = useState(null);
   const [preview, setPreview] = useState(null);
   const [selectedPhase, setSelectedPhase] = useState(null);
+  const [editDocT, setEditDocT] = useState(null);
 
   const countFor = (phase) => templates.filter(t => phase.categories.includes(t.category)).length;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['MessageTemplate'] });
+  const invalidateDocT = () => queryClient.invalidateQueries({ queryKey: ['DocumentTemplate'] });
 
   // First-ever load of this org: no templates exist yet, seed the defaults
   // once so there's something to show.
@@ -55,6 +59,16 @@ export default function Communication() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, templates.length]);
+
+  // Same seeding pattern for document templates (also done from the
+  // document generator itself, in case this page is never visited —
+  // whichever loads first wins, the other's check just finds them already there).
+  useEffect(() => {
+    if (!loadingDocTemplates && docTemplates.length === 0) {
+      base44.entities.DocumentTemplate.bulkCreate(DEFAULT_DOCUMENT_TEMPLATES.map(t => ({ ...t, is_system: true }))).then(invalidateDocT);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingDocTemplates, docTemplates.length]);
 
   const del = async (t) => {
     await base44.entities.MessageTemplate.delete(t.id);
@@ -74,6 +88,8 @@ export default function Communication() {
           <Plus className="w-4 h-4" /> Nueva plantilla
         </button>
       </div>
+
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Mensajes por WhatsApp / Mail</h2>
 
       <div className={cn('mb-6', !selectedPhase && 'bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5')}>
         {selectedPhase ? (
@@ -137,8 +153,40 @@ export default function Communication() {
         </div>
       )}
 
+      <div className="mt-10 pt-8 border-t border-border">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Modelos de documentos</h2>
+        <p className="text-sm text-muted-foreground mb-4 flex items-center gap-1.5">
+          <FileSignature className="w-3.5 h-3.5 shrink-0" /> El texto por defecto de cada tipo de documento (constancias, acuerdos, etc.) que se genera desde Clientes. Editalo acá una vez y queda así para todos los clientes — no hace falta rearmarlo cada vez.
+        </p>
+        {loadingDocTemplates ? <div className="text-center py-10 text-muted-foreground text-sm">Cargando…</div> : (
+          <div className="space-y-4">
+            {DOC_TYPES.filter(dt => dt !== 'Documento personalizado').map(docType => {
+              const items = docTemplates.filter(t => t.doc_type === docType);
+              if (items.length === 0) return null;
+              return (
+                <div key={docType}>
+                  <h3 className="text-sm font-semibold mb-2">{docType}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {items.map(t => (
+                      <div key={t.id} className="bg-card rounded-2xl border border-border card-shadow p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <Badge variant={t.operation_type === 'B2B' ? 'primary' : t.operation_type === 'B2C' ? 'blue' : 'muted'}>{t.operation_type}</Badge>
+                          <button onClick={() => setEditDocT(t)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-3">{t.intro_text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <TemplateForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} editT={editT} />
       <PreviewModal template={preview} onClose={() => setPreview(null)} />
+      <DocTemplateForm docT={editDocT} onClose={() => setEditDocT(null)} onSaved={invalidateDocT} />
     </div>
   );
 }
@@ -192,6 +240,45 @@ function PreviewModal({ template, onClose }) {
         )}
         <textarea value={msg} onChange={e => setMsg(e.target.value)} rows={6} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
         <p className="text-xs text-muted-foreground">Variables: {'{nombre} {empresa} {producto} {monto} {fecha} {hora} {vendedor}'}</p>
+      </div>
+    </Modal>
+  );
+}
+
+function DocTemplateForm({ docT, onClose, onSaved }) {
+  const [form, setForm] = useState({ intro_text: '', conditions_text: '', show_prices: true, show_signature: true });
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (docT) setForm({ intro_text: docT.intro_text || '', conditions_text: docT.conditions_text || '', show_prices: docT.show_prices !== false, show_signature: docT.show_signature !== false });
+  }, [docT]);
+  if (!docT) return null;
+  const save = async () => {
+    setSaving(true);
+    try {
+      await base44.entities.DocumentTemplate.update(docT.id, form);
+      onSaved(); onClose();
+    } finally { setSaving(false); }
+  };
+  return (
+    <Modal open={!!docT} onClose={onClose} title={docT.name} subtitle={`${docT.doc_type} · ${docT.operation_type}`}
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
+        <button onClick={save} disabled={saving} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar'}</button>
+      </>}>
+      <div className="space-y-3">
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Introducción</label>
+          <textarea value={form.intro_text} onChange={e => setForm({ ...form, intro_text: e.target.value })} rows={4} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Condiciones</label>
+          <textarea value={form.conditions_text} onChange={e => setForm({ ...form, conditions_text: e.target.value })} rows={3} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+        </div>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.show_prices} onChange={e => setForm({ ...form, show_prices: e.target.checked })} className="w-4 h-4 accent-primary" /> Mostrar precios por defecto</label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.show_signature} onChange={e => setForm({ ...form, show_signature: e.target.checked })} className="w-4 h-4 accent-primary" /> Espacio para firma por defecto</label>
+        </div>
+        <p className="text-xs text-muted-foreground">Variables: {'{{nombre_cliente}} {{empresa_cliente}} {{cuit_cliente}} {{nombre_empresa}} {{razon_social_empresa}} {{cuit_empresa}} {{numero_venta}}'} y las demás disponibles al generar el documento.</p>
       </div>
     </Modal>
   );
