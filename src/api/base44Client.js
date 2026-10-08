@@ -170,6 +170,39 @@ const integrations = {
       if (error) throw error;
       return { signed_url: data.signedUrl };
     },
+
+    // Same bucket/RLS as UploadPrivateFile, but takes a Blob (what jsPDF's
+    // doc.output('blob') gives us) instead of a File, since a Blob has no
+    // .name to derive a path/extension from.
+    async UploadPrivateBlob({ blob, filename = 'documento.pdf' }) {
+      const orgId = await currentOrgId();
+      const ext = filename.split('.').pop() || 'pdf';
+      const path = `${orgId}/documents/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from('private-files').upload(path, blob, { contentType: blob.type || 'application/pdf' });
+      if (error) throw error;
+      return { file_uri: path };
+    },
+
+    // Longer-lived signed URL for sharing a generated document by WhatsApp
+    // or email (a link, since neither can attach a file from the browser
+    // without a backend) — 3 days by default instead of the 5-minute one
+    // used for inline "download this" links elsewhere.
+    async CreateDocumentSignedUrl({ file_uri, expiresIn = 259200 }) {
+      const { data, error } = await supabase.storage.from('private-files').createSignedUrl(file_uri, expiresIn);
+      if (error) throw error;
+      return { signed_url: data.signedUrl };
+    },
+  },
+};
+
+// Atomic per-org, per-type document numbering (public.next_document_number,
+// 0018_document_generator.sql) — never computed client-side, to avoid two
+// sellers generating documents at the same moment landing on the same number.
+const documents = {
+  async nextNumber(docType) {
+    const { data, error } = await supabase.rpc('next_document_number', { p_doc_type: docType });
+    if (error) throw error;
+    return data;
   },
 };
 
@@ -218,4 +251,4 @@ const users = {
   },
 };
 
-export const base44 = { entities, auth, integrations, users, admin };
+export const base44 = { entities, auth, integrations, users, admin, documents };
