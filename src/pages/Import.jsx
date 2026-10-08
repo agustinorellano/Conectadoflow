@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Upload, ArrowLeft, Users, UserPlus, CheckCircle2, AlertTriangle, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Upload, ArrowLeft, Users, UserPlus, Package, CheckCircle2, AlertTriangle, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { StyledSelect } from '@/components/ui/styled-select';
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 
 const CHUNK_SIZE = 200; // keeps each bulkCreate insert comfortably sized
 const PREVIEW_ROWS = 5;
+const BACK_ROUTES = { Client: '/clientes', Lead: '/leads', Product: '/productos' };
 
 export default function Import() {
   const navigate = useNavigate();
@@ -60,10 +61,10 @@ export default function Import() {
     setError('');
     try {
       const { valid, invalid } = buildImportRows(parsed.rows, parsed.headers, mapping, entityDef);
-      const withOwner = valid.map(row => ({ ...row, owner_id: user?.id, owner_name: user?.full_name }));
+      const payload = entityDef.hasOwner ? valid.map(row => ({ ...row, owner_id: user?.id, owner_name: user?.full_name })) : valid;
       let created = 0;
-      for (let i = 0; i < withOwner.length; i += CHUNK_SIZE) {
-        const chunk = withOwner.slice(i, i + CHUNK_SIZE);
+      for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
+        const chunk = payload.slice(i, i + CHUNK_SIZE);
         if (chunk.length === 0) continue;
         await base44.entities[entityDef.entityName].bulkCreate(chunk);
         created += chunk.length;
@@ -81,8 +82,8 @@ export default function Import() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[800px] mx-auto">
-      <button onClick={() => navigate(entityKey === 'Lead' ? '/leads' : '/clientes')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
-        <ArrowLeft className="w-4 h-4" /> {entityKey === 'Lead' ? 'Leads' : 'Clientes'}
+      <button onClick={() => navigate(BACK_ROUTES[entityKey] || '/clientes')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
+        <ArrowLeft className="w-4 h-4" /> {entityKey ? IMPORT_ENTITIES[entityKey].label : 'Clientes'}
       </button>
 
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-1">Importar desde CSV</h1>
@@ -91,7 +92,7 @@ export default function Import() {
       {!entityKey ? (
         <div className="bg-card rounded-2xl border border-border card-shadow p-5">
           <p className="text-sm font-medium mb-3">¿Qué querés importar?</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <button onClick={() => setEntityKey('Client')} className="flex flex-col items-center gap-2 p-5 rounded-2xl border border-border hover:border-primary hover:-translate-y-0.5 hover:card-shadow transition-all text-primary">
               <span className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center"><Users className="w-5 h-5" /></span>
               <span className="text-sm font-semibold text-foreground">Clientes</span>
@@ -99,6 +100,10 @@ export default function Import() {
             <button onClick={() => setEntityKey('Lead')} className="flex flex-col items-center gap-2 p-5 rounded-2xl border border-border hover:border-primary hover:-translate-y-0.5 hover:card-shadow transition-all text-primary">
               <span className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center"><UserPlus className="w-5 h-5" /></span>
               <span className="text-sm font-semibold text-foreground">Leads</span>
+            </button>
+            <button onClick={() => setEntityKey('Product')} className="flex flex-col items-center gap-2 p-5 rounded-2xl border border-border hover:border-primary hover:-translate-y-0.5 hover:card-shadow transition-all text-primary">
+              <span className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center"><Package className="w-5 h-5" /></span>
+              <span className="text-sm font-semibold text-foreground">Productos</span>
             </button>
           </div>
         </div>

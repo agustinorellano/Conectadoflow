@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -22,6 +23,7 @@ const CURRENCY_OPTIONS = ['ARS', 'USD', 'EUR'];
 const PAGE_SIZE = 24;
 
 export default function Products() {
+  const navigate = useNavigate();
   const { config } = useData();
   const queryClient = useQueryClient();
   const { data: products = [], isLoading: loading } = useEntityList('Product');
@@ -128,6 +130,9 @@ export default function Products() {
           <p className="text-sm text-muted-foreground mt-0.5">{products.length} productos y servicios</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => navigate('/importar?entity=Product')} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-foreground border border-border text-sm font-medium hover:bg-accent">
+            <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Importar</span>
+          </button>
           <button onClick={exportExcel} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-success text-white text-sm font-medium hover:opacity-90">
             <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Exportar</span> Excel
           </button>

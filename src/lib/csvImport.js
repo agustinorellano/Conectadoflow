@@ -73,6 +73,14 @@ const FIELD_SYNONYMS = {
   source: ['origen', 'fuente', 'canal'],
   interest: ['interes', 'producto de interes'],
   notes: ['notas', 'observaciones', 'comentarios'],
+  code: ['codigo', 'sku', 'code'],
+  category: ['categoria', 'rubro'],
+  kind: ['tipo'],
+  price: ['precio', 'precio de venta', 'pvp'],
+  cost: ['costo', 'precio de costo'],
+  stock: ['stock', 'cantidad', 'existencias'],
+  currency: ['moneda', 'currency'],
+  description: ['descripcion', 'detalle'],
 };
 
 // For each CSV header, picks the best-guess target field key (or null for
@@ -111,10 +119,13 @@ export function buildImportRows(rows, headers, mapping, entityDef) {
   return { valid, invalid };
 }
 
+const CURRENCY_OPTIONS = ['ARS', 'USD', 'EUR'];
+
 export const IMPORT_ENTITIES = {
   Client: {
     entityName: 'Client',
     label: 'Clientes',
+    hasOwner: true,
     requiredFields: ['name'],
     fields: [
       { key: 'name', label: 'Nombre', required: true },
@@ -137,6 +148,7 @@ export const IMPORT_ENTITIES = {
   Lead: {
     entityName: 'Lead',
     label: 'Leads',
+    hasOwner: true,
     requiredFields: ['first_name'],
     fields: [
       { key: 'first_name', label: 'Nombre', required: true },
@@ -152,6 +164,32 @@ export const IMPORT_ENTITIES = {
       first_name: raw.first_name, last_name: raw.last_name || '', company: raw.company || '',
       phone: raw.phone || '', email: raw.email || '', interest: raw.interest || '', notes: raw.notes || '',
       source: raw.source || 'Otro', status: 'Nuevo',
+    }),
+  },
+  Product: {
+    entityName: 'Product',
+    label: 'Productos',
+    hasOwner: false, // shared catalog, not per-seller — same as everywhere else products are written
+    requiredFields: ['name'],
+    fields: [
+      { key: 'name', label: 'Nombre', required: true },
+      { key: 'code', label: 'Código' },
+      { key: 'category', label: 'Categoría' },
+      { key: 'kind', label: 'Tipo (Producto/Servicio)' },
+      { key: 'price', label: 'Precio' },
+      { key: 'currency', label: 'Moneda (ARS/USD/EUR)' },
+      { key: 'cost', label: 'Costo' },
+      { key: 'stock', label: 'Stock' },
+      { key: 'description', label: 'Descripción' },
+    ],
+    build: (raw) => ({
+      name: raw.name, code: raw.code || '', category: raw.category || '', description: raw.description || '',
+      kind: raw.kind && normalize(raw.kind).startsWith('serv') ? 'Servicio' : 'Producto',
+      price: Number(String(raw.price || '0').replace(',', '.')) || 0,
+      cost: raw.cost ? Number(String(raw.cost).replace(',', '.')) || 0 : null,
+      stock: Number(String(raw.stock || '0').replace(',', '.')) || 0,
+      currency: CURRENCY_OPTIONS.includes((raw.currency || '').toUpperCase()) ? raw.currency.toUpperCase() : 'ARS',
+      is_active: true,
     }),
   },
 };
