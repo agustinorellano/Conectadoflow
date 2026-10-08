@@ -34,7 +34,7 @@ export default function WhatsAppButton({ phone, client, opportunity, stage, comp
   }, [open, stage]);
 
   const pickTemplate = (cat) => {
-    const t = templates.find(t => t.category === cat && t.is_active !== false);
+    const t = templates.find(t => t.category === cat && t.is_active !== false && (t.channel || 'WhatsApp') === 'WhatsApp');
     const vars = {
       nombre: client?.name?.split(' ')[0] || '',
       empresa: client?.company || '',

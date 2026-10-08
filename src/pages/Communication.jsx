@@ -36,13 +36,33 @@ const DOC_TYPE_META = {
 };
 
 const DEFAULT_TEMPLATES = [
-  { name: 'Primer contacto', category: 'Primer contacto', body: 'Hola {nombre}, ¿cómo estás? Soy {vendedor} de Conectado. Vi tu interés en {producto} y quería presentarme. ¿Tenés unos minutos para charlar?' },
-  { name: 'Seguimiento general', category: 'Seguimiento', body: 'Hola {nombre}, ¿cómo estás? Quería saber si tenés alguna duda sobre {producto} o si avanzamos con la propuesta. Quedo a disposición.' },
-  { name: 'Confirmación de reunión', category: 'Confirmación de reunión', body: 'Hola {nombre}, te confirmo nuestra reunión el {fecha} a las {hora}. ¿Te queda bien? Avisame cualquier cambio.' },
-  { name: 'Seguimiento de propuesta', category: 'Seguimiento de propuesta', body: 'Hola {nombre}, ¿cómo estás? Quería consultarte si pudiste revisar la propuesta que te enviamos y si tenés alguna duda que podamos resolver.' },
-  { name: 'Recordatorio de pago', category: 'Recordatorio de pago', body: 'Hola {nombre}, te recordamos que tenés un pago de {monto} con vencimiento el {fecha}. ¿Podés confirmarnos la transferencia? Gracias!' },
-  { name: 'Pago vencido', category: 'Pago vencido', body: 'Hola {nombre}, tu pago de {monto} venció el {fecha}. ¿Podemos ponernos de acuerdo para regularizarlo? Avisame.' },
-  { name: 'Agradecimiento post-venta', category: 'Agradecimiento', body: 'Hola {nombre}, ¡muchas gracias por tu compra! Esperamos que disfrutes {producto}. Quedamos a disposición para lo que necesites.' },
+  { name: 'Primer contacto', category: 'Primer contacto', channel: 'WhatsApp', body: 'Hola {nombre}, ¿cómo estás? Soy {vendedor} de Conectado. Vi tu interés en {producto} y quería presentarme. ¿Tenés unos minutos para charlar?' },
+  { name: 'Seguimiento general', category: 'Seguimiento', channel: 'WhatsApp', body: 'Hola {nombre}, ¿cómo estás? Quería saber si tenés alguna duda sobre {producto} o si avanzamos con la propuesta. Quedo a disposición.' },
+  { name: 'Confirmación de reunión', category: 'Confirmación de reunión', channel: 'WhatsApp', body: 'Hola {nombre}, te confirmo nuestra reunión el {fecha} a las {hora}. ¿Te queda bien? Avisame cualquier cambio.' },
+  { name: 'Seguimiento de propuesta', category: 'Seguimiento de propuesta', channel: 'WhatsApp', body: 'Hola {nombre}, ¿cómo estás? Quería consultarte si pudiste revisar la propuesta que te enviamos y si tenés alguna duda que podamos resolver.' },
+  { name: 'Recordatorio de pago', category: 'Recordatorio de pago', channel: 'WhatsApp', body: 'Hola {nombre}, te recordamos que tenés un pago de {monto} con vencimiento el {fecha}. ¿Podés confirmarnos la transferencia? Gracias!' },
+  { name: 'Pago vencido', category: 'Pago vencido', channel: 'WhatsApp', body: 'Hola {nombre}, tu pago de {monto} venció el {fecha}. ¿Podemos ponernos de acuerdo para regularizarlo? Avisame.' },
+  { name: 'Agradecimiento post-venta', category: 'Agradecimiento', channel: 'WhatsApp', body: 'Hola {nombre}, ¡muchas gracias por tu compra! Esperamos que disfrutes {producto}. Quedamos a disposición para lo que necesites.' },
+];
+
+// Email reuses the same categories as WhatsApp, but the text itself is
+// its own set: a chat-length WhatsApp line reads as curt in an inbox, so
+// these are longer, with a greeting/closing and a subject line of their own.
+const DEFAULT_EMAIL_TEMPLATES = [
+  { name: 'Primer contacto', category: 'Primer contacto', channel: 'Email', subject: 'Nos ponemos en contacto desde {vendedor}',
+    body: 'Estimado/a {nombre}:\n\nMi nombre es {vendedor} y me pongo en contacto en representación de nuestra empresa. Vimos su interés en {producto} y quisiera presentarme formalmente para ponernos a su disposición y responder cualquier consulta que pueda tener.\n\nSi lo desea, con gusto podemos coordinar una breve llamada o reunión en el horario que mejor le convenga.\n\nQuedo atento/a a su respuesta.\n\nSaludos cordiales,\n{vendedor}' },
+  { name: 'Seguimiento general', category: 'Seguimiento', channel: 'Email', subject: 'Seguimiento — {producto}',
+    body: 'Estimado/a {nombre}:\n\nLe escribo para hacer un seguimiento de nuestra conversación anterior sobre {producto}. Quería saber si tuvo oportunidad de evaluarlo y si surgió alguna consulta que podamos resolver.\n\nQuedamos a su disposición para avanzar en lo que necesite.\n\nSaludos cordiales,\n{vendedor}' },
+  { name: 'Confirmación de reunión', category: 'Confirmación de reunión', channel: 'Email', subject: 'Confirmación de reunión — {fecha}',
+    body: 'Estimado/a {nombre}:\n\nLe escribo para confirmar nuestra reunión pautada para el día {fecha} a las {hora}. Si por algún motivo el horario no le resulta conveniente, no dude en avisarme para coordinar una alternativa.\n\nQuedo a la espera de su confirmación.\n\nSaludos cordiales,\n{vendedor}' },
+  { name: 'Seguimiento de propuesta', category: 'Seguimiento de propuesta', channel: 'Email', subject: 'Seguimiento de nuestra propuesta comercial',
+    body: 'Estimado/a {nombre}:\n\nQuería consultarle si pudo revisar la propuesta que le enviamos oportunamente. Estamos a su disposición para resolver cualquier duda o ajustar los términos de ser necesario.\n\nAgradecemos nos pueda comentar cómo desea continuar.\n\nSaludos cordiales,\n{vendedor}' },
+  { name: 'Recordatorio de pago', category: 'Recordatorio de pago', channel: 'Email', subject: 'Recordatorio de pago pendiente',
+    body: 'Estimado/a {nombre}:\n\nLe escribimos para recordarle que tiene un pago de {monto} con vencimiento el día {fecha}. Le agradeceríamos confirmarnos la transferencia a la brevedad, o avisarnos si necesita coordinar otra fecha.\n\nAnte cualquier consulta, quedamos a su disposición.\n\nSaludos cordiales,\n{vendedor}' },
+  { name: 'Pago vencido', category: 'Pago vencido', channel: 'Email', subject: 'Pago vencido — {monto}',
+    body: 'Estimado/a {nombre}:\n\nLe informamos que el pago de {monto} con vencimiento el día {fecha} se encuentra vencido a la fecha. Le agradeceríamos ponerse en contacto a la brevedad para regularizar la situación o coordinar una alternativa de pago.\n\nQuedamos atentos a su respuesta.\n\nSaludos cordiales,\n{vendedor}' },
+  { name: 'Agradecimiento post-venta', category: 'Agradecimiento', channel: 'Email', subject: 'Muchas gracias por su compra',
+    body: 'Estimado/a {nombre}:\n\nQueremos agradecerle por su reciente compra de {producto}. Esperamos que su experiencia sea excelente y quedamos a su disposición ante cualquier consulta, duda o inconveniente que pueda surgir.\n\nFue un placer trabajar con usted.\n\nSaludos cordiales,\n{vendedor}' },
 ];
 
 export default function Communication() {
@@ -55,18 +75,24 @@ export default function Communication() {
   const [selectedPhase, setSelectedPhase] = useState(null);
   const [editDocT, setEditDocT] = useState(null);
   const [selectedDocType, setSelectedDocType] = useState(null);
+  const [activeChannel, setActiveChannel] = useState('WhatsApp');
 
-  const countFor = (phase) => templates.filter(t => phase.categories.includes(t.category)).length;
+  const channelTemplates = templates.filter(t => (t.channel || 'WhatsApp') === activeChannel);
+  const countFor = (phase) => channelTemplates.filter(t => phase.categories.includes(t.category)).length;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['MessageTemplate'] });
   const invalidateDocT = () => queryClient.invalidateQueries({ queryKey: ['DocumentTemplate'] });
 
-  // First-ever load of this org: no templates exist yet, seed the defaults
-  // once so there's something to show.
+  // First-ever load of this org: no templates exist yet for a channel, seed
+  // that channel's defaults once so there's something to show. WhatsApp and
+  // Email are seeded independently — editing/deleting one channel's set
+  // doesn't re-trigger seeding the other.
   useEffect(() => {
-    if (!loading && templates.length === 0) {
-      base44.entities.MessageTemplate.bulkCreate(DEFAULT_TEMPLATES).then(invalidate);
-    }
+    if (loading) return;
+    const hasWa = templates.some(t => (t.channel || 'WhatsApp') === 'WhatsApp');
+    const hasEmail = templates.some(t => t.channel === 'Email');
+    const toSeed = [...(hasWa ? [] : DEFAULT_TEMPLATES), ...(hasEmail ? [] : DEFAULT_EMAIL_TEMPLATES)];
+    if (toSeed.length > 0) base44.entities.MessageTemplate.bulkCreate(toSeed).then(invalidate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, templates.length]);
 
@@ -91,7 +117,7 @@ export default function Communication() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Comunicación</h1>
           <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
-            <Info className="w-3.5 h-3.5 shrink-0" /> Elegí una etapa y mandá el mensaje por WhatsApp en un clic.
+            <Info className="w-3.5 h-3.5 shrink-0" /> Elegí una etapa y mandá el mensaje en un clic.
           </p>
         </div>
         <button onClick={() => { setEditT(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
@@ -99,7 +125,20 @@ export default function Communication() {
         </button>
       </div>
 
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Mensajes por WhatsApp / Mail</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mensajes</h2>
+        <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-xl">
+          {COMMUNICATION_CHANNELS.map(c => (
+            <button key={c} type="button" onClick={() => { setActiveChannel(c); setSelectedPhase(null); }}
+              className={cn('px-3 h-8 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition-colors', activeChannel === c ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              {c === 'WhatsApp' ? <MessageCircle className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />} {c === 'Email' ? 'Mail' : c}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        {activeChannel === 'WhatsApp' ? 'Mensajes cortos para WhatsApp — se abren listos para enviar.' : 'Mensajes de mail: más largos y formales, con asunto propio.'}
+      </p>
 
       <div className={cn('mb-6', !selectedPhase && 'bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5')}>
         {selectedPhase ? (
@@ -131,7 +170,7 @@ export default function Communication() {
       ) : (
         <div className="space-y-6">
           {JOURNEY_PHASES.find(p => p.key === selectedPhase).categories.map(cat => {
-            const items = templates.filter(t => t.category === cat);
+            const items = channelTemplates.filter(t => t.category === cat);
             if (items.length === 0) return null;
             return (
               <div key={cat}>
@@ -140,23 +179,32 @@ export default function Communication() {
                   {items.map(t => (
                     <motion.div key={t.id} layout className="bg-card rounded-2xl border border-border card-shadow p-4">
                       <div className="flex items-start justify-between mb-2">
-                        <p className="font-semibold">{t.name}</p>
-                        <div className="flex gap-1">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{t.name}</p>
+                          {t.channel === 'Email' && t.subject && <p className="text-xs text-muted-foreground truncate">Asunto: {t.subject}</p>}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
                           <button onClick={() => { setEditT(t); setShowForm(true); }} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground"><Edit3 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => del(t)} className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-muted-foreground"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{t.body}</p>
-                      <button onClick={() => setPreview(t)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366] text-white text-xs font-medium hover:opacity-90">
-                        <MessageCircle className="w-3.5 h-3.5" /> Probar en WhatsApp
-                      </button>
+                      <p className="text-sm text-muted-foreground line-clamp-3 mb-3 whitespace-pre-line">{t.body}</p>
+                      {t.channel === 'Email' ? (
+                        <button onClick={() => setPreview(t)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">
+                          <Mail className="w-3.5 h-3.5" /> Probar por mail
+                        </button>
+                      ) : (
+                        <button onClick={() => setPreview(t)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366] text-white text-xs font-medium hover:opacity-90">
+                          <MessageCircle className="w-3.5 h-3.5" /> Probar en WhatsApp
+                        </button>
+                      )}
                     </motion.div>
                   ))}
                 </div>
               </div>
             );
           })}
-          {JOURNEY_PHASES.find(p => p.key === selectedPhase).categories.every(cat => templates.filter(t => t.category === cat).length === 0) && (
+          {JOURNEY_PHASES.find(p => p.key === selectedPhase).categories.every(cat => channelTemplates.filter(t => t.category === cat).length === 0) && (
             <EmptyState icon={MessageCircle} title="Sin plantillas en esta etapa" subtitle="Creá una nueva plantilla y elegí una categoría de esta etapa."
               action={<button onClick={() => { setEditT(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium"><Plus className="w-4 h-4" /> Nueva plantilla</button>} />
           )}
@@ -217,7 +265,7 @@ export default function Communication() {
         )}
       </div>
 
-      <TemplateForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} editT={editT} />
+      <TemplateForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} editT={editT} defaultChannel={activeChannel} />
       <PreviewModal template={preview} onClose={() => setPreview(null)} />
       <DocTemplateForm docT={editDocT} onClose={() => setEditDocT(null)} onSaved={invalidateDocT} />
     </div>
@@ -233,8 +281,8 @@ function PreviewModal({ template, onClose }) {
   useEffect(() => {
     if (template) {
       setMsg(fillTemplate(template.body, { nombre: 'Carlos', empresa: 'Acme', producto: 'Servicio Premium', monto: '$500.000', fecha: '15/10', hora: '15:00', vendedor: 'Ana' }));
-      setSubject(template.name);
-      setChannel('WhatsApp');
+      setSubject(template.channel === 'Email' && template.subject ? fillTemplate(template.subject, { nombre: 'Carlos', empresa: 'Acme', producto: 'Servicio Premium', monto: '$500.000', fecha: '15/10', hora: '15:00', vendedor: 'Ana' }) : template.name);
+      setChannel(template.channel === 'Email' ? 'Email' : 'WhatsApp');
     }
   }, [template]);
   if (!template) return null;
@@ -247,7 +295,7 @@ function PreviewModal({ template, onClose }) {
     <Modal open={!!template} onClose={onClose} title="Probar plantilla" subtitle={template.name}
       footer={<>
         <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
-        <button onClick={send} disabled={!canSend} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#25D366] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
+        <button onClick={send} disabled={!canSend} className={cn('inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50', channel === 'WhatsApp' ? 'bg-[#25D366]' : 'bg-primary')}>
           <Send className="w-4 h-4" /> {channel === 'WhatsApp' ? 'Abrir WhatsApp' : 'Abrir mail'}
         </button>
       </>}>
@@ -317,13 +365,14 @@ function DocTemplateForm({ docT, onClose, onSaved }) {
   );
 }
 
-function TemplateForm({ open, onClose, onSaved, editT }) {
-  const [form, setForm] = useState({ name: '', category: 'Seguimiento', body: '' });
+function TemplateForm({ open, onClose, onSaved, editT, defaultChannel }) {
+  const [form, setForm] = useState({ name: '', category: 'Seguimiento', channel: 'WhatsApp', subject: '', body: '' });
   const [saving, setSaving] = useState(false);
   useEffect(() => {
-    if (editT) setForm({ name: editT.name, category: editT.category, body: editT.body });
-    else setForm({ name: '', category: 'Seguimiento', body: '' });
-  }, [editT, open]);
+    if (editT) setForm({ name: editT.name, category: editT.category, channel: editT.channel || 'WhatsApp', subject: editT.subject || '', body: editT.body });
+    else setForm({ name: '', category: 'Seguimiento', channel: defaultChannel || 'WhatsApp', subject: '', body: '' });
+  }, [editT, open, defaultChannel]);
+  const isEmail = form.channel === 'Email';
   const save = async () => {
     setSaving(true);
     try {
@@ -334,21 +383,33 @@ function TemplateForm({ open, onClose, onSaved, editT }) {
   };
   return (
     <Modal open={open} onClose={onClose} title={editT ? 'Editar plantilla' : 'Nueva plantilla'}
+      subtitle={isEmail ? 'Mail' : 'WhatsApp'}
       footer={<>
         <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
         <button onClick={save} disabled={saving || !form.name || !form.body} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar'}</button>
       </>}>
       <div className="space-y-3">
         <div><label className="text-sm font-medium mb-1.5 block">Nombre</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" /></div>
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">Categoría</label>
-          <StyledSelect value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
-            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-          </StyledSelect>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Categoría</label>
+            <StyledSelect value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
+              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </StyledSelect>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Canal</label>
+            <StyledSelect value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value })} className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm">
+              {COMMUNICATION_CHANNELS.map(c => <option key={c} value={c}>{c === 'Email' ? 'Mail' : c}</option>)}
+            </StyledSelect>
+          </div>
         </div>
+        {isEmail && (
+          <div><label className="text-sm font-medium mb-1.5 block">Asunto</label><input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Asunto del mail…" className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" /></div>
+        )}
         <div>
           <label className="text-sm font-medium mb-1.5 block">Mensaje</label>
-          <textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} rows={6} placeholder="Hola {nombre}, ¿cómo estás?…" className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+          <textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} rows={isEmail ? 10 : 6} placeholder={isEmail ? 'Estimado/a {nombre}:\n\n…' : 'Hola {nombre}, ¿cómo estás?…'} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
           <p className="text-xs text-muted-foreground mt-1.5">Variables disponibles: {'{nombre} {empresa} {producto} {monto} {fecha} {hora} {vendedor}'}</p>
         </div>
       </div>
