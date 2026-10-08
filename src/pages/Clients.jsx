@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight, Package } from 'lucide-react';
+import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight, Package, FileText } from 'lucide-react';
+import DocumentGeneratorModal from '@/components/DocumentGeneratorModal';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useEntityList } from '@/lib/useEntityQuery';
@@ -57,6 +58,7 @@ export default function Clients() {
   const [messageClient, setMessageClient] = useState(null);
   const [messageChannel, setMessageChannel] = useState('WhatsApp');
   const openMessage = (c, ch) => { setMessageClient(c); setMessageChannel(ch); };
+  const [docClient, setDocClient] = useState(null);
   const [page, setPage] = useState(1);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -200,6 +202,10 @@ export default function Clients() {
                             <Mail className="w-4 h-4" />
                           </button>
                         )}
+                        <button onClick={(e) => { e.stopPropagation(); setDocClient(c); }} title="Documentos"
+                          className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-500 flex items-center justify-center hover:bg-violet-500/20">
+                          <FileText className="w-4 h-4" />
+                        </button>
                       </div>
                       <ArrowRight className="w-4 h-4 text-muted-foreground ml-2" />
                     </div>
@@ -258,6 +264,10 @@ export default function Clients() {
                           <Mail className="w-4 h-4" />
                         </button>
                       )}
+                      <button onClick={(e) => { e.stopPropagation(); setDocClient(c); }} title="Documentos"
+                        className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-500 flex items-center justify-center hover:bg-violet-500/20">
+                        <FileText className="w-4 h-4" />
+                      </button>
                     </div>
                     <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
                   </motion.div>
@@ -285,6 +295,7 @@ export default function Clients() {
 
       <ClientForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} user={user} />
       <ClientMessageModal client={messageClient} initialChannel={messageChannel} onClose={() => setMessageClient(null)} />
+      <DocumentGeneratorModal client={docClient} onClose={() => setDocClient(null)} />
     </div>
   );
 }
