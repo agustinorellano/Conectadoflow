@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt, Package, Share2 } from 'lucide-react';
+import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt, Package, Share2, FileText } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
@@ -10,6 +10,7 @@ import { useEntityList } from '@/lib/useEntityQuery';
 import { useCurrencyRates } from '@/lib/useCurrencyRates';
 import { convertAmount } from '@/lib/currencyRates';
 import Modal from '@/components/Modal';
+import DocumentGeneratorModal from '@/components/DocumentGeneratorModal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
@@ -62,6 +63,7 @@ export default function Sales() {
   const loading = loadingSales || loadingPayments || loadingClients || loadingProducts;
   const [showForm, setShowForm] = useState(false);
   const [editingSale, setEditingSale] = useState(null);
+  const [docSale, setDocSale] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
   const [period, setPeriod] = useState('all');
@@ -271,6 +273,9 @@ export default function Sales() {
                          </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setDocSale(s)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-violet-500/10 hover:text-violet-500 flex items-center justify-center" title="Generar documento">
+                          <FileText className="w-4 h-4" />
+                        </button>
                         <button onClick={() => handleEdit(s)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground flex items-center justify-center" title="Editar venta">
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -337,6 +342,7 @@ export default function Sales() {
       }
 
       <SaleForm open={showForm} onClose={closeForm} onSaved={invalidate} clients={clients} products={products} user={user} config={config} sale={editingSale} />
+      <DocumentGeneratorModal client={docSale ? clients.find(c => c.id === docSale.client_id) : null} sale={docSale} onClose={() => setDocSale(null)} />
     </div>
   );
 }

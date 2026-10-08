@@ -23,7 +23,7 @@ const emptyItem = () => ({ description: '', quantity: 1, delivered: '', pending:
 
 const STATUS_VARIANT = { Borrador: 'muted', Generado: 'blue', Enviado: 'success', 'Error de envío': 'destructive', Anulado: 'muted' };
 
-export default function DocumentGeneratorModal({ client, onClose }) {
+export default function DocumentGeneratorModal({ client, sale, onClose }) {
   const { config } = useData();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -67,7 +67,13 @@ export default function DocumentGeneratorModal({ client, onClose }) {
     setError('');
     setOperationType(client.type === 'Empresa' ? 'B2B' : 'B2C');
     setDate(new Date().toISOString().slice(0, 10));
-    setItems([emptyItem()]);
+    // Generating from an existing sale: pull its line items as a starting
+    // point (already-delivered quantities default to the sold quantity —
+    // the user edits them if a partial delivery happened) instead of
+    // making the seller retype what was already sold.
+    setItems(sale?.items?.length
+      ? sale.items.map(it => ({ description: it.description || '', quantity: it.quantity ?? 1, delivered: it.quantity ?? '', pending: 0, unit_price: it.unit_price ?? '', notes: '' }))
+      : [emptyItem()]);
     setIssuer({
       company_name: config?.company_name || '', billing_name: config?.billing_name || '',
       billing_tax_id: config?.billing_tax_id || '', billing_address: config?.billing_address || config?.address || '',
@@ -78,7 +84,7 @@ export default function DocumentGeneratorModal({ client, onClose }) {
       name: client.name || '', company: client.company || '', tax_id: client.tax_id || '',
       address: client.address || '', email: client.email || '', phone: client.phone || '',
     });
-  }, [open, client, config]);
+  }, [open, client, sale, config]);
 
   // Template matching this doc_type/operation_type, preferring an exact
   // operation_type match over one marked "Ambos".
@@ -103,11 +109,11 @@ export default function DocumentGeneratorModal({ client, onClose }) {
   }, [template]);
 
   const totalAmount = useMemo(() => items.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0), [items]);
-  const currency = config?.currency || 'ARS';
+  const currency = sale?.currency || config?.currency || 'ARS';
 
   const vars = useMemo(() => buildDocVars({
-    client: clientData, issuer, documentNumber: null, saleNumber: client.last_sale_number, totalAmount, currency,
-  }), [clientData, issuer, totalAmount, currency, client]);
+    client: clientData, issuer, documentNumber: null, saleNumber: sale?.number, totalAmount, currency,
+  }), [clientData, issuer, totalAmount, currency, sale]);
 
   const filledIntro = fillDocTemplate(template?.intro_text, vars);
   const filledConditions = fillDocTemplate(conditions, vars);
@@ -143,7 +149,7 @@ export default function DocumentGeneratorModal({ client, onClose }) {
       const { file_uri } = await base44.integrations.Core.UploadPrivateBlob({ blob, filename: `${documentNumber}.pdf` });
 
       const row = await base44.entities.ClientDocument.create({
-        client_id: client.id, sale_id: client._sale_id || null, template_id: templateId || null,
+        client_id: client.id, sale_id: sale?.id || null, template_id: templateId || null,
         doc_type: docType, operation_type: operationType, document_number: documentNumber,
         status: 'Generado', issuer_snapshot: issuer, client_snapshot: clientData,
         items, conditions: filledConditions, observations, currency,
@@ -186,7 +192,8 @@ export default function DocumentGeneratorModal({ client, onClose }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={client ? `Documentos — ${client.name}` : ''} size="lg"
+    <Modal open={open} onClose={onClose} title={client ? `Documentos — ${client.name}` : ''}
+      subtitle={sale ? `A partir de la venta ${sale.number || ''}` : undefined} size="lg"
       footer={result ? (
         <>
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cerrar</button>
