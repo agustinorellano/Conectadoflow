@@ -235,13 +235,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 items-start gap-3 mb-4">
-        <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
-        <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
-        <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
-        <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 items-stretch gap-3 mb-4">
         <div className="lg:col-span-2 flex flex-col gap-3">
           <IncomeReportCard
@@ -291,6 +284,13 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 items-start gap-3 mb-4">
+        <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
+        <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
+        <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
+        <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
       </div>
 
       <div className={cn('grid grid-cols-1 gap-3 mb-4', showTopSeller ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
