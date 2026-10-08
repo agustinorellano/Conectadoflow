@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt, Package, Share2, FileText } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { ShoppingCart, Plus, Search, Trash2, Pencil, ChevronRight, ChevronDown, DollarSign, Wallet, Receipt, Package, Share2, FileText, FileDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
@@ -170,6 +171,20 @@ export default function Sales() {
     return Object.values(map).sort((a, b) => b.revenue - a.revenue);
   }, [fSales, rates, currency]);
 
+  const exportExcel = () => {
+    const rows = filtered.map(s => ({
+      Número: s.number || '', Cliente: s.client_name || '', Fecha: formatDate(s.date), Canal: s.channel || '',
+      'Medio de pago': s.payment_method || '', Entidad: s.bank_entity || '', Estado: s.status,
+      'Estado de cobro': s.payment_status, Bruto: s.gross_amount || 0, Descuento: s.discount || 0,
+      Impuestos: s.tax || 0, Total: s.total_amount || 0, Cobrado: s.collected_amount || 0,
+      Saldo: s.balance || 0, Moneda: s.currency || currency,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
+    XLSX.writeFile(wb, `ventas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -189,6 +204,9 @@ export default function Sales() {
             { key: '3m', label: 'Últimos 3 meses' },
             { key: 'year', label: 'Este año' },
           ]} />
+          <button onClick={exportExcel} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-accent">
+            <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Exportar</span>
+          </button>
           <button onClick={() => setShowForm(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
             <Plus className="w-4 h-4" /> Nueva venta
           </button>

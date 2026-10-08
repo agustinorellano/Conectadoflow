@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter, Upload, FileDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -47,6 +48,19 @@ export default function Leads() {
     Nuevo: 'muted', Contactado: 'blue', Calificado: 'violet', Convertido: 'success', Perdido: 'destructive'
   }[s] || 'muted');
 
+  const exportExcel = () => {
+    const rows = filtered.map(l => ({
+      Nombre: l.first_name, Apellido: l.last_name || '', Empresa: l.company || '', Teléfono: l.phone || '',
+      Email: l.email || '', Origen: l.source || '', Interés: l.interest || '', Estado: l.status,
+      'Valor potencial': l.potential_value || 0, 'Último contacto': l.last_contact ? formatDate(l.last_contact) : '',
+      'Próxima acción': l.next_action || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+    XLSX.writeFile(wb, `leads_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -55,9 +69,13 @@ export default function Leads() {
           <p className="text-sm text-muted-foreground mt-0.5">{leads.length} leads · {leads.filter(l => l.status === 'Nuevo').length} nuevos</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={exportExcel}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-accent">
+            <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Exportar</span>
+          </button>
           <button onClick={() => navigate('/importar?entity=Lead')}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-accent">
-            <Upload className="w-4 h-4" /> Importar
+            <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Importar</span>
           </button>
           <button onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
