@@ -245,6 +245,15 @@ export default function Dashboard() {
           />
           <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
         </div>
+        <div className="grid grid-cols-2 gap-3 content-start">
+          <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
+          <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
+          <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
+          <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
           <h2 className="font-semibold mb-2.5 text-sm">Cobros pendientes</h2>
           <div className="space-y-1">
@@ -266,8 +275,10 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </div>
 
-          <h2 className="font-semibold mt-4 mb-2 text-sm">Próximas reuniones</h2>
+        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+          <h2 className="font-semibold mb-2.5 text-sm">Próximas reuniones</h2>
           <div className="space-y-1">
             {stats.upcomingMeetings.length === 0 && <p className="text-sm text-muted-foreground py-2 text-center">Sin reuniones programadas</p>}
             {stats.upcomingMeetings.map(m => (
@@ -284,13 +295,6 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 items-start gap-3 mb-4">
-        <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
-        <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
-        <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
-        <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
       </div>
 
       <div className={cn('grid grid-cols-1 gap-3 mb-4', showTopSeller ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
