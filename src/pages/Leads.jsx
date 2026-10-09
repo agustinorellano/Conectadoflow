@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
-import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter, Upload, FileDown } from 'lucide-react';
+import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter, Upload, FileDown, AlertTriangle, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -18,15 +18,37 @@ import { cn } from '@/lib/utils';
 
 const STATUSES = ['Nuevo','Contactado','Calificado','Convertido','Perdido'];
 
+// Same phone/email already in Clientes — the lead is almost certainly the
+// same person re-entered (e.g. they wrote in again, or someone forgot an
+// existing client was already loaded). Normalizes both before comparing:
+// phone to just its digits (so "+54 9 11 1234-5678" matches "01112345678"),
+// email to lowercase/trimmed — otherwise harmless formatting differences
+// would hide a real duplicate.
+const normalizePhone = (p) => (p || '').replace(/\D/g, '').slice(-10);
+const normalizeEmail = (e) => (e || '').trim().toLowerCase();
+
+function findDuplicateClient(lead, clients) {
+  const leadPhone = normalizePhone(lead.phone);
+  const leadEmail = normalizeEmail(lead.email);
+  return clients.find(c =>
+    (leadPhone && normalizePhone(c.phone) === leadPhone) ||
+    (leadEmail && normalizeEmail(c.email) === leadEmail)
+  ) || null;
+}
+
 export default function Leads() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: leads = [], isLoading: loading } = useEntityList('Lead', { sort: '-created_date', limit: 200 });
+  // Same cache key Clientes/Ventas already use (sort/limit match) — opening
+  // Leads doesn't re-fetch the client list if one of those was open first.
+  const { data: clients = [] } = useEntityList('Client', { sort: '-created_date', limit: 200 });
   const { definitions: customDefs } = useCustomFieldDefinitions('Lead');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [convertLead, setConvertLead] = useState(null);
+  const [duplicateLead, setDuplicateLead] = useState(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -109,17 +131,28 @@ export default function Leads() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
           <AnimatePresence>
-            {filtered.map(l => (
+            {filtered.map(l => {
+              const dup = findDuplicateClient(l, clients);
+              return (
               <motion.div key={l.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-card rounded-2xl border border-border card-shadow p-4 hover:card-shadow-lg transition-all">
+                className={cn('bg-card rounded-2xl border card-shadow p-4 hover:card-shadow-lg transition-all', dup ? 'border-destructive/40' : 'border-border')}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white flex items-center justify-center font-semibold shrink-0">
-                      {(l.first_name || '?').charAt(0)}
+                    <div className="relative shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white flex items-center justify-center font-semibold">
+                        {(l.first_name || '?').charAt(0)}
+                      </div>
+                      {dup && (
+                        <button onClick={() => setDuplicateLead(l)} title="Dato duplicado"
+                          className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive ring-2 ring-card animate-pulse hover:scale-110 transition-transform" />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold truncate">{l.first_name} {l.last_name}</p>
                       {l.company && <p className="text-xs text-muted-foreground truncate">{l.company}</p>}
+                      {dup && (
+                        <button onClick={() => setDuplicateLead(l)} className="text-[11px] font-medium text-destructive hover:underline">Dato duplicado</button>
+                      )}
                     </div>
                   </div>
                   <Badge variant={statusVariant(l.status)} dot>{l.status}</Badge>
@@ -144,14 +177,55 @@ export default function Leads() {
                   </div>
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
 
       <LeadForm open={showForm} onClose={() => { setShowForm(false); }} onSaved={invalidate} user={user} />
       <ConvertModal lead={convertLead} onClose={() => setConvertLead(null)} onConverted={(id) => { invalidateConversion(); navigate(`/clientes/${id}`); }} user={user} />
+      <DuplicateLeadModal lead={duplicateLead} client={duplicateLead ? findDuplicateClient(duplicateLead, clients) : null}
+        onClose={() => setDuplicateLead(null)} onDeleted={invalidate} />
     </div>
+  );
+}
+
+function DuplicateLeadModal({ lead, client, onClose, onDeleted }) {
+  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
+  if (!lead) return null;
+
+  const del = async () => {
+    setDeleting(true);
+    try {
+      await base44.entities.Lead.delete(lead.id);
+      onDeleted();
+      onClose();
+    } finally { setDeleting(false); }
+  };
+
+  return (
+    <Modal open={!!lead} onClose={onClose} title="Dato duplicado"
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">No, dejarlo</button>
+        <button onClick={del} disabled={deleting} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
+          <Trash2 className="w-4 h-4" /> {deleting ? 'Eliminando…' : 'Eliminar lead'}
+        </button>
+      </>}>
+      <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20">
+        <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm">
+            <span className="font-medium">{lead.first_name} {lead.last_name}</span> ya figura como cliente
+            {client && <> — <button onClick={() => navigate(`/clientes/${client.id}`)} className="font-medium text-primary hover:underline">{client.name}</button></>}.
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Coincide el teléfono o el email con un cliente ya cargado. Probablemente este lead quedó duplicado — podés eliminarlo para mantener la base ordenada, o dejarlo así si en realidad son personas distintas.
+          </p>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
