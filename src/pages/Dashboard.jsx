@@ -311,8 +311,14 @@ export default function Dashboard() {
   // van juntos. Productos (un conteo de catálogo, no ligado al período)
   // se corrió a la fila de Meta mensual/Mejor vendedor, donde antes
   // estaba Leads.
+  // auto-fit/minmax en vez de un grid-cols fijo: este bloque vive en dos
+  // columnas de ancho muy distinto (la angosta de al lado del gráfico de
+  // Ingresos, la ancha para Vendedor) y además el sidebar abierto le come
+  // espacio real que ningún breakpoint de viewport detecta — así cada
+  // card se queda en su propia fila en cuanto deja de entrar un segundo
+  // "mínimo" de 150px, en vez de recortar el texto para forzar 2 columnas.
   const statsGrid = (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
       <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
       <StatCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} />
       <StatCard label="Por cobrar" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
