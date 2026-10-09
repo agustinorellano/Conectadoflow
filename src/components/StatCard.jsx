@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 // label on top, big number and a small delta pill inline beside it (not
 // stacked) on the row below. No accent bar, no sparkline — intentionally
 // plainer than KpiCard, used only for this specific row.
-export default function StatCard({ label, value, variation: v, icon: Icon, accent, onClick }) {
+export default function StatCard({ label, value, sublabel, variation: v, icon: Icon, accent, onClick }) {
   const positive = v >= 0;
   return (
     <div
@@ -36,6 +36,7 @@ export default function StatCard({ label, value, variation: v, icon: Icon, accen
           </span>
         )}
       </div>
+      {sublabel && <p className="text-[11px] text-muted-foreground truncate -mt-1">{sublabel}</p>}
     </div>
   );
 }

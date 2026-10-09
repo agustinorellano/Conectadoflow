@@ -4,7 +4,7 @@ import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   ShoppingCart, UserPlus, Wallet, Package, Award,
-  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing, MapPin,
+  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing, MapPin, Receipt,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
@@ -277,7 +277,8 @@ export default function Dashboard() {
       <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
       <StatCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} />
       <StatCard label="Por cobrar" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
-      <StatCard label="Más vendido" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
+      <StatCard label="Ticket promedio" value={amount(stats.avgTicket)} icon={Receipt} accent="#0ea5e9" />
+      <StatCard label="Más vendido" value={stats.topProduct?.name ?? '—'} sublabel={stats.topProduct ? `${stats.topProduct.units} unidad${stats.topProduct.units === 1 ? '' : 'es'}` : null} icon={Award} accent="#ec4899" />
       <StatCard label="Productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
     </div>
   );
