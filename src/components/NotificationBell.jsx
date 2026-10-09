@@ -2,19 +2,25 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, AlertCircle, UserPlus, CheckCircle2, Megaphone, BellRing } from 'lucide-react';
+import { Bell, X, AlertCircle, UserPlus, CheckCircle2, Megaphone, BellRing, Clock } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { useCommerce } from '@/lib/CommerceContext';
 import { useEntityList } from '@/lib/useEntityQuery';
 import { isOverdue, formatDate, isStaleClient, STALE_CONTACT_DAYS, isStaleOpportunity, STALE_OPP_DAYS } from '@/lib/flowUtils';
+import { isHidden, dismiss, snooze, SNOOZE_OPTIONS } from '@/lib/notificationPrefs';
 import { cn } from '@/lib/utils';
 
 const NOTIF_KEY = (userId) => ['Notification', 'list', { filter: { owner_id: userId, is_read: false }, sort: '-created_date', limit: 20 }];
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [snoozeMenuFor, setSnoozeMenuFor] = useState(null);
+  // localStorage isn't reactive — bump this after every dismiss/snooze so
+  // the items useMemo (which reads isHidden()) recomputes and the item
+  // actually disappears from the list right away.
+  const [prefsTick, setPrefsTick] = useState(0);
   const { user } = useAuth();
   const { config } = useData();
   const { filterByCommerce } = useCommerce();
@@ -114,8 +120,23 @@ export default function NotificationBell() {
         link: '/clientes',
       }));
 
-    return [...adminNotifications, ...staleAlert, ...staleOppsAlert, ...overduePayments, ...untouchedLeads, ...todayActivities];
-  }, [user, notifications, payments, leads, activities, clients, opportunities, filterByCommerce]);
+    return [...adminNotifications, ...staleAlert, ...staleOppsAlert, ...overduePayments, ...untouchedLeads, ...todayActivities]
+      .filter(it => !isHidden(it.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, notifications, payments, leads, activities, clients, opportunities, filterByCommerce, prefsTick]);
+
+  const dismissItem = (item) => {
+    dismiss(item.id);
+    if (item.isAdminNotification) base44.entities.Notification.update(item.id, { is_read: true }).catch(() => {});
+    setSnoozeMenuFor(null);
+    setPrefsTick(t => t + 1);
+  };
+
+  const snoozeItem = (item, ms) => {
+    snooze(item.id, ms);
+    setSnoozeMenuFor(null);
+    setPrefsTick(t => t + 1);
+  };
 
   const count = items.length;
 
@@ -135,7 +156,7 @@ export default function NotificationBell() {
       <AnimatePresence>
         {open && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+            <div className="fixed inset-0 z-40" onClick={() => { setOpen(false); setSnoozeMenuFor(null); }} />
             <motion.div
               initial={{ opacity: 0, y: -8, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -145,7 +166,7 @@ export default function NotificationBell() {
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <p className="font-semibold text-sm">Notificaciones</p>
-                <button onClick={() => setOpen(false)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-accent">
+                <button onClick={() => { setOpen(false); setSnoozeMenuFor(null); }} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-accent">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -154,8 +175,8 @@ export default function NotificationBell() {
                   <p className="text-sm text-muted-foreground py-8 text-center">Estás al día 🎉</p>
                 ) : (
                   items.map(item => (
+                    <div key={item.id} className="relative group border-b border-border/50 last:border-0">
                     <button
-                      key={item.id}
                       onClick={async () => {
                         setOpen(false);
                         if (item.isAdminNotification) {
@@ -164,7 +185,7 @@ export default function NotificationBell() {
                         }
                         if (item.link) navigate(item.link);
                       }}
-                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-accent/50 transition-colors text-left border-b border-border/50 last:border-0"
+                      className="w-full flex items-start gap-3 pl-4 pr-16 py-3 hover:bg-accent/50 transition-colors text-left"
                     >
                       <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', item.color)}>
                         <item.icon className="w-4 h-4" />
@@ -174,6 +195,35 @@ export default function NotificationBell() {
                         {item.subtitle && <p className="text-xs text-muted-foreground mt-0.5 leading-snug break-words">{item.subtitle}</p>}
                       </div>
                     </button>
+
+                    <div className="absolute right-2 top-2.5 flex items-center gap-0.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSnoozeMenuFor(snoozeMenuFor === item.id ? null : item.id); }}
+                        title="Recordármelo más tarde"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); dismissItem(item); }}
+                        title="Descartar"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {snoozeMenuFor === item.id && (
+                      <div className="absolute right-2 top-10 z-10 bg-card border border-border rounded-xl shadow-lg py-1 w-36" onClick={(e) => e.stopPropagation()}>
+                        {SNOOZE_OPTIONS.map(opt => (
+                          <button key={opt.key} onClick={() => snoozeItem(item, opt.ms)}
+                            className="w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-accent">
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    </div>
                   ))
                 )}
               </div>
