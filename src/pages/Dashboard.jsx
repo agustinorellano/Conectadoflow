@@ -12,7 +12,6 @@ import { useAuth } from '@/lib/AuthContext';
 import { useCommerce } from '@/lib/CommerceContext';
 import { useCurrencyRates } from '@/lib/useCurrencyRates';
 import { convertAmount } from '@/lib/currencyRates';
-import KpiCard from '@/components/KpiCard';
 import StatCard from '@/components/StatCard';
 import Badge from '@/components/Badge';
 import SalesByEntityChart from '@/components/SalesByEntityChart';
@@ -279,6 +278,7 @@ export default function Dashboard() {
       <StatCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} />
       <StatCard label="Por cobrar" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
       <StatCard label="Más vendido" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
+      <StatCard label="Productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
     </div>
   );
 
@@ -360,7 +360,7 @@ export default function Dashboard() {
         </>
       )}
 
-      <div className={cn('grid grid-cols-1 gap-3 mb-4', showTopSeller ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+      <div className={cn('grid grid-cols-1 gap-3 mb-4', showTopSeller && 'sm:grid-cols-2')}>
         <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.monthRevenue} formatValue={amount} />
         {showTopSeller && (
           <div className="bg-card rounded-2xl border border-border card-shadow p-3.5 h-full flex flex-col justify-center">
@@ -380,7 +380,6 @@ export default function Dashboard() {
             )}
           </div>
         )}
-        <KpiCard label="Productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
       </div>
 
       {view === 'commerce' && (
