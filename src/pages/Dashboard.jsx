@@ -4,7 +4,7 @@ import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   ShoppingCart, UserPlus, Wallet, Package, Award,
-  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing, MapPin, Receipt,
+  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing, MapPin, Receipt, Share2,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
@@ -226,6 +226,17 @@ export default function Dashboard() {
     const topProductEntry = Object.entries(productUnits).sort((a, b) => b[1] - a[1])[0];
     const topProduct = topProductEntry ? { name: topProductEntry[0], units: topProductEntry[1] } : null;
 
+    // Mismo cálculo que ya existía en Ventas ("Ventas por canal") —
+    // fSales ya viene convertido a la moneda base, no hace falta reconvertir.
+    const channelMap = {};
+    periodSales.forEach(s => {
+      const key = s.channel || 'Sin especificar';
+      if (!channelMap[key]) channelMap[key] = { name: key, count: 0, revenue: 0 };
+      channelMap[key].count += 1;
+      channelMap[key].revenue += Number(s.total_amount) || 0;
+    });
+    const channelSales = Object.values(channelMap).sort((a, b) => b.revenue - a.revenue);
+
     const recentSales = [...periodSales].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
     const totalProductsCount = fProducts.filter(p => p.is_active !== false).length;
 
@@ -233,7 +244,7 @@ export default function Dashboard() {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
       commerceBreakdown, branchBreakdown, visibleBranches, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, monthRevenue, fSales,
-      topProduct, recentSales, totalProductsCount, staleClients, funnelRecommendation,
+      topProduct, recentSales, totalProductsCount, staleClients, funnelRecommendation, channelSales,
     };
   }, [data, period, filterByCommerce, commerces, config, rates, currency, user]);
 
@@ -496,8 +507,25 @@ export default function Dashboard() {
       </div>
       </div>
 
-      <div className={cn('grid grid-cols-1 gap-3 sm:gap-4 mb-4', !isVendedor && 'lg:grid-cols-2')}>
+      <div className={cn('grid grid-cols-1 gap-3 sm:gap-4 mb-4', !isVendedor ? 'lg:grid-cols-3' : 'lg:grid-cols-2')}>
         {!isVendedor && tasksCard}
+
+        {stats.channelSales.length > 0 && (
+          <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-3.5">
+              <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Share2 className="w-4 h-4" />
+              </span>
+              <h2 className="font-semibold text-sm">Ventas por canal</h2>
+            </div>
+            <div className="space-y-3.5">
+              {stats.channelSales.map(c => (
+                <ProgressBar key={c.name} label={c.name} value={c.revenue} max={stats.channelSales[0].revenue}
+                  formatValue={amount} sublabel={`${c.count} venta${c.count === 1 ? '' : 's'}`} />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
           <div className="flex items-center justify-between mb-2.5">
