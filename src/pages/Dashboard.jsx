@@ -29,16 +29,17 @@ import {
 import { buildDailySeries } from '@/lib/salesSeries';
 import { cn } from '@/lib/utils';
 
-// Dashboard-wide stats window. Not user-facing anymore (no selector in the
-// header) — IncomeReportCard has its own independent time toggle instead.
-const period = 'month';
-
 export default function Dashboard() {
   const { config } = useData();
   const { user } = useAuth();
   const { filterByCommerce, currentCommerceId, setCurrentCommerceId, commerces } = useCommerce();
   const [view, setView] = useState('general');
   const [hideAmounts, setHideAmounts] = useState(false);
+  // Shared by every widget on the page (Ingresos, Ventas, Leads, Mejor
+  // vendedor, Funnel) — the pills live inside IncomeReportCard, but
+  // changing them now moves the whole dashboard's window, not just that
+  // one chart.
+  const [period, setPeriod] = useState('month');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -157,7 +158,11 @@ export default function Dashboard() {
     const sellerBreakdown = Object.values(sellerMap).sort((a, b) => b.revenue - a.revenue);
     const topSeller = sellerBreakdown[0] || null;
 
-    const monthlyGoal = config?.monthly_goal ? Number(config.monthly_goal) : Math.max(revenue, 1) * 1.2;
+    // Meta mensual always tracks the calendar month, independent of the
+    // shared period selector above — a monthly target compared against a
+    // "last 7 days" revenue would always look broken regardless of label.
+    const monthRevenue = fSales.filter(s => s.status !== 'Cancelada' && inPeriod(s.date, 'month')).reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
+    const monthlyGoal = config?.monthly_goal ? Number(config.monthly_goal) : Math.max(monthRevenue, 1) * 1.2;
     const monthlyGoalIsEstimated = !config?.monthly_goal;
 
     const leadsSparkline = buildDailySeries(fLeads, 'created_date');
@@ -178,7 +183,7 @@ export default function Dashboard() {
     return {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
-      commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, fSales,
+      commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, monthRevenue, fSales,
       leadsSparkline, topProduct, recentSales, totalProductsCount, staleClients,
     };
   }, [data, period, filterByCommerce, commerces, config, rates, currency]);
@@ -232,6 +237,8 @@ export default function Dashboard() {
             baseCurrency={currency}
             hidden={hideAmounts}
             onToggleHidden={() => setHideAmounts(!hideAmounts)}
+            period={period}
+            onPeriodChange={setPeriod}
           />
           <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
         </div>
@@ -270,7 +277,7 @@ export default function Dashboard() {
       </div>
 
       <div className={cn('grid grid-cols-1 gap-3 mb-4', showTopSeller ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
-        <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.revenue} formatValue={amount} />
+        <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.monthRevenue} formatValue={amount} />
         {showTopSeller && (
           <div className="bg-card rounded-2xl border border-border card-shadow p-3.5 h-full flex flex-col justify-center">
             <div className="flex items-center gap-2 mb-2">

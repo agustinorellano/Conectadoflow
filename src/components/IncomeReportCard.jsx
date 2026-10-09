@@ -39,12 +39,11 @@ function ChartTooltip({ active, payload, label, formatValue }) {
 }
 
 // Ingresos + reporte de ventas, merged into one card: the wallet-style
-// currency switcher plus the trend chart, each with their own time control
-// (the chart's 1d/7d/30d/Mes/3m/Año pills are local to this card — they
-// don't change the rest of the dashboard, same as the reference layout's
-// chart-local period toggle).
-export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, onToggleHidden }) {
-  const [chartPeriod, setChartPeriod] = useState('month');
+// currency switcher plus the trend chart. The 1d/7d/30d/Mes/3m/Año period
+// is controlled by the parent (Dashboard) so every other widget on the
+// page — Ventas, Leads, Mejor vendedor, Funnel — shares the exact same
+// window instead of each one quietly meaning something different.
+export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, onToggleHidden, period: chartPeriod, onPeriodChange }) {
   const [rates, setRates] = useState(null);
   const [error, setError] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('BASE');
@@ -148,7 +147,7 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
         {CHART_PERIODS.map(p => (
           <button
             key={p.key}
-            onClick={() => setChartPeriod(p.key)}
+            onClick={() => onPeriodChange(p.key)}
             className={cn(
               'px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors',
               chartPeriod === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
