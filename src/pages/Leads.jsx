@@ -12,7 +12,7 @@ import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import CustomFieldsSection, { useCustomFieldDefinitions } from '@/components/CustomFieldsSection';
-import { formatCurrency, formatDate, timeAgo, LEAD_SOURCES } from '@/lib/flowUtils';
+import { formatCurrency, formatDate, timeAgo, LEAD_SOURCES, normalizePhoneDigits, normalizeEmailLower } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
@@ -20,19 +20,13 @@ const STATUSES = ['Nuevo','Contactado','Calificado','Convertido','Perdido'];
 
 // Same phone/email already in Clientes — the lead is almost certainly the
 // same person re-entered (e.g. they wrote in again, or someone forgot an
-// existing client was already loaded). Normalizes both before comparing:
-// phone to just its digits (so "+54 9 11 1234-5678" matches "01112345678"),
-// email to lowercase/trimmed — otherwise harmless formatting differences
-// would hide a real duplicate.
-const normalizePhone = (p) => (p || '').replace(/\D/g, '').slice(-10);
-const normalizeEmail = (e) => (e || '').trim().toLowerCase();
-
+// existing client was already loaded).
 function findDuplicateClient(lead, clients) {
-  const leadPhone = normalizePhone(lead.phone);
-  const leadEmail = normalizeEmail(lead.email);
+  const leadPhone = normalizePhoneDigits(lead.phone);
+  const leadEmail = normalizeEmailLower(lead.email);
   return clients.find(c =>
-    (leadPhone && normalizePhone(c.phone) === leadPhone) ||
-    (leadEmail && normalizeEmail(c.email) === leadEmail)
+    (leadPhone && normalizePhoneDigits(c.phone) === leadPhone) ||
+    (leadEmail && normalizeEmailLower(c.email) === leadEmail)
   ) || null;
 }
 

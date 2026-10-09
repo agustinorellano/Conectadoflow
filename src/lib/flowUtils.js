@@ -205,6 +205,17 @@ export function pct(part, total) {
   return Math.min(100, Math.round((part / total) * 100));
 }
 
+// Duplicate detection (Leads vs Clientes, Clientes vs Clientes): same
+// phone/email formatted differently ("+54 9 11 1234-5678" vs
+// "01112345678") shouldn't hide an obvious duplicate, so both get
+// normalized down to just their comparable core before matching.
+export function normalizePhoneDigits(p) {
+  return (p || '').replace(/\D/g, '').slice(-10);
+}
+export function normalizeEmailLower(e) {
+  return (e || '').trim().toLowerCase();
+}
+
 // WhatsApp
 export function buildWhatsAppUrl(phone, message) {
   let clean = (phone || '').replace(/[^\d]/g, '');

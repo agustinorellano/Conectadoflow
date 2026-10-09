@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
-import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight, Package, FileText, Upload, FileDown } from 'lucide-react';
+import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight, Package, FileText, Upload, FileDown, AlertTriangle, Trash2 } from 'lucide-react';
 import DocumentGeneratorModal from '@/components/DocumentGeneratorModal';
 import CustomFieldsSection, { useCustomFieldDefinitions } from '@/components/CustomFieldsSection';
 import { base44 } from '@/api/base44Client';
@@ -13,7 +13,7 @@ import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
-import { formatCurrency, formatDateShort, CLIENT_TYPES, COMMUNICATION_CHANNELS, buildWhatsAppUrl, buildMailtoUrl } from '@/lib/flowUtils';
+import { formatCurrency, formatDateShort, CLIENT_TYPES, COMMUNICATION_CHANNELS, buildWhatsAppUrl, buildMailtoUrl, normalizePhoneDigits, normalizeEmailLower } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
@@ -62,6 +62,7 @@ export default function Clients() {
   const [messageChannel, setMessageChannel] = useState('WhatsApp');
   const openMessage = (c, ch) => { setMessageClient(c); setMessageChannel(ch); };
   const [docClient, setDocClient] = useState(null);
+  const [duplicateClient, setDuplicateClient] = useState(null);
   const [page, setPage] = useState(1);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -98,6 +99,29 @@ export default function Clients() {
   }, [sales]);
 
   const withTopProduct = (c) => ({ ...c, top_product: topProductByClient[c.id]?.name || null });
+
+  // Same phone/email on two different client rows — almost always a
+  // double entry (loaded twice, or converted from a lead that already
+  // had a client). Maps each client's id to the other duplicate row
+  // found, so the card/row for that specific client can flag it.
+  const duplicateClientMap = useMemo(() => {
+    const map = {};
+    for (let i = 0; i < clients.length; i++) {
+      const a = clients[i];
+      const aPhone = normalizePhoneDigits(a.phone);
+      const aEmail = normalizeEmailLower(a.email);
+      if (!aPhone && !aEmail) continue;
+      for (let j = 0; j < clients.length; j++) {
+        if (i === j) continue;
+        const b = clients[j];
+        if ((aPhone && normalizePhoneDigits(b.phone) === aPhone) || (aEmail && normalizeEmailLower(b.email) === aEmail)) {
+          map[a.id] = b;
+          break;
+        }
+      }
+    }
+    return map;
+  }, [clients]);
 
   const filtered = clients.filter(c => {
     const q = search.toLowerCase();
@@ -186,17 +210,27 @@ export default function Clients() {
               {paged.map(rawC => {
                 const c = withTopProduct(rawC);
                 const standing = getStanding(c);
+                const dup = duplicateClientMap[c.id];
                 return (
                   <motion.div key={c.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                     onClick={() => navigate(`/clientes/${c.id}`)}
-                    className="cursor-pointer text-left bg-card rounded-2xl border border-border card-shadow p-4 hover:card-shadow-lg hover:-translate-y-0.5 transition-all">
+                    className={cn('cursor-pointer text-left bg-card rounded-2xl border card-shadow p-4 hover:card-shadow-lg hover:-translate-y-0.5 transition-all', dup ? 'border-destructive/40' : 'border-border')}>
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary/60 text-white flex items-center justify-center font-semibold shrink-0">
-                        {c.name?.charAt(0).toUpperCase()}
+                      <div className="relative shrink-0">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary/60 text-white flex items-center justify-center font-semibold">
+                          {c.name?.charAt(0).toUpperCase()}
+                        </div>
+                        {dup && (
+                          <button onClick={(e) => { e.stopPropagation(); setDuplicateClient(c); }} title="Dato duplicado"
+                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive ring-2 ring-card animate-pulse hover:scale-110 transition-transform" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{c.name}</p>
                         {c.company && <p className="text-xs text-muted-foreground truncate">{c.company}</p>}
+                        {dup && (
+                          <button onClick={(e) => { e.stopPropagation(); setDuplicateClient(c); }} className="text-[11px] font-medium text-destructive hover:underline">Dato duplicado</button>
+                        )}
                         <div onClick={e => e.stopPropagation()} className="mt-1.5">
                           <SituationSelect client={c} onChange={updateSituation} />
                         </div>
@@ -248,16 +282,25 @@ export default function Clients() {
             <AnimatePresence>
               {paged.map((rawC, i) => {
                 const c = withTopProduct(rawC);
+                const dup = duplicateClientMap[c.id];
                 return (
                   <motion.div key={c.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     onClick={() => navigate(`/clientes/${c.id}`)}
-                    className={cn('cursor-pointer flex items-center gap-3 p-3 sm:p-4 hover:bg-accent/50 transition-colors', i !== paged.length - 1 && 'border-b border-border')}>
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 text-white flex items-center justify-center font-semibold shrink-0 text-sm">
-                      {c.name?.charAt(0).toUpperCase()}
+                    className={cn('cursor-pointer flex items-center gap-3 p-3 sm:p-4 hover:bg-accent/50 transition-colors', i !== paged.length - 1 && 'border-b border-border', dup && 'bg-destructive/5')}>
+                    <div className="relative shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 text-white flex items-center justify-center font-semibold text-sm">
+                        {c.name?.charAt(0).toUpperCase()}
+                      </div>
+                      {dup && (
+                        <button onClick={(e) => { e.stopPropagation(); setDuplicateClient(c); }} title="Dato duplicado"
+                          className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-destructive ring-2 ring-card animate-pulse hover:scale-110 transition-transform" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{c.name}</p>
-                      {c.top_product ? (
+                      {dup ? (
+                        <button onClick={(e) => { e.stopPropagation(); setDuplicateClient(c); }} className="text-[11px] font-medium text-destructive hover:underline">Dato duplicado</button>
+                      ) : c.top_product ? (
                         <p className="text-xs text-primary truncate flex items-center gap-1"><Package className="w-3 h-3 shrink-0" /> {c.top_product}</p>
                       ) : (
                         <p className="text-xs text-muted-foreground truncate">{c.company || c.email || c.phone || '—'}</p>
@@ -325,6 +368,8 @@ export default function Clients() {
       <ClientForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} user={user} />
       <ClientMessageModal client={messageClient} initialChannel={messageChannel} onClose={() => setMessageClient(null)} />
       <DocumentGeneratorModal client={docClient} onClose={() => setDocClient(null)} />
+      <DuplicateClientModal client={duplicateClient} other={duplicateClient ? duplicateClientMap[duplicateClient.id] : null}
+        sales={sales} onClose={() => setDuplicateClient(null)} onDeleted={invalidate} />
     </div>
   );
 }
@@ -353,6 +398,62 @@ function SituationSelect({ client, onChange }) {
     >
       {SITUATION_STAGES.map(s => <option key={s.key} value={s.key}>{s.key}</option>)}
     </StyledSelect>
+  );
+}
+
+function DuplicateClientModal({ client, other, sales, onClose, onDeleted }) {
+  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+  if (!client) return null;
+
+  // sales.client_id is "on delete restrict" in the DB — a client with
+  // sales can't be deleted at all without losing that history, so the
+  // option is hidden instead of letting the delete fail. Opportunities/
+  // activities would cascade-delete, which is an acceptable loss for a
+  // genuine duplicate that never actually sold anything.
+  const hasSales = sales.some(s => s.client_id === client.id);
+
+  const del = async () => {
+    setError('');
+    setDeleting(true);
+    try {
+      await base44.entities.Client.delete(client.id);
+      onDeleted();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'No se pudo eliminar el cliente.');
+    } finally { setDeleting(false); }
+  };
+
+  return (
+    <Modal open={!!client} onClose={onClose} title="Dato duplicado"
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">No, son distintos</button>
+        {!hasSales && (
+          <button onClick={del} disabled={deleting} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
+            <Trash2 className="w-4 h-4" /> {deleting ? 'Eliminando…' : 'Eliminar este'}
+          </button>
+        )}
+      </>}>
+      <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20">
+        <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm">
+            <span className="font-medium">{client.name}</span> coincide en teléfono o email con otro cliente ya cargado
+            {other && <> — <button onClick={() => navigate(`/clientes/${other.id}`)} className="font-medium text-primary hover:underline">{other.name}</button></>}.
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Probablemente uno de los dos quedó duplicado (cargado dos veces, o convertido desde un lead que ya era cliente).
+            Si en realidad son personas distintas que comparten el dato (por ejemplo, familiares con el mismo teléfono), dejalo así.
+          </p>
+          {hasSales && (
+            <p className="text-sm text-warning mt-2">Este cliente tiene ventas registradas, así que no se puede eliminar directamente sin perder ese historial — revisá cuál de los dos es el correcto y pasá manualmente lo que haga falta.</p>
+          )}
+          {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+        </div>
+      </div>
+    </Modal>
   );
 }
 
