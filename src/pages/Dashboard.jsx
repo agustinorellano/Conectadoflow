@@ -188,16 +188,6 @@ export default function Dashboard() {
     patchEntity('Activity', act.id, { status: 'Realizada' });
   };
 
-  const markPaid = async (p) => {
-    await base44.entities.Payment.update(p.id, { status: 'Pagado', paid_date: new Date().toISOString().slice(0, 10) });
-    patchEntity('Payment', p.id, { status: 'Pagado' });
-  };
-
-  const pendingPayments = useMemo(() => filterByCommerce(data.payments)
-    .filter(p => p.status === 'Pendiente' || p.status === 'Parcial')
-    .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-    .slice(0, 5), [data.payments, filterByCommerce]);
-
   const maxFunnel = Math.max(...stats.funnel.map(f => f.count), 1);
 
   return (
@@ -258,30 +248,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-          <h2 className="font-semibold mb-2.5 text-sm">Cobros pendientes</h2>
-          <div className="space-y-1">
-            {pendingPayments.length === 0 && <p className="text-sm text-muted-foreground py-3 text-center">Sin cobros pendientes</p>}
-            {pendingPayments.map(p => (
-              <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-accent/50 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{p.client_name}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xs text-muted-foreground">{hideAmounts ? '••••••' : formatCurrency(p.amount, p.currency || currency)}</span>
-                    {isOverdue(p.due_date) ? (
-                      <Badge variant="destructive" dot>Vencido</Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">· Vence {new Date(p.due_date).toLocaleDateString('es-AR')}</span>
-                    )}
-                  </div>
-                </div>
-                <button onClick={() => markPaid(p)} className="shrink-0 px-2 py-1 rounded-lg bg-success text-white text-xs font-medium hover:opacity-90">Cobrado</button>
-              </div>
-            ))}
-          </div>
-        </div>
-
+      <div className="mb-4">
         <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
           <h2 className="font-semibold mb-2.5 text-sm">Próximas reuniones</h2>
           <div className="space-y-1">
