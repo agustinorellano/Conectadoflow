@@ -194,6 +194,58 @@ export default function Dashboard() {
   };
 
   const maxFunnel = Math.max(...stats.funnel.map(f => f.count), 1);
+  // Un vendedor no ve facturación de la empresa (ni el gráfico de Ingresos
+  // ni la fila donde vivía) — en cambio, apenas entra ve primero "qué tengo
+  // que hacer hoy" (tareas + reuniones), arriba de todo lo demás.
+  const isVendedor = user?.role === 'user';
+
+  const tasksCard = (
+    <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+      <h2 className="font-semibold mb-2.5 text-sm">Tareas pendientes</h2>
+      <div className="space-y-0.5">
+        {stats.pendingActivities.length === 0 && <p className="text-sm text-muted-foreground py-3 text-center">Sin tareas pendientes</p>}
+        {stats.pendingActivities.map(a => (
+          <div key={a.id} className="w-full flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-accent/50 transition-colors text-left group">
+            <button onClick={() => toggleActivity(a)}>
+              <Circle className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+            </button>
+            <span className="text-sm flex-1">{a.title}</span>
+            {a.due_date && daysUntil(a.due_date) !== null && daysUntil(a.due_date) < 0 && <Badge variant="destructive">Vencida</Badge>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const meetingsCard = (
+    <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+      <h2 className="font-semibold mb-2.5 text-sm">Próximas reuniones</h2>
+      <div className="space-y-1">
+        {stats.upcomingMeetings.length === 0 && <p className="text-sm text-muted-foreground py-2 text-center">Sin reuniones programadas</p>}
+        {stats.upcomingMeetings.map(m => (
+          <div key={m.id} className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-accent/50 transition-colors">
+            <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{m.title}</p>
+              <p className="text-xs text-muted-foreground">{m.client_name} · {formatDateTime(m.date)}</p>
+            </div>
+            <Badge variant="primary">{m.type}</Badge>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const statsGrid = (
+    <div className="grid grid-cols-2 gap-3">
+      <StatCard label="Productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
+      <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
+      <StatCard label="Por cobrar" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
+      <StatCard label="Más vendido" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
+    </div>
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1240px] mx-auto">
@@ -230,51 +282,48 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 items-stretch gap-3 mb-4">
-        <div className="lg:col-span-2 flex flex-col gap-3">
-          <IncomeReportCard
-            sales={stats.fSales}
-            baseCurrency={currency}
-            hidden={hideAmounts}
-            onToggleHidden={() => setHideAmounts(!hideAmounts)}
-            period={period}
-            onPeriodChange={setPeriod}
-          />
-          <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
-        </div>
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
-            <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
-            <StatCard label="Por cobrar" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
-            <StatCard label="Más vendido" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
+      {isVendedor ? (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            {tasksCard}
+            {meetingsCard}
           </div>
-          <div className="flex-1">
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 items-stretch gap-3 mb-4">
+            <div className="lg:col-span-2 flex flex-col gap-3">
+              {statsGrid}
+              <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
+            </div>
             <SalesByEntityChart sales={stats.fSales} currency={currency} />
           </div>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-          <h2 className="font-semibold mb-2.5 text-sm">Próximas reuniones</h2>
-          <div className="space-y-1">
-            {stats.upcomingMeetings.length === 0 && <p className="text-sm text-muted-foreground py-2 text-center">Sin reuniones programadas</p>}
-            {stats.upcomingMeetings.map(m => (
-              <div key={m.id} className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-accent/50 transition-colors">
-                <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Calendar className="w-4 h-4" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{m.title}</p>
-                  <p className="text-xs text-muted-foreground">{m.client_name} · {formatDateTime(m.date)}</p>
-                </div>
-                <Badge variant="primary">{m.type}</Badge>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 items-stretch gap-3 mb-4">
+            <div className="lg:col-span-2 flex flex-col gap-3">
+              <IncomeReportCard
+                sales={stats.fSales}
+                baseCurrency={currency}
+                hidden={hideAmounts}
+                onToggleHidden={() => setHideAmounts(!hideAmounts)}
+                period={period}
+                onPeriodChange={setPeriod}
+              />
+              <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
+            </div>
+            <div className="flex flex-col gap-3">
+              {statsGrid}
+              <div className="flex-1">
+                <SalesByEntityChart sales={stats.fSales} currency={currency} />
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </div>
+
+          <div className="mb-4">
+            {meetingsCard}
+          </div>
+        </>
+      )}
 
       <div className={cn('grid grid-cols-1 gap-3 mb-4', showTopSeller ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
         <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.monthRevenue} formatValue={amount} />
@@ -354,22 +403,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4">
-        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-          <h2 className="font-semibold mb-2.5 text-sm">Tareas pendientes</h2>
-          <div className="space-y-0.5">
-            {stats.pendingActivities.length === 0 && <p className="text-sm text-muted-foreground py-3 text-center">Sin tareas pendientes</p>}
-            {stats.pendingActivities.map(a => (
-              <div key={a.id} className="w-full flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-accent/50 transition-colors text-left group">
-                <button onClick={() => toggleActivity(a)}>
-                  <Circle className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
-                </button>
-                <span className="text-sm flex-1">{a.title}</span>
-                {a.due_date && daysUntil(a.due_date) !== null && daysUntil(a.due_date) < 0 && <Badge variant="destructive">Vencida</Badge>}
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className={cn('grid grid-cols-1 gap-3 sm:gap-4 mb-4', !isVendedor && 'lg:grid-cols-2')}>
+        {!isVendedor && tasksCard}
 
         <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
           <div className="flex items-center justify-between mb-2.5">
