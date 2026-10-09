@@ -178,11 +178,7 @@ export default function Onboarding() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
         <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <svg viewBox="0 0 40 40" className="w-6 h-6" fill="none" stroke="white" strokeWidth="2.4">
-              <circle cx="15" cy="20" r="8" /><circle cx="25" cy="20" r="8" />
-            </svg>
-          </div>
+          <img src="/logo.png" alt="Conectado Flow" className="w-10 h-10 rounded-xl" />
           <div>
             <p className="font-semibold text-lg leading-tight">Conectado</p>
             <p className="text-primary font-medium leading-tight">Flow</p>
