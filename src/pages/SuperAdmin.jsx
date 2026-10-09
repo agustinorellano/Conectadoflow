@@ -17,6 +17,7 @@ export default function SuperAdmin() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('orgs');
   const [notifyTarget, setNotifyTarget] = useState(null); // { orgId, orgName } | 'broadcast' | null
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (user && !user.is_platform_admin) {
@@ -24,14 +25,23 @@ export default function SuperAdmin() {
     }
   }, [user, navigate]);
 
+  // Antes tragaba cualquier error de admin_list_organizations/admin_list_users
+  // (.catch(() => [])) y mostraba 0/0 sin ninguna pista de qué pasó — si la
+  // función no estaba autorizada o ni siquiera existía todavía en el caché
+  // de PostgREST, quedaba indistinguible de "no hay datos". Ahora se ve el
+  // motivo real.
   const load = async () => {
     setLoading(true);
+    setLoadError('');
     try {
-      const [o, u] = await Promise.all([
-        base44.admin.listOrganizations().catch(() => []),
-        base44.admin.listUsers().catch(() => []),
+      const [o, u] = await Promise.allSettled([
+        base44.admin.listOrganizations(),
+        base44.admin.listUsers(),
       ]);
-      setOrgs(o); setUsers(u);
+      if (o.status === 'fulfilled') setOrgs(o.value); else setOrgs([]);
+      if (u.status === 'fulfilled') setUsers(u.value); else setUsers([]);
+      const failed = [o, u].find(r => r.status === 'rejected');
+      if (failed) setLoadError(failed.reason?.message || 'No se pudieron cargar los datos');
     } finally { setLoading(false); }
   };
 
@@ -57,6 +67,12 @@ export default function SuperAdmin() {
         </button>
       </div>
       <p className="text-sm text-muted-foreground mb-6">Organizaciones y usuarios de toda la plataforma Conectado Flow</p>
+
+      {loadError && (
+        <div className="mb-6 p-3.5 rounded-xl bg-destructive/10 text-destructive text-sm">
+          No se pudieron cargar los datos: {loadError}
+        </div>
+      )}
 
       <div className="flex items-center gap-1.5 p-1 bg-secondary/60 rounded-xl w-fit mb-6">
         <button onClick={() => setTab('orgs')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'orgs' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Organizaciones ({orgs.length})</button>
