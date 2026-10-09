@@ -8,9 +8,14 @@ const DefaultFallback = () => (
 );
 
 export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthenticatedElement }) {
-  const { isAuthenticated, isLoadingAuth, authChecked } = useAuth();
+  // Same reasoning as AuthenticatedApp in App.jsx: gate only on the first
+  // ever check, not on isLoadingAuth — that one flips true again on every
+  // background re-check (e.g. tab regaining focus), which would otherwise
+  // unmount the whole routed page (and whatever form/modal was open in it)
+  // each time.
+  const { isAuthenticated, authChecked } = useAuth();
 
-  if (isLoadingAuth || !authChecked) {
+  if (!authChecked) {
     return fallback;
   }
 

@@ -36,9 +36,14 @@ import Products from '@/pages/Products';
 import SuperAdmin from '@/pages/SuperAdmin';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth } = useAuth();
+  // Only the very first auth check (before authChecked is ever set) should
+  // block the whole app behind a spinner. A later re-check — e.g. Supabase
+  // revalidating the session when the tab regains focus — sets
+  // isLoadingAuth again too, and gating on that unmounted every open
+  // modal/form in the app each time the user switched tabs and came back.
+  const { authChecked } = useAuth();
 
-  if (isLoadingAuth) {
+  if (!authChecked) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
