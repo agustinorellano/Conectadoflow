@@ -245,11 +245,16 @@ export default function Dashboard() {
           />
           <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
         </div>
-        <div className="grid grid-cols-2 gap-3 content-start">
-          <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
-          <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
-          <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
-          <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
+            <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
+            <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
+            <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
+          </div>
+          <div className="flex-1">
+            <SalesByEntityChart sales={stats.fSales} currency={currency} />
+          </div>
         </div>
       </div>
 
@@ -409,8 +414,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      <SalesByEntityChart sales={stats.fSales} currency={currency} />
     </div>
   );
 }
