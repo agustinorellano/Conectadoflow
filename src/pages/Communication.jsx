@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight, Mail, FileSignature, PackageCheck, Truck, ClipboardCheck, Handshake, FileEdit } from 'lucide-react';
+import { MessageCircle, Plus, Edit3, Trash2, Send, UserPlus, FileText, Wallet, RefreshCw, Info, ChevronLeft, ChevronRight, Mail, FileSignature, PackageCheck, Truck, ClipboardCheck, Handshake, FileEdit, Eye } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
@@ -9,7 +9,9 @@ import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { buildWhatsAppUrl, buildMailtoUrl, fillTemplate, COMMUNICATION_CHANNELS } from '@/lib/flowUtils';
-import { DOC_TYPES, DEFAULT_DOCUMENT_TEMPLATES } from '@/lib/documentEngine';
+import { DOC_TYPES, DEFAULT_DOCUMENT_TEMPLATES, fillDocTemplate, buildDocVars } from '@/lib/documentEngine';
+import { buildDocumentPdf } from '@/lib/buildDocumentPdf';
+import { useData } from '@/lib/DataContext';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = ['Primer contacto','Seguimiento','Confirmación de reunión','Recordatorio','Envío de propuesta','Seguimiento de propuesta','Cierre','Agradecimiento','Facturación','Recordatorio de pago','Pago vencido','Reactivación','Postventa'];
@@ -322,13 +324,57 @@ function PreviewModal({ template, onClose }) {
   );
 }
 
+// Fake stand-in data for the preview — same idea as PreviewModal above
+// (Carlos/Acme), just the document-shaped equivalent, so editing a
+// template shows exactly what a real client would see without needing a
+// real client or a real sale on hand.
+const PREVIEW_SAMPLE_ITEMS = [
+  { description: 'Producto o servicio de ejemplo', quantity: 2, delivered: 2, pending: 0, unit_price: 15000, notes: '' },
+  { description: 'Otro ítem de ejemplo', quantity: 1, delivered: 1, pending: 0, unit_price: 8000, notes: '' },
+];
+
 function DocTemplateForm({ docT, onClose, onSaved }) {
-  const [form, setForm] = useState({ intro_text: '', conditions_text: '', show_prices: true, show_signature: true });
+  const { config } = useData();
+  const [form, setForm] = useState({ intro_text: '', conditions_text: '', show_prices: true, show_signature: true, show_banner: true });
   const [saving, setSaving] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const previewUrlRef = useRef(null);
+
   useEffect(() => {
-    if (docT) setForm({ intro_text: docT.intro_text || '', conditions_text: docT.conditions_text || '', show_prices: docT.show_prices !== false, show_signature: docT.show_signature !== false });
+    if (docT) setForm({
+      intro_text: docT.intro_text || '', conditions_text: docT.conditions_text || '',
+      show_prices: docT.show_prices !== false, show_signature: docT.show_signature !== false, show_banner: docT.show_banner !== false,
+    });
+    setPreviewUrl(null);
   }, [docT]);
+
+  // Revoke the previous blob URL whenever we build a new one, and on unmount —
+  // otherwise every "Vista previa" click leaks another one for the session's life.
+  useEffect(() => () => { if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current); }, []);
+
   if (!docT) return null;
+
+  const refreshPreview = () => {
+    const issuer = { company_name: config?.company_name, billing_name: config?.billing_name, billing_tax_id: config?.billing_tax_id,
+      billing_address: config?.billing_address || config?.address, billing_email: config?.billing_email || config?.email,
+      primary_color: config?.primary_color };
+    const totalAmount = PREVIEW_SAMPLE_ITEMS.reduce((s, it) => s + it.quantity * it.unit_price, 0);
+    const vars = buildDocVars({
+      client: { name: 'Carlos Gómez', company: 'Acme SRL', tax_id: '30-12345678-9' }, issuer,
+      documentNumber: '(previsualización)', saleNumber: 'V-000123', totalAmount, currency: config?.currency || 'ARS',
+    });
+    const pdf = buildDocumentPdf({
+      doc: { doc_type: docT.doc_type, document_number: '(previsualización)', date: new Date().toISOString(), observations: '', total_amount: form.show_prices ? totalAmount : null },
+      issuer, filledIntro: fillDocTemplate(form.intro_text, vars), filledConditions: fillDocTemplate(form.conditions_text, vars),
+      items: PREVIEW_SAMPLE_ITEMS, showPrices: form.show_prices, showSignature: form.show_signature, showBanner: form.show_banner,
+      currency: config?.currency || 'ARS',
+    });
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const url = pdf.output('bloburl');
+    previewUrlRef.current = url;
+    setPreviewUrl(url);
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -337,25 +383,43 @@ function DocTemplateForm({ docT, onClose, onSaved }) {
     } finally { setSaving(false); }
   };
   return (
-    <Modal open={!!docT} onClose={onClose} title={docT.name} subtitle={`${docT.doc_type} · ${docT.operation_type}`}
+    <Modal open={!!docT} onClose={onClose} title={docT.name} subtitle={`${docT.doc_type} · ${docT.operation_type}`} size="xl"
       footer={<>
         <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
         <button onClick={save} disabled={saving} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar'}</button>
       </>}>
-      <div className="space-y-3">
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">Introducción</label>
-          <textarea value={form.intro_text} onChange={e => setForm({ ...form, intro_text: e.target.value })} rows={4} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Introducción</label>
+            <textarea value={form.intro_text} onChange={e => setForm({ ...form, intro_text: e.target.value })} rows={4} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Condiciones</label>
+            <textarea value={form.conditions_text} onChange={e => setForm({ ...form, conditions_text: e.target.value })} rows={3} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.show_prices} onChange={e => setForm({ ...form, show_prices: e.target.checked })} className="w-4 h-4 accent-primary" /> Mostrar precios por defecto</label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.show_signature} onChange={e => setForm({ ...form, show_signature: e.target.checked })} className="w-4 h-4 accent-primary" /> Espacio para firma por defecto</label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.show_banner} onChange={e => setForm({ ...form, show_banner: e.target.checked })} className="w-4 h-4 accent-primary" /> Banner con el nombre de tu marca al inicio del documento</label>
+          </div>
+          <p className="text-xs text-muted-foreground">Variables: {'{{nombre_cliente}} {{empresa_cliente}} {{cuit_cliente}} {{nombre_empresa}} {{razon_social_empresa}} {{cuit_empresa}} {{numero_venta}}'} y las demás disponibles al generar el documento.</p>
         </div>
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">Condiciones</label>
-          <textarea value={form.conditions_text} onChange={e => setForm({ ...form, conditions_text: e.target.value })} rows={3} className="w-full px-3.5 py-3 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-medium">Vista previa</label>
+            <button onClick={refreshPreview} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">
+              <Eye className="w-3.5 h-3.5" /> {previewUrl ? 'Actualizar' : 'Ver'} vista previa
+            </button>
+          </div>
+          {previewUrl ? (
+            <iframe title="Vista previa del documento" src={previewUrl} className="w-full flex-1 min-h-[420px] rounded-xl border border-border bg-white" />
+          ) : (
+            <div className="flex-1 min-h-[420px] rounded-xl border border-dashed border-border flex items-center justify-center text-sm text-muted-foreground text-center p-6">
+              Tocá "Ver vista previa" para ver cómo queda el documento con datos de ejemplo, acá mismo, sin salir de esta ventana.
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.show_prices} onChange={e => setForm({ ...form, show_prices: e.target.checked })} className="w-4 h-4 accent-primary" /> Mostrar precios por defecto</label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.show_signature} onChange={e => setForm({ ...form, show_signature: e.target.checked })} className="w-4 h-4 accent-primary" /> Espacio para firma por defecto</label>
-        </div>
-        <p className="text-xs text-muted-foreground">Variables: {'{{nombre_cliente}} {{empresa_cliente}} {{cuit_cliente}} {{nombre_empresa}} {{razon_social_empresa}} {{cuit_empresa}} {{numero_venta}}'} y las demás disponibles al generar el documento.</p>
       </div>
     </Modal>
   );

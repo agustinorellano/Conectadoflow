@@ -1,11 +1,16 @@
 import { jsPDF } from 'jspdf';
 import { formatCurrency, formatDate } from '@/lib/flowUtils';
 
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 70, g: 91, b: 232 };
+}
+
 // Builds the PDF for a generated document. Same visual conventions as the
 // other jsPDF exports in the app (Productos, Reportes): bold header, muted
 // subtitle, a simple table, page-numbered footer. Returns the jsPDF
 // instance — caller decides whether to .save(), .output('blob'), etc.
-export function buildDocumentPdf({ doc: docData, issuer, filledIntro, filledConditions, items, showPrices, showSignature, currency }) {
+export function buildDocumentPdf({ doc: docData, issuer, filledIntro, filledConditions, items, showPrices, showSignature, showBanner, currency }) {
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -16,9 +21,23 @@ export function buildDocumentPdf({ doc: docData, issuer, filledIntro, filledCond
     if (y + needed > pageHeight - 20) { pdf.addPage(); y = 20; }
   };
 
-  // Header: issuer identity
-  pdf.setFontSize(16); pdf.setFont(undefined, 'bold');
-  pdf.text(issuer.company_name || issuer.name || 'Mi empresa', marginX, y); y += 7;
+  // Header: issuer identity — either a plain text line (default) or, when
+  // the template opts in, a colored letterhead band in the org's own
+  // primary_color with the company name large and in white. Only drawn
+  // on page 1, like a real letterhead.
+  if (showBanner) {
+    const { r, g, b } = hexToRgb(issuer.primary_color);
+    const bannerH = 26;
+    pdf.setFillColor(r, g, b);
+    pdf.rect(0, 0, pageWidth, bannerH, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(19); pdf.setFont(undefined, 'bold');
+    pdf.text(issuer.company_name || issuer.name || 'Mi empresa', marginX, bannerH / 2 + 6);
+    y = bannerH + 10;
+  } else {
+    pdf.setFontSize(16); pdf.setFont(undefined, 'bold'); pdf.setTextColor(0);
+    pdf.text(issuer.company_name || issuer.name || 'Mi empresa', marginX, y); y += 7;
+  }
   pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(100);
   const issuerLines = [
     issuer.billing_name && `Razón social: ${issuer.billing_name}`,

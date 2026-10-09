@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Plus, Trash2, Eye, Download, Send, Mail, MessageCircle,
@@ -44,11 +44,16 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
   const [observations, setObservations] = useState('');
   const [showPrices, setShowPrices] = useState(true);
   const [showSignature, setShowSignature] = useState(true);
+  const [showBanner, setShowBanner] = useState(true);
   const [issuer, setIssuer] = useState({});
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const previewUrlRef = useRef(null);
   const [clientData, setClientData] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // the created ClientDocument row, once generated
+
+  useEffect(() => () => { if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current); }, []);
 
   // First-ever use: no templates exist yet for this org, seed the defaults.
   useEffect(() => {
@@ -78,8 +83,9 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
       company_name: config?.company_name || '', billing_name: config?.billing_name || '',
       billing_tax_id: config?.billing_tax_id || '', billing_address: config?.billing_address || config?.address || '',
       billing_email: config?.billing_email || config?.email || '', billing_phone: config?.billing_phone || config?.phone || '',
-      logo_url: config?.logo_url || '',
+      logo_url: config?.logo_url || '', primary_color: config?.primary_color || '',
     });
+    setPreviewUrl(null);
     setClientData({
       name: client.name || '', company: client.company || '', tax_id: client.tax_id || '',
       address: client.address || '', email: client.email || '', phone: client.phone || '',
@@ -105,6 +111,7 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
       setConditions(template.conditions_text || '');
       setShowPrices(template.show_prices !== false);
       setShowSignature(template.show_signature !== false);
+      setShowBanner(template.show_banner !== false);
     }
   }, [template]);
 
@@ -126,15 +133,19 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
   const buildPdfBlob = (documentNumber) => {
     const pdf = buildDocumentPdf({
       doc: { doc_type: docType, document_number: documentNumber, date, observations, total_amount: showPrices ? totalAmount : null },
-      issuer, filledIntro, filledConditions, items, showPrices, showSignature, currency,
+      issuer, filledIntro, filledConditions, items, showPrices, showSignature, showBanner, currency,
     });
     return pdf;
   };
 
+  // Renders inline (an iframe inside this same modal) instead of
+  // window.open — a new tab is one more thing to lose track of mid-edit.
   const preview = () => {
     const pdf = buildPdfBlob('(previsualización)');
-    const blobUrl = pdf.output('bloburl');
-    window.open(blobUrl, '_blank');
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const url = pdf.output('bloburl');
+    previewUrlRef.current = url;
+    setPreviewUrl(url);
   };
 
   const generate = async () => {
@@ -229,7 +240,7 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
 
   return (
     <Modal open={open} onClose={onClose} title={client ? `Documentos — ${client.name}` : ''}
-      subtitle={sale ? `A partir de la venta ${sale.number || ''}` : undefined} size="lg"
+      subtitle={sale ? `A partir de la venta ${sale.number || ''}` : undefined} size="xl"
       footer={result ? (
         <>
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cerrar</button>
@@ -240,7 +251,7 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
       ) : tab === 'new' ? (
         <>
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
-          <button onClick={preview} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-sm font-medium hover:bg-accent"><Eye className="w-4 h-4" /> Vista previa</button>
+          <button onClick={preview} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-sm font-medium hover:bg-accent"><Eye className="w-4 h-4" /> {previewUrl ? 'Actualizar vista previa' : 'Vista previa'}</button>
           <button onClick={generate} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
             <FileText className="w-4 h-4" /> {saving ? 'Generando…' : 'Generar documento'}
           </button>
@@ -401,9 +412,10 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
                 {showPrices && <p className="text-right text-sm font-semibold mt-2">Total: {formatCurrency(totalAmount, currency)}</p>}
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={showPrices} onChange={e => setShowPrices(e.target.checked)} className="w-4 h-4 accent-primary" /> Mostrar precios</label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={showSignature} onChange={e => setShowSignature(e.target.checked)} className="w-4 h-4 accent-primary" /> Espacio para firma</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={showBanner} onChange={e => setShowBanner(e.target.checked)} className="w-4 h-4 accent-primary" /> Banner con tu marca</label>
               </div>
 
               <div>
@@ -414,6 +426,13 @@ export default function DocumentGeneratorModal({ client, sale, onClose }) {
                 <label className="text-sm font-medium mb-1.5 block">Observaciones</label>
                 <textarea value={observations} onChange={e => setObservations(e.target.value)} rows={2} className="inp resize-none" />
               </div>
+
+              {previewUrl && (
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Vista previa</label>
+                  <iframe title="Vista previa del documento" src={previewUrl} className="w-full h-[420px] rounded-xl border border-border bg-white" />
+                </div>
+              )}
             </div>
           )}
         </>
