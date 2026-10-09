@@ -61,6 +61,7 @@ export default function Sales() {
   const { data: payments = [], isLoading: loadingPayments } = useEntityList('Payment');
   const { data: clients = [], isLoading: loadingClients } = useEntityList('Client');
   const { data: products = [], isLoading: loadingProducts } = useEntityList('Product');
+  const { data: branches = [] } = useEntityList('Branch');
   const loading = loadingSales || loadingPayments || loadingClients || loadingProducts;
   const [showForm, setShowForm] = useState(false);
   const [editingSale, setEditingSale] = useState(null);
@@ -68,7 +69,7 @@ export default function Sales() {
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
   const [period, setPeriod] = useState('all');
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const currency = config?.currency || 'ARS';
   const rates = useCurrencyRates();
@@ -90,8 +91,11 @@ export default function Sales() {
   };
 
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
+  const branchParam = searchParams.get('branch');
 
-  const fSales = filterByCommerce(sales).filter(s => period === 'all' || inPeriod(s.date, period));
+  const fSales = filterByCommerce(sales)
+    .filter(s => period === 'all' || inPeriod(s.date, period))
+    .filter(s => !branchParam || s.branch_id === branchParam);
   const filtered = fSales.filter(s => {
     const q = search.toLowerCase();
     return !q || [s.number, s.client_name].some(v => (v || '').toLowerCase().includes(q));
@@ -185,8 +189,16 @@ export default function Sales() {
     XLSX.writeFile(wb, `ventas_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  const branchFilterName = branchParam ? branches.find(b => b.id === branchParam)?.name : null;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto">
+      {branchParam && (
+        <div className="flex items-center justify-between gap-3 mb-4 px-3.5 py-2.5 rounded-xl bg-primary/10 text-sm">
+          <span>Mostrando solo ventas de <span className="font-semibold">{branchFilterName || 'esta sucursal'}</span></span>
+          <button onClick={() => setSearchParams(prev => { const p = new URLSearchParams(prev); p.delete('branch'); return p; })} className="text-primary font-medium hover:underline shrink-0">Quitar filtro</button>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Ventas</h1>
@@ -359,7 +371,7 @@ export default function Sales() {
         )
       }
 
-      <SaleForm open={showForm} onClose={closeForm} onSaved={invalidate} clients={clients} products={products} user={user} config={config} sale={editingSale} />
+      <SaleForm open={showForm} onClose={closeForm} onSaved={invalidate} clients={clients} products={products} branches={branches} user={user} config={config} sale={editingSale} />
       <DocumentGeneratorModal client={docSale ? clients.find(c => c.id === docSale.client_id) : null} sale={docSale} onClose={() => setDocSale(null)} />
     </div>
   );
@@ -410,12 +422,12 @@ function emptySaleFormFor(config) {
     client_id: '', client_mode: 'existing', new_client_name: '', new_client_phone: '',
     date: new Date().toISOString().slice(0, 10), currency: config?.currency || 'ARS',
     discount_pct: '', apply_tax: !!config?.tax_rate, payment_method: 'Transferencia', status: 'Confirmada',
-    installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1, channel: '',
+    installments: 1, observations: '', bank_entity: '', card_type: '', card_brand: '', installments_count: 1, channel: '', branch_id: '',
   };
 }
 const CUSTOM_ITEM = '__custom__';
 
-function SaleForm({ open, onClose, onSaved, clients, products, user, config, sale }) {
+function SaleForm({ open, onClose, onSaved, clients, products, branches = [], user, config, sale }) {
   const [form, setForm] = useState(() => emptySaleFormFor(config));
   const { currentCommerceId: curCommerceId } = useCommerce();
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: '' }]);
@@ -445,7 +457,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
         payment_method: sale.payment_method || 'Transferencia',
         status: sale.status || 'Confirmada', installments: sale.installments_count || 1, observations: sale.observations || '',
         bank_entity: sale.bank_entity || '', card_type: sale.card_type || '', card_brand: sale.card_brand || '',
-        installments_count: sale.installments_count || 1, channel: sale.channel || '',
+        installments_count: sale.installments_count || 1, channel: sale.channel || '', branch_id: sale.branch_id || '',
       });
       setItems(sale.items?.length ? sale.items.map(it => ({ description: it.description, quantity: it.quantity, unit_price: it.unit_price, product_id: it.product_id, custom: !it.product_id })) : [{ description: '', quantity: 1, unit_price: '' }]);
     } else {
@@ -498,6 +510,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
           date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity,
           card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1,
           status: form.status, observations: form.observations, channel: form.channel || null,
+          branch_id: form.branch_id || null,
           balance: newBalance, payment_status: paymentStatus,
         });
         const failed = await syncProductStock(products, sale.items, computedItems);
@@ -521,6 +534,7 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
           date: form.date, payment_method: form.payment_method, bank_entity: form.bank_entity, card_type: form.card_type, card_brand: form.card_brand, installments_count: Number(form.installments_count) || 1, status: form.status,
           channel: form.channel || null,
           commerce_id: curCommerceId !== 'all' ? curCommerceId : undefined,
+          branch_id: form.branch_id || null,
           collected_amount: 0, balance: total, payment_status: 'Pendiente', observations: form.observations,
           owner_id: user?.id, owner_name: user?.full_name,
         });
@@ -611,6 +625,16 @@ function SaleForm({ open, onClose, onSaved, clients, products, user, config, sal
             placeholder="Ej: WhatsApp, Instagram, Ecommerce…" className="inp" />
           <datalist id="sale-channels">{SALE_CHANNELS.map(c => <option key={c} value={c} />)}</datalist>
         </div>
+
+        {branches.length > 0 && (
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Sucursal</label>
+            <StyledSelect value={form.branch_id} onChange={e => setForm({ ...form, branch_id: e.target.value })} className="inp">
+              <option value="">Sin especificar</option>
+              {branches.filter(b => curCommerceId === 'all' || b.commerce_id === curCommerceId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </StyledSelect>
+          </div>
+        )}
 
         <div>
           <div className="flex items-center justify-between mb-2">

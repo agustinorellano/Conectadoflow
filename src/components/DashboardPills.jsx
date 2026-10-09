@@ -1,13 +1,15 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-const VIEWS = [
+const DEFAULT_VIEWS = [
   { key: 'general', label: 'General' },
   { key: 'commerce', label: 'Por comercio' },
+  { key: 'branch', label: 'Por sucursal' },
   { key: 'seller', label: 'Por vendedor' },
 ];
 
-export default function DashboardPills({ view, setView }) {
+export default function DashboardPills({ view, setView, views }) {
+  const VIEWS = views || DEFAULT_VIEWS;
   return (
     <div className="flex items-center gap-1.5 p-1 bg-secondary/60 rounded-xl w-fit overflow-x-auto no-scrollbar">
       {VIEWS.map(v => (

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
-import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter, Upload, FileDown, AlertTriangle, Trash2 } from 'lucide-react';
+import { UserPlus, Search, MoreVertical, ArrowRight, Phone, Mail, Building2, Filter, Upload, FileDown, AlertTriangle, Trash2, Users, PhoneCall, UserCheck, CheckCircle2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -10,13 +10,23 @@ import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import KpiCard from '@/components/KpiCard';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import CustomFieldsSection, { useCustomFieldDefinitions } from '@/components/CustomFieldsSection';
-import { formatCurrency, formatDate, timeAgo, LEAD_SOURCES, normalizePhoneDigits, normalizeEmailLower } from '@/lib/flowUtils';
+import { formatDate, timeAgo, LEAD_SOURCES, normalizePhoneDigits, normalizeEmailLower } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
 const STATUSES = ['Nuevo','Contactado','Calificado','Convertido','Perdido'];
+
+// Nivel cualitativo en vez de un monto — más fácil de cargar y de leer
+// de un vistazo, con los colores típicos de semáforo (bajo=rojo,
+// medio=amarillo, alto=verde).
+const POTENTIAL_LEVELS = [
+  { value: 'Bajo', variant: 'destructive', dot: 'bg-destructive' },
+  { value: 'Medio', variant: 'warning', dot: 'bg-warning' },
+  { value: 'Alto', variant: 'success', dot: 'bg-success' },
+];
 
 // Same phone/email already in Clientes — the lead is almost certainly the
 // same person re-entered (e.g. they wrote in again, or someone forgot an
@@ -70,7 +80,7 @@ export default function Leads() {
     const rows = filtered.map(l => ({
       Nombre: l.first_name, Apellido: l.last_name || '', Empresa: l.company || '', Teléfono: l.phone || '',
       Email: l.email || '', Origen: l.source || '', Interés: l.interest || '', Estado: l.status,
-      'Valor potencial': l.potential_value || 0, 'Último contacto': l.last_contact ? formatDate(l.last_contact) : '',
+      'Valor potencial': l.potential_value || '', 'Último contacto': l.last_contact ? formatDate(l.last_contact) : '',
       'Próxima acción': l.next_action || '',
       ...Object.fromEntries(customDefs.map(d => [d.label, l.custom_fields?.[d.id] ?? ''])),
     }));
@@ -101,6 +111,13 @@ export default function Leads() {
             <UserPlus className="w-4 h-4" /> Nuevo lead
           </button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <KpiCard label="Total" value={leads.length} icon={Users} accent="#465BE8" />
+        <KpiCard label="Falta contactar" value={leads.filter(l => l.status === 'Nuevo').length} icon={PhoneCall} accent="#f59e0b" onClick={() => setStatusFilter('Nuevo')} />
+        <KpiCard label="En contacto" value={leads.filter(l => l.status === 'Contactado' || l.status === 'Calificado').length} icon={UserCheck} accent="#3b82f6" onClick={() => setStatusFilter('Contactado')} />
+        <KpiCard label="Convertidos" value={leads.filter(l => l.status === 'Convertido').length} icon={CheckCircle2} accent="#22c55e" onClick={() => setStatusFilter('Convertido')} />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
@@ -158,8 +175,10 @@ export default function Leads() {
                 </div>
                 <div className="flex items-center justify-between pt-3 border-t border-border">
                   <div>
-                    {l.potential_value ? <p className="text-sm font-semibold">{formatCurrency(l.potential_value)}</p> : <p className="text-xs text-muted-foreground">Sin valor</p>}
-                    <p className="text-xs text-muted-foreground">{l.source} · {timeAgo(l.created_date)}</p>
+                    {l.potential_value ? (
+                      <Badge variant={POTENTIAL_LEVELS.find(p => p.value === l.potential_value)?.variant} dot>{l.potential_value}</Badge>
+                    ) : <p className="text-xs text-muted-foreground">Sin valor</p>}
+                    <p className="text-xs text-muted-foreground mt-1">{l.source} · {timeAgo(l.created_date)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {l.phone && <WhatsAppButton phone={l.phone} client={{ name: `${l.first_name} ${l.last_name}` }} stage={l.status} compact />}
@@ -245,7 +264,7 @@ function LeadForm({ open, onClose, onSaved, user }) {
     try {
       await base44.entities.Lead.create({
         ...form,
-        potential_value: Number(form.potential_value) || 0,
+        potential_value: form.potential_value || null,
         status: 'Nuevo',
         owner_id: user?.id,
         owner_name: user?.full_name,
@@ -270,7 +289,19 @@ function LeadForm({ open, onClose, onSaved, user }) {
         <Input label="Email" value={form.email} onChange={v => setForm({ ...form, email: v })} />
         <Select label="Fuente" value={form.source} options={LEAD_SOURCES} onChange={v => setForm({ ...form, source: v })} />
         <Input label="Interés" value={form.interest} onChange={v => setForm({ ...form, interest: v })} />
-        <Input label="Valor potencial" value={form.potential_value} onChange={v => setForm({ ...form, potential_value: v })} type="number" />
+        <div className="col-span-2">
+          <label className="text-sm font-medium mb-1.5 block">Valor potencial</label>
+          <div className="flex items-center gap-2">
+            {POTENTIAL_LEVELS.map(p => (
+              <button key={p.value} type="button" onClick={() => setForm({ ...form, potential_value: form.potential_value === p.value ? '' : p.value })}
+                className={cn('inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition-all',
+                  form.potential_value === p.value ? 'border-transparent ring-2 ring-offset-1 ring-current' : 'border-border hover:border-primary/40',
+                  form.potential_value === p.value && (p.variant === 'destructive' ? 'bg-destructive/10 text-destructive' : p.variant === 'warning' ? 'bg-warning/15 text-warning' : 'bg-success/10 text-success'))}>
+                <span className={cn('w-2 h-2 rounded-full', p.dot)} /> {p.value}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="col-span-2">
           <label className="text-sm font-medium mb-1.5 block">Notas</label>
           <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2}
@@ -296,7 +327,6 @@ function ConvertModal({ lead, onClose, onConverted, user }) {
         email: lead.email || '',
         type: lead.company ? 'Empresa' : 'Consumidor',
         status: 'Activo',
-        potential_value: lead.potential_value || 0,
         owner_id: lead.owner_id || user?.id,
         owner_name: lead.owner_name || user?.full_name,
         lead_source: lead.source,
@@ -308,7 +338,7 @@ function ConvertModal({ lead, onClose, onConverted, user }) {
           client_company: client.company,
           title: lead.interest || 'Oportunidad inicial',
           product: lead.interest || '',
-          amount: lead.potential_value || 0,
+          amount: 0,
           probability: 20,
           stage: 'Nuevo lead',
           stage_order: 0,

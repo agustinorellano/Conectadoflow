@@ -4,7 +4,7 @@ import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   ShoppingCart, UserPlus, Wallet, Package, Award,
-  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing,
+  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing, MapPin,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
@@ -46,7 +46,7 @@ export default function Dashboard() {
   // every mount: switching away from Dashboard and back reuses this data
   // (per the shared staleTime in query-client.js) instead of re-fetching
   // all 8 tables again.
-  const ENTITY_KEYS = ['Sale', 'Lead', 'Client', 'Payment', 'Opportunity', 'Meeting', 'Activity', 'Product'];
+  const ENTITY_KEYS = ['Sale', 'Lead', 'Client', 'Payment', 'Opportunity', 'Meeting', 'Activity', 'Product', 'Branch', 'BranchManager'];
   const results = useQueries({
     queries: ENTITY_KEYS.map((name) => ({
       queryKey: [name, 'list', { filter: undefined, sort: undefined, limit: undefined }],
@@ -56,8 +56,8 @@ export default function Dashboard() {
   const loading = results.some(r => r.isLoading);
   const resultData = results.map(r => r.data || []);
   const data = useMemo(() => {
-    const [sales, leads, clients, payments, opportunities, meetings, activities, products] = resultData;
-    return { sales, leads, clients, payments, opportunities, meetings, activities, products };
+    const [sales, leads, clients, payments, opportunities, meetings, activities, products, branches, branchManagers] = resultData;
+    return { sales, leads, clients, payments, opportunities, meetings, activities, products, branches, branchManagers };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, resultData);
 
@@ -138,14 +138,39 @@ export default function Dashboard() {
     // to) — same currency conversion, kept unfiltered by commerce.
     const allSalesBase = data.sales.map(s => ({ ...s, total_amount: toBase(s.total_amount, s.currency), currency }));
     const allPaymentsBase = data.payments.map(p => ({ ...p, amount: toBase(p.amount, p.currency), currency }));
-    const commerceBreakdown = commerces.map(c => {
-      const cSales = allSalesBase.filter(s => s.status !== 'Cancelada' && (s.commerce_id === c.id || (!s.commerce_id && c.id === commerces[0]?.id)));
-      const cRevenue = cSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
-      const cClients = data.clients.filter(cl => cl.commerce_id === c.id || (!cl.commerce_id && c.id === commerces[0]?.id)).length;
-      const cLeads = data.leads.filter(l => l.commerce_id === c.id || (!l.commerce_id && c.id === commerces[0]?.id)).length;
-      const cPending = allPaymentsBase.filter(p => (p.status === 'Pendiente' || p.status === 'Parcial') && (p.commerce_id === c.id || (!p.commerce_id && c.id === commerces[0]?.id))).reduce((s, p) => s + (Number(p.amount) || 0), 0);
-      return { id: c.id, name: c.name, revenue: cRevenue, salesCount: cSales.length, clients: cClients, leads: cLeads, pending: cPending };
-    }).filter(c => c.salesCount > 0 || c.clients > 0);
+    // Admin ve el total de cada comercio (todas sus sucursales, todos sus
+    // vendedores). Un gerente con sucursales asignadas en vez de eso solo
+    // ve, agrupado por comercio, lo que pasó en SUS sucursales — un
+    // comercio con 3 sucursales y un gerente a cargo de una sola no debe
+    // mostrarle la facturación de las otras dos.
+    const isAdminRole = user?.role === 'admin';
+    const isManagerRole = user?.role === 'manager';
+    const visibleBranches = isAdminRole ? data.branches
+      : isManagerRole ? data.branches.filter(b => data.branchManagers.some(bm => bm.branch_id === b.id && bm.manager_id === user.id))
+      : [];
+    const visibleBranchIds = new Set(visibleBranches.map(b => b.id));
+
+    const commerceBreakdown = isManagerRole
+      ? commerces.filter(c => visibleBranches.some(b => b.commerce_id === c.id)).map(c => {
+          const cBranchIds = new Set(visibleBranches.filter(b => b.commerce_id === c.id).map(b => b.id));
+          const cSales = allSalesBase.filter(s => s.status !== 'Cancelada' && cBranchIds.has(s.branch_id));
+          const cRevenue = cSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
+          return { id: c.id, name: c.name, revenue: cRevenue, salesCount: cSales.length, clients: null, leads: null, pending: 0 };
+        })
+      : commerces.map(c => {
+          const cSales = allSalesBase.filter(s => s.status !== 'Cancelada' && (s.commerce_id === c.id || (!s.commerce_id && c.id === commerces[0]?.id)));
+          const cRevenue = cSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
+          const cClients = data.clients.filter(cl => cl.commerce_id === c.id || (!cl.commerce_id && c.id === commerces[0]?.id)).length;
+          const cLeads = data.leads.filter(l => l.commerce_id === c.id || (!l.commerce_id && c.id === commerces[0]?.id)).length;
+          const cPending = allPaymentsBase.filter(p => (p.status === 'Pendiente' || p.status === 'Parcial') && (p.commerce_id === c.id || (!p.commerce_id && c.id === commerces[0]?.id))).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+          return { id: c.id, name: c.name, revenue: cRevenue, salesCount: cSales.length, clients: cClients, leads: cLeads, pending: cPending };
+        }).filter(c => c.salesCount > 0 || c.clients > 0);
+
+    const branchBreakdown = visibleBranches.map(b => {
+      const bSales = allSalesBase.filter(s => s.status !== 'Cancelada' && visibleBranchIds.has(s.branch_id) && s.branch_id === b.id);
+      const bRevenue = bSales.reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
+      return { id: b.id, name: b.name, commerceName: commerces.find(c => c.id === b.commerce_id)?.name || '', revenue: bRevenue, salesCount: bSales.length };
+    });
 
     const sellerMap = {};
     periodSales.forEach(s => {
@@ -180,10 +205,10 @@ export default function Dashboard() {
     return {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
-      commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, monthRevenue, fSales,
+      commerceBreakdown, branchBreakdown, visibleBranches, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, monthRevenue, fSales,
       topProduct, recentSales, totalProductsCount, staleClients,
     };
-  }, [data, period, filterByCommerce, commerces, config, rates, currency]);
+  }, [data, period, filterByCommerce, commerces, config, rates, currency, user]);
 
   const toggleActivity = async (act) => {
     await base44.entities.Activity.update(act.id, { status: 'Realizada' });
@@ -195,6 +220,15 @@ export default function Dashboard() {
   // ni la fila donde vivía) — en cambio, apenas entra ve primero "qué tengo
   // que hacer hoy" (tareas + reuniones), arriba de todo lo demás.
   const isVendedor = user?.role === 'user';
+  // "Por comercio"/"Por sucursal" exponen facturación — mismo criterio que
+  // ya aplica a Ingresos: solo admin/gerente, nunca vendedor (arriba) ni
+  // viewer. Cada pill además solo aparece si hay algo que mostrar en ella.
+  const dashboardViews = [
+    { key: 'general', label: 'General' },
+    ...(commerces.length > 1 ? [{ key: 'commerce', label: 'Por comercio' }] : []),
+    ...(stats.visibleBranches?.length > 0 ? [{ key: 'branch', label: 'Por sucursal' }] : []),
+    { key: 'seller', label: 'Por vendedor' },
+  ];
 
   const tasksCard = (
     <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
@@ -277,9 +311,9 @@ export default function Dashboard() {
         </button>
       )}
 
-      {commerces.length > 1 && (
+      {!isVendedor && dashboardViews.length > 1 && (
         <div className="mb-4">
-          <DashboardPills view={view} setView={setView} />
+          <DashboardPills view={view} setView={setView} views={dashboardViews} />
         </div>
       )}
 
@@ -357,7 +391,7 @@ export default function Dashboard() {
               {stats.commerceBreakdown.map(c => (
                 <button key={c.id} onClick={() => setCurrentCommerceId(c.id)} className="text-left p-4 rounded-xl border border-border hover:border-primary transition-all">
                   <div className="flex items-center gap-2 mb-2"><Store className="w-4 h-4 text-primary" /><p className="text-sm font-medium truncate">{c.name}</p></div>
-                  <ProgressBar value={c.revenue} max={Math.max(...stats.commerceBreakdown.map(x => x.revenue), 1)} formatValue={amount} sublabel={`${c.salesCount} ventas · ${c.clients} clientes`} />
+                  <ProgressBar value={c.revenue} max={Math.max(...stats.commerceBreakdown.map(x => x.revenue), 1)} formatValue={amount} sublabel={c.clients != null ? `${c.salesCount} ventas · ${c.clients} clientes` : `${c.salesCount} ventas`} />
                 </button>
               ))}
             </div>
@@ -365,6 +399,24 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground py-2">
               Seleccioná <button onClick={() => setCurrentCommerceId('all')} className="text-primary font-medium hover:underline">"Todos los comercios"</button> en el selector de arriba para ver el desglose por comercio.
             </p>
+          )}
+        </div>
+      )}
+
+      {view === 'branch' && (
+        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-4">
+          <h2 className="font-semibold mb-3 text-sm">Rendimiento por sucursal</h2>
+          {stats.visibleBranches.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {stats.branchBreakdown.map(b => (
+                <button key={b.id} onClick={() => navigate(`/ventas?branch=${b.id}`)} className="text-left p-4 rounded-xl border border-border hover:border-primary transition-all">
+                  <div className="flex items-center gap-2 mb-2"><MapPin className="w-4 h-4 text-primary" /><p className="text-sm font-medium truncate">{b.name}</p></div>
+                  <ProgressBar value={b.revenue} max={Math.max(...stats.branchBreakdown.map(x => x.revenue), 1)} formatValue={amount} sublabel={`${b.salesCount} ventas${b.commerceName ? ` · ${b.commerceName}` : ''}`} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-2">Todavía no tenés sucursales asignadas.</p>
           )}
         </div>
       )}
