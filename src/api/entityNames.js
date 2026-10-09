@@ -18,6 +18,7 @@ export const ENTITY_TABLES = {
   MessageTemplate: 'message_templates',
   Notification: 'notifications',
   Opportunity: 'opportunities',
+  Organization: 'organizations',
   Payment: 'payments',
   PaymentEntity: 'payment_entities',
   PipelineStage: 'pipeline_stages',

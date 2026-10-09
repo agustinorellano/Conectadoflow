@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone } from 'lucide-react';
+import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
 import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
+import DeleteOrganizationModal from '@/components/DeleteOrganizationModal';
 import { formatCurrency, formatDate } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
 
@@ -18,6 +19,7 @@ export default function SuperAdmin() {
   const [tab, setTab] = useState('orgs');
   const [notifyTarget, setNotifyTarget] = useState(null); // { orgId, orgName } | 'broadcast' | null
   const [loadError, setLoadError] = useState('');
+  const [deleteOrg, setDeleteOrg] = useState(null);
 
   useEffect(() => {
     if (user && !user.is_platform_admin) {
@@ -111,6 +113,9 @@ export default function SuperAdmin() {
                 <button onClick={() => setNotifyTarget({ orgId: o.id, orgName: o.name })} className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-primary transition-colors shrink-0" title="Enviar notificación">
                   <Send className="w-4 h-4" />
                 </button>
+                <button onClick={() => setDeleteOrg(o)} className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0" title="Eliminar organización">
+                  <Trash2 className="w-4 h-4" />
+                </button>
                 <Switch checked={o.is_active} onCheckedChange={() => toggleOrg(o)} onLabel="Activa" offLabel="Suspendida" />
               </div>
 
@@ -147,6 +152,7 @@ export default function SuperAdmin() {
       )}
 
       <NotifyModal target={notifyTarget} onClose={() => setNotifyTarget(null)} />
+      <DeleteOrganizationModal org={deleteOrg} onClose={() => setDeleteOrg(null)} onDeleted={load} />
     </div>
   );
 }

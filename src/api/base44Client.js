@@ -232,6 +232,15 @@ const admin = {
     if (error) throw error;
     return data; // number of notifications created
   },
+  // Borra TODO lo de una organización: datos, miembros y sus cuentas de
+  // login. El propio backend (delete_organization) valida que quien llama
+  // sea admin de plataforma o admin de esa misma organización — se usa
+  // tanto desde el Panel de administración como desde "Eliminar mi
+  // organización" en Configuración.
+  async deleteOrganization(orgId) {
+    const { error } = await supabase.rpc('delete_organization', { org_id: orgId });
+    if (error) throw error;
+  },
 };
 
 const users = {

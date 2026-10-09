@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles, AlertTriangle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
+import { useAuth } from '@/lib/AuthContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
+import DeleteOrganizationModal from '@/components/DeleteOrganizationModal';
 import { LEAD_SOURCES, PAYMENT_METHODS, SALE_STATUS } from '@/lib/flowUtils';
 import { NAV_ITEMS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
 import { CUSTOM_FIELD_ENTITIES, FIELD_TYPES, suggestedProductFields } from '@/lib/customFields';
@@ -126,6 +128,7 @@ export default function SettingsPage() {
               </Field>
               <Field label="Tasa de impuesto (%)"><input type="number" value={form.tax_rate || 0} onChange={e => setForm({ ...form, tax_rate: e.target.value })} className="inp" /></Field>
               <SaveBar saving={saving} saved={saved} onSave={save} />
+              <DangerZone />
             </div>
           )}
 
@@ -187,6 +190,42 @@ export default function SettingsPage() {
 
 function Field({ label, children }) {
   return <div><label className="text-sm font-medium mb-1.5 block">{label}</label>{children}</div>;
+}
+
+// Eliminar la organización entera — no borra una fila de config, borra
+// toda la cuenta (misma función que usa el Panel de administración, el
+// backend valida que quien llama sea admin de ESTA organización). Se
+// busca el nombre real de organizations acá en vez de usar
+// app_config.company_name porque son dos campos distintos que pueden
+// haberse desincronizado, y el modal pide escribir el nombre exacto.
+function DangerZone() {
+  const { user } = useAuth();
+  const [org, setOrg] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user?.organization_id) return;
+    base44.entities.Organization.get(user.organization_id).then(setOrg).catch(() => {});
+  }, [user?.organization_id]);
+
+  if (user?.role !== 'admin' || !org) return null;
+
+  return (
+    <>
+      <div className="border-t border-border pt-4 mt-2">
+        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/5 border border-destructive/20">
+          <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-destructive">Eliminar organización</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Borra toda la cuenta — clientes, ventas, documentos y el acceso de todo el equipo. No se puede deshacer.</p>
+          </div>
+          <button onClick={() => setConfirmOpen(true)} className="px-3.5 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:opacity-90 shrink-0">Eliminar</button>
+        </div>
+      </div>
+      <DeleteOrganizationModal org={confirmOpen ? org : null} onClose={() => setConfirmOpen(false)}
+        onDeleted={() => { base44.auth.logout('/login'); }} />
+    </>
+  );
 }
 
 function SaveBar({ saving, saved, onSave }) {
