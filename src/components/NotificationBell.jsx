@@ -162,7 +162,13 @@ export default function NotificationBell() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97 }}
               transition={{ duration: 0.15 }}
-              className="absolute right-0 top-full mt-1 w-96 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden"
+              // "absolute right-0" posiciona el panel relativo al botón de
+              // la campanita, no a la pantalla — en mobile la campanita no
+              // está pegada al borde derecho (hay un avatar al lado), así
+              // que un panel ancho se salía por la izquierda. fixed +
+              // left-4/right-4 lo centra en la pantalla en mobile; desde
+              // sm vuelve a colgar del botón como antes.
+              className="fixed left-4 right-4 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1 sm:w-96 sm:max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden"
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <p className="font-semibold text-sm">Notificaciones</p>
