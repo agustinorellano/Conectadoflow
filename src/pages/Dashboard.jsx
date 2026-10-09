@@ -26,7 +26,6 @@ import {
   formatCurrency, formatDateTime, inPeriod, previousPeriodAmount,
   variation, daysUntil, isOverdue, isStaleClient, STALE_CONTACT_DAYS,
 } from '@/lib/flowUtils';
-import { buildDailySeries } from '@/lib/salesSeries';
 import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
@@ -165,8 +164,6 @@ export default function Dashboard() {
     const monthlyGoal = config?.monthly_goal ? Number(config.monthly_goal) : Math.max(monthRevenue, 1) * 1.2;
     const monthlyGoalIsEstimated = !config?.monthly_goal;
 
-    const leadsSparkline = buildDailySeries(fLeads, 'created_date');
-
     const productUnits = {};
     periodSales.forEach(s => {
       (s.items || []).forEach(it => {
@@ -184,7 +181,7 @@ export default function Dashboard() {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
       commerceBreakdown, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, monthRevenue, fSales,
-      leadsSparkline, topProduct, recentSales, totalProductsCount, staleClients,
+      topProduct, recentSales, totalProductsCount, staleClients,
     };
   }, [data, period, filterByCommerce, commerces, config, rates, currency]);
 
@@ -238,10 +235,14 @@ export default function Dashboard() {
     </div>
   );
 
+  // Ventas y Leads son los dos números de "qué entró en el período" —
+  // van juntos. Productos (un conteo de catálogo, no ligado al período)
+  // se corrió a la fila de Meta mensual/Mejor vendedor, donde antes
+  // estaba Leads.
   const statsGrid = (
     <div className="grid grid-cols-2 gap-3">
-      <StatCard label="Productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
       <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
+      <StatCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} />
       <StatCard label="Por cobrar" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
       <StatCard label="Más vendido" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
     </div>
@@ -345,7 +346,7 @@ export default function Dashboard() {
             )}
           </div>
         )}
-        <KpiCard label="Leads" value={stats.leadsCount} variation={variation(stats.leadsCount, stats.prevLeadsCount)} icon={UserPlus} accent="#8b5cf6" onClick={() => navigate('/leads')} sparkline={stats.leadsSparkline} />
+        <KpiCard label="Productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
       </div>
 
       {view === 'commerce' && (
