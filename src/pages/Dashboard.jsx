@@ -117,10 +117,38 @@ export default function Dashboard() {
     const inPipeline = fOpps.filter(o => !o.is_won && !o.is_lost).reduce((s, o) => s + (Number(o.amount) || 0), 0);
 
     const funnelStages = ['Nuevo lead','Contactado','Calificado','Reunión','Propuesta','Negociación','Ganado'];
-    const funnel = funnelStages.map(stage => ({
-      stage,
-      count: fOpps.filter(o => o.stage === stage || (stage === 'Ganado' && o.is_won)).length,
-    }));
+    const funnel = funnelStages.map(stage => {
+      const stageOpps = fOpps.filter(o => o.stage === stage || (stage === 'Ganado' && o.is_won));
+      return {
+        stage,
+        count: stageOpps.length,
+        // La más vieja sin tocar es la más urgente de recomendar — no la
+        // que se acaba de crear.
+        oldest: [...stageOpps].sort((a, b) => new Date(a.updated_date || a.created_date) - new Date(b.updated_date || b.created_date))[0] || null,
+      };
+    });
+
+    // Una sola recomendación accionable, no una por etapa (eso sería ruido):
+    // la primera etapa con algo pendiente, en el orden en que avanza el
+    // pipeline — es la más temprana/urgente de resolver.
+    const funnelRecommendation = (() => {
+      const actionByStage = {
+        'Nuevo lead': 'Solicitar reunión a',
+        'Contactado': 'Solicitar reunión a',
+        'Calificado': 'Solicitar reunión a',
+        'Reunión': 'Quedaría pendiente enviar propuesta a',
+        'Propuesta': 'Quedaría pendiente hacer seguimiento con',
+        'Negociación': 'Quedaría pendiente cerrar con',
+      };
+      for (const stage of funnelStages) {
+        if (stage === 'Ganado') continue;
+        const entry = funnel.find(f => f.stage === stage);
+        if (entry?.count > 0 && entry.oldest) {
+          return { stage, action: actionByStage[stage], opportunity: entry.oldest };
+        }
+      }
+      return null;
+    })();
 
     const now = new Date();
     const upcomingMeetings = fMeetings.filter(m => m.status === 'Programada' && new Date(m.date) >= now).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 4);
@@ -205,7 +233,7 @@ export default function Dashboard() {
       revenue, prevRevenue, salesCount, prevSalesCount, leadsCount, prevLeadsCount, avgTicket,
       collected, pending, overdue, inPipeline, funnel, upcomingMeetings, pendingActivities, topClients,
       commerceBreakdown, branchBreakdown, visibleBranches, sellerBreakdown, topSeller, monthlyGoal, monthlyGoalIsEstimated, monthRevenue, fSales,
-      topProduct, recentSales, totalProductsCount, staleClients,
+      topProduct, recentSales, totalProductsCount, staleClients, funnelRecommendation,
     };
   }, [data, period, filterByCommerce, commerces, config, rates, currency, user]);
 
@@ -354,10 +382,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-
-          <div className="mb-4">
-            {meetingsCard}
-          </div>
         </>
       )}
 
@@ -432,7 +456,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-4">
+      <div className={cn('grid grid-cols-1 gap-3 mb-4', !isVendedor && 'lg:grid-cols-2')}>
+      {!isVendedor && meetingsCard}
+      <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3.5">
           <h2 className="font-semibold text-sm">Funnel comercial</h2>
           <button onClick={() => navigate('/pipeline')} className="text-xs text-primary font-medium inline-flex items-center gap-1 hover:gap-1.5 transition-all">Ver pipeline <ArrowRight className="w-3 h-3" /></button>
@@ -454,6 +480,20 @@ export default function Dashboard() {
           <div><p className="text-xs text-muted-foreground">En proceso (pipeline)</p><p className="text-lg font-bold">{amount(stats.inPipeline)}</p></div>
           <div><p className="text-xs text-muted-foreground">Cobrado en período</p><p className="text-lg font-bold text-success">{amount(stats.collected)}</p></div>
         </div>
+        {stats.funnelRecommendation && (
+          <button onClick={() => navigate('/pipeline')}
+            className="mt-3.5 w-full flex items-start gap-2.5 p-3 rounded-xl bg-primary-soft/60 hover:bg-primary-soft transition-colors text-left">
+            <span className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
+              <Award className="w-3.5 h-3.5" />
+            </span>
+            <p className="text-sm min-w-0">
+              <span className="font-semibold">{stats.funnelRecommendation.action}</span>{' '}
+              {stats.funnelRecommendation.opportunity.client_name || 'este cliente'}
+              <span className="text-muted-foreground"> — está en "{stats.funnelRecommendation.stage}" hace tiempo.</span>
+            </p>
+          </button>
+        )}
+      </div>
       </div>
 
       <div className={cn('grid grid-cols-1 gap-3 sm:gap-4 mb-4', !isVendedor && 'lg:grid-cols-2')}>

@@ -214,10 +214,18 @@ export default function NotificationBell() {
                     </div>
 
                     {snoozeMenuFor === item.id && (
-                      <div className="absolute right-2 top-10 z-10 bg-card border border-border rounded-xl shadow-lg py-1 w-36" onClick={(e) => e.stopPropagation()}>
+                      // Parte del flujo normal de la fila (no un popover
+                      // flotante) a propósito: el panel de notificaciones
+                      // recorta todo lo que se sale de sus bordes
+                      // (overflow-hidden + scroll interno), así que un menú
+                      // posicionado "absolute" quedaba cortado y medio
+                      // escondido. Así empuja la fila hacia abajo y queda
+                      // siempre completamente visible.
+                      <div className="flex items-center gap-1.5 px-4 pb-3 -mt-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-xs text-muted-foreground mr-0.5">Recordar en:</span>
                         {SNOOZE_OPTIONS.map(opt => (
                           <button key={opt.key} onClick={() => snoozeItem(item, opt.ms)}
-                            className="w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-accent">
+                            className="px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary hover:bg-accent">
                             {opt.label}
                           </button>
                         ))}
