@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users2, Crown, User, Eye, Mail, Plus, MessageCircle, KeyRound } from 'lucide-react';
+import { Users2, Crown, User, Eye, Mail, Plus, MessageCircle, KeyRound, Copy, Check } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -168,6 +168,25 @@ export default function Team() {
 
 // Letras/números sin ambiguos (0/O, 1/l/I) — más fácil de leer y tipear
 // a mano si el admin se lo dicta o lo manda por WhatsApp.
+// Botón "Copiar" para el usuario/contraseña del bloque de credenciales —
+// no asumimos que el admin va a seleccionar el texto a mano antes de
+// mandarlo por WhatsApp/mail o guardarlo en su gestor de contraseñas.
+function CopyButton({ text, onCopied }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); } catch { return; }
+    setCopied(true);
+    onCopied?.();
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button type="button" onClick={copy} title="Copiar"
+      className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors', copied ? 'text-success' : 'text-muted-foreground hover:bg-accent hover:text-foreground')}>
+      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
 function generatePassword() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let out = '';
@@ -181,8 +200,9 @@ function ResetPasswordModal({ user, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => { if (user) { setPhone(user.phone || ''); setPassword(generatePassword()); setDone(false); setError(''); } }, [user]);
+  useEffect(() => { if (user) { setPhone(user.phone || ''); setPassword(generatePassword()); setDone(false); setError(''); setCopied(false); } }, [user]);
 
   if (!user) return null;
 
@@ -198,10 +218,17 @@ function ResetPasswordModal({ user, onClose }) {
 
   const credentialsMessage = `Hola! Te renovamos el acceso a Conectado Flow.\n\nEmail: ${user.email}\nContraseña nueva: ${password}\n\nEntrá en ${window.location.origin}/login`;
 
+  // No se puede volver a ver esta contraseña después de cerrar — si el
+  // admin todavía no la copió ni la mandó, confirmamos antes de perderla.
+  const guardedClose = () => {
+    if (done && !copied && !window.confirm('¿Ya copiaste o enviaste la contraseña? No vas a poder verla de nuevo después de cerrar esto.')) return;
+    onClose();
+  };
+
   return (
-    <Modal open={!!user} onClose={onClose} title={done ? 'Contraseña actualizada' : `Restablecer contraseña de ${user.full_name || user.email}`}
+    <Modal open={!!user} onClose={guardedClose} title={done ? 'Contraseña actualizada' : `Restablecer contraseña de ${user.full_name || user.email}`}
       footer={done ? (
-        <button onClick={onClose} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Listo</button>
+        <button onClick={guardedClose} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Listo</button>
       ) : (
         <><button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
           <button onClick={reset} disabled={saving || !password} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Restablecer'}</button></>
@@ -209,16 +236,19 @@ function ResetPasswordModal({ user, onClose }) {
       {done ? (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">Ya quedó la contraseña nueva. Compartísela a {user.full_name || 'esta persona'}.</p>
-          <div className="p-3.5 rounded-xl bg-secondary/60 text-sm space-y-1">
+          <div className="p-3.5 rounded-xl bg-secondary/60 text-sm space-y-1.5">
             <p><span className="text-muted-foreground">Email:</span> <span className="font-medium">{user.email}</span></p>
-            <p><span className="text-muted-foreground">Contraseña:</span> <span className="font-medium font-mono">{password}</span></p>
+            <div className="flex items-center justify-between gap-2">
+              <p><span className="text-muted-foreground">Contraseña:</span> <span className="font-medium font-mono">{password}</span></p>
+              <CopyButton text={`${user.email} / ${password}`} onCopied={() => setCopied(true)} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <a href={buildWhatsAppUrl(phone, credentialsMessage)} target="_blank" rel="noopener noreferrer"
+            <a href={buildWhatsAppUrl(phone, credentialsMessage)} target="_blank" rel="noopener noreferrer" onClick={() => setCopied(true)}
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366]/10 text-[#25D366] text-sm font-medium hover:bg-[#25D366]/20">
               <MessageCircle className="w-4 h-4" /> WhatsApp
             </a>
-            <a href={buildMailtoUrl(user.email, 'Nueva contraseña — Conectado Flow', credentialsMessage)}
+            <a href={buildMailtoUrl(user.email, 'Nueva contraseña — Conectado Flow', credentialsMessage)} onClick={() => setCopied(true)}
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20">
               <Mail className="w-4 h-4" /> Mail
             </a>
@@ -254,10 +284,11 @@ function InviteModal({ open, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [created, setCreated] = useState(null); // { email, password } una vez creada la cuenta
+  const [copied, setCopied] = useState(false);
 
   const reset = () => {
     setFullName(''); setEmail(''); setPhone(''); setRole('user'); setPassword(generatePassword());
-    setCreated(null); setError('');
+    setCreated(null); setError(''); setCopied(false);
   };
 
   const invite = async () => {
@@ -277,10 +308,17 @@ function InviteModal({ open, onClose, onDone }) {
 
   const close = () => { reset(); onClose(); };
 
+  // No se puede volver a ver esta contraseña después de cerrar — si el
+  // admin todavía no la copió ni la mandó, confirmamos antes de perderla.
+  const guardedClose = () => {
+    if (created && !copied && !window.confirm('¿Ya copiaste o enviaste la contraseña? No vas a poder verla de nuevo después de cerrar esto.')) return;
+    close();
+  };
+
   return (
-    <Modal open={open} onClose={close} title={created ? 'Cuenta creada' : 'Invitar miembro'}
+    <Modal open={open} onClose={guardedClose} title={created ? 'Cuenta creada' : 'Invitar miembro'}
       footer={created ? (
-        <button onClick={close} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Listo</button>
+        <button onClick={guardedClose} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Listo</button>
       ) : (
         <><button onClick={close} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
           <button onClick={invite} disabled={saving || !email || !password} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Creando…' : 'Crear cuenta'}</button></>
@@ -290,16 +328,19 @@ function InviteModal({ open, onClose, onDone }) {
           <p className="text-sm text-muted-foreground">
             La cuenta ya está lista para usarse. Compartile estos datos — por WhatsApp o por mail, lo que te resulte más rápido.
           </p>
-          <div className="p-3.5 rounded-xl bg-secondary/60 text-sm space-y-1">
+          <div className="p-3.5 rounded-xl bg-secondary/60 text-sm space-y-1.5">
             <p><span className="text-muted-foreground">Email:</span> <span className="font-medium">{created.email}</span></p>
-            <p><span className="text-muted-foreground">Contraseña:</span> <span className="font-medium font-mono">{created.password}</span></p>
+            <div className="flex items-center justify-between gap-2">
+              <p><span className="text-muted-foreground">Contraseña:</span> <span className="font-medium font-mono">{created.password}</span></p>
+              <CopyButton text={`${created.email} / ${created.password}`} onCopied={() => setCopied(true)} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <a href={buildWhatsAppUrl(phone, credentialsMessage)} target="_blank" rel="noopener noreferrer"
+            <a href={buildWhatsAppUrl(phone, credentialsMessage)} target="_blank" rel="noopener noreferrer" onClick={() => setCopied(true)}
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366]/10 text-[#25D366] text-sm font-medium hover:bg-[#25D366]/20">
               <MessageCircle className="w-4 h-4" /> WhatsApp
             </a>
-            <a href={buildMailtoUrl(created.email, 'Acceso a Conectado Flow', credentialsMessage)}
+            <a href={buildMailtoUrl(created.email, 'Acceso a Conectado Flow', credentialsMessage)} onClick={() => setCopied(true)}
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20">
               <Mail className="w-4 h-4" /> Mail
             </a>

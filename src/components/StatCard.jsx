@@ -8,11 +8,11 @@ import { cn } from '@/lib/utils';
 // plainer than KpiCard, used only for this specific row.
 export default function StatCard({ label, value, sublabel, variation: v, icon: Icon, accent, onClick }) {
   const positive = v >= 0;
-  // A number always fits truncated at the big size, but a product/client
-  // name here (e.g. "Más vendido") would get cut to a couple of letters —
-  // drop to a smaller size and wrap onto 2 lines instead of ellipsizing it
-  // on one.
-  const isLongText = typeof value === 'string' && value.length > 12;
+  // A short number always fits at the big size, but a longer currency
+  // amount (e.g. "$1.318.750") or a product/client name (e.g. "Más
+  // vendido") gets cut off in the 2-column mobile grid — drop to a
+  // smaller size and wrap onto 2 lines instead of ellipsizing it on one.
+  const isLongText = typeof value === 'string' && value.length > 9;
   return (
     <div
       onClick={onClick}
@@ -27,7 +27,7 @@ export default function StatCard({ label, value, sublabel, variation: v, icon: I
             <Icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
           </span>
         )}
-        <p className="text-xs sm:text-sm text-muted-foreground truncate">{label}</p>
+        <p className="text-xs sm:text-sm text-muted-foreground leading-snug line-clamp-2">{label}</p>
       </div>
       <div className="flex items-center justify-between gap-2 min-w-0">
         <p title={isLongText ? value : undefined} className={cn(
