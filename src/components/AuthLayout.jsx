@@ -1,14 +1,5 @@
 import React from "react";
 
-function LogoMark({ className }) {
-  return (
-    <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2.4">
-      <circle cx="15" cy="20" r="8" />
-      <circle cx="25" cy="20" r="8" />
-    </svg>
-  );
-}
-
 // Constellation-style backdrop: faint curved connection lines with glowing
 // nodes, over a near-black navy — same mood as the reference image, just
 // without its headline/CTA (we overlay our own brand copy + glass pills).
@@ -73,9 +64,7 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
           ))}
 
           <div className="relative z-10 flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-[10px] bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
-              <LogoMark className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
+            <img src="/logo.png" alt="Conectado Flow" className="w-9 h-9 sm:w-10 sm:h-10 rounded-[10px] shrink-0" />
             <div>
               <p className="font-semibold text-base sm:text-lg leading-tight">Conectado</p>
               <p className="text-xs sm:text-sm text-white/70 leading-tight -mt-0.5">Flow</p>
