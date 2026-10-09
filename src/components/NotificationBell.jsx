@@ -141,7 +141,7 @@ export default function NotificationBell() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97 }}
               transition={{ duration: 0.15 }}
-              className="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden"
+              className="absolute right-0 top-full mt-1 w-96 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden"
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <p className="font-semibold text-sm">Notificaciones</p>
@@ -170,8 +170,8 @@ export default function NotificationBell() {
                         <item.icon className="w-4 h-4" />
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
+                        <p className="text-sm font-medium leading-snug break-words">{item.title}</p>
+                        {item.subtitle && <p className="text-xs text-muted-foreground mt-0.5 leading-snug break-words">{item.subtitle}</p>}
                       </div>
                     </button>
                   ))
