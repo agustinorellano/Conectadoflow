@@ -95,7 +95,12 @@ export default function Layout() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-4 gap-3 border-b border-sidebar-border">
-          <img src="/logo.png" alt="Conectado Flow" className="w-9 h-9 rounded-[10px] shrink-0 shadow-sm" />
+          <div className="w-9 h-9 rounded-[10px] bg-primary flex items-center justify-center shrink-0 shadow-sm">
+            <svg viewBox="0 0 40 40" className="w-5 h-5" fill="none" stroke="white" strokeWidth="2.4">
+              <circle cx="15" cy="20" r="8" />
+              <circle cx="25" cy="20" r="8" />
+            </svg>
+          </div>
           {!collapsed && (
             <div className="overflow-hidden">
               <p className="font-semibold text-[15px] leading-tight tracking-tight">Conectado</p>
@@ -194,7 +199,11 @@ export default function Layout() {
               className="fixed left-0 top-0 bottom-0 w-[260px] bg-sidebar text-sidebar-foreground z-50 md:hidden flex flex-col"
             >
               <div className="h-16 flex items-center px-4 gap-3 border-b border-sidebar-border">
-                <img src="/logo.png" alt="Conectado Flow" className="w-9 h-9 rounded-[10px]" />
+                <div className="w-9 h-9 rounded-[10px] bg-primary flex items-center justify-center">
+                  <svg viewBox="0 0 40 40" className="w-5 h-5" fill="none" stroke="white" strokeWidth="2.4">
+                    <circle cx="15" cy="20" r="8" /><circle cx="25" cy="20" r="8" />
+                  </svg>
+                </div>
                 <div>
                   <p className="font-semibold text-[15px] leading-tight">Conectado</p>
                   <p className="text-[13px] text-[#9aa8ff] font-medium leading-tight">Flow</p>
