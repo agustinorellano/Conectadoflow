@@ -235,15 +235,31 @@ const admin = {
 };
 
 const users = {
-  // Sends a real Supabase auth invite + assigns the new profile to the
-  // caller's organization/role, via the invite-user Edge Function (needs
-  // the service-role key, so it can't run in the browser).
-  async inviteUser(email, role) {
+  // Creates the account directly with a password the admin chose, then
+  // assigns the new profile to the caller's organization/role, via the
+  // invite-user Edge Function (needs the service-role key, so it can't
+  // run in the browser).
+  async inviteUser(email, role, password, fullName) {
     const { data, error } = await supabase.functions.invoke('invite-user', {
-      body: { email, role, redirectTo: window.location.origin + '/reset-password' },
+      body: { email, role, password, full_name: fullName },
     });
     if (error) {
       const message = data?.error || error.context?.error || error.message || 'No se pudo invitar';
+      throw new Error(message);
+    }
+    if (data?.error) throw new Error(data.error);
+    return data;
+  },
+
+  // Nadie puede leer la contraseña actual de un miembro — Supabase no la
+  // guarda de forma reversible. Lo que sí puede hacer un admin es ponerle
+  // una nueva, para dársela de nuevo si la perdió.
+  async resetMemberPassword(userId, password) {
+    const { data, error } = await supabase.functions.invoke('invite-user', {
+      body: { action: 'reset_password', user_id: userId, password },
+    });
+    if (error) {
+      const message = data?.error || error.context?.error || error.message || 'No se pudo restablecer la contraseña';
       throw new Error(message);
     }
     if (data?.error) throw new Error(data.error);
