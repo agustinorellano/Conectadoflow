@@ -244,10 +244,10 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Total productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
+            <StatCard label="Productos" value={stats.totalProductsCount} icon={Package} accent="#465BE8" onClick={() => navigate('/productos')} />
             <StatCard label="Ventas" value={stats.salesCount} variation={variation(stats.salesCount, stats.prevSalesCount)} icon={ShoppingCart} accent="#22c55e" onClick={() => navigate('/ventas')} />
-            <StatCard label="Cobros pendientes" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
-            <StatCard label="Top products" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
+            <StatCard label="Por cobrar" value={amount(stats.pending)} icon={Wallet} accent="#f59e0b" onClick={() => navigate('/cobros')} />
+            <StatCard label="Más vendido" value={stats.topProduct?.units ?? 0} icon={Award} accent="#ec4899" />
           </div>
           <div className="flex-1">
             <SalesByEntityChart sales={stats.fSales} currency={currency} />
