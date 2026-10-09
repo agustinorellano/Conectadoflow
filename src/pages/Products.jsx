@@ -13,6 +13,7 @@ import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
 import { Image as UIImage } from '@/components/ui/image';
+import CustomFieldsSection, { useCustomFieldDefinitions } from '@/components/CustomFieldsSection';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ export default function Products() {
   const { config } = useData();
   const queryClient = useQueryClient();
   const { data: products = [], isLoading: loading } = useEntityList('Product');
+  const { definitions: customDefs } = useCustomFieldDefinitions('Product');
   const [search, setSearch] = useState('');
   const [filterKind, setFilterKind] = useState('all');
   const [showForm, setShowForm] = useState(false);
@@ -86,6 +88,7 @@ export default function Products() {
       'Situación de stock': stockSituation(p),
       'Precio': Number(p.price) || 0,
       'Costo': Number(p.cost) || 0,
+      ...Object.fromEntries(customDefs.map(d => [d.label, p.custom_fields?.[d.id] ?? ''])),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -323,7 +326,7 @@ function DeleteProductModal({ product, onClose, onDeleted }) {
 
 function ProductForm({ open, onClose, onSaved, product }) {
   const { config } = useData();
-  const [form, setForm] = useState({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true });
+  const [form, setForm] = useState({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true, custom_fields: {} });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -332,9 +335,9 @@ function ProductForm({ open, onClose, onSaved, product }) {
     if (!open) return;
     setError('');
     if (product) {
-      setForm({ ...product, price: String(product.price || ''), cost: String(product.cost || ''), stock: String(product.stock || ''), currency: product.currency || config?.currency || 'ARS' });
+      setForm({ ...product, price: String(product.price || ''), cost: String(product.cost || ''), stock: String(product.stock || ''), currency: product.currency || config?.currency || 'ARS', custom_fields: product.custom_fields || {} });
     } else {
-      setForm({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true });
+      setForm({ name: '', code: '', category: '', kind: 'Producto', price: '', cost: '', currency: config?.currency || 'ARS', description: '', image_url: '', stock: '', is_active: true, custom_fields: {} });
     }
   }, [open, product, config]);
 
@@ -362,6 +365,7 @@ function ProductForm({ open, onClose, onSaved, product }) {
         price: Number(form.price) || 0, cost: Number(form.cost) || 0, currency: form.currency,
         description: form.description, image_url: form.image_url,
         stock: Number(form.stock) || 0, is_active: form.is_active,
+        custom_fields: form.custom_fields || {},
       };
       if (product) {
         await base44.entities.Product.update(product.id, payload);
@@ -440,6 +444,9 @@ function ProductForm({ open, onClose, onSaved, product }) {
           <label className="text-sm font-medium mb-1.5 block">Descripción</label>
           <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} className="inp resize-none" />
         </div>
+      </div>
+      <div className="mt-4 pt-4 border-t border-border">
+        <CustomFieldsSection entity="Product" values={form.custom_fields} onChange={v => setForm({ ...form, custom_fields: v })} />
       </div>
       <style>{`.inp{width:100%;padding:0.5rem 0.75rem;border-radius:0.75rem;border:1px solid hsl(var(--input));background:hsl(var(--background));font-size:0.875rem;outline:none}.inp:focus{border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/0.3)}`}</style>
     </Modal>

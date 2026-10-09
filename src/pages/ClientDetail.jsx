@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/AuthContext';
 import SituationStatus from '@/components/SituationStatus';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import DocumentGeneratorModal from '@/components/DocumentGeneratorModal';
+import { CustomFieldsView } from '@/components/CustomFieldsSection';
 import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
 import { ClientForm } from '@/pages/Clients';
@@ -123,6 +124,11 @@ export default function ClientDetail() {
           <p className="text-xs text-muted-foreground">Saldo</p>
           <p className="text-xl font-bold text-warning">{formatCurrency(client.balance || 0)}</p>
         </div>
+      </div>
+
+      {/* Custom fields */}
+      <div className="mb-6">
+        <CustomFieldsView entity="Client" values={client.custom_fields} />
       </div>
 
       {/* Payment methods */}

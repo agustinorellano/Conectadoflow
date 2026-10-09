@@ -11,6 +11,7 @@ import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import WhatsAppButton from '@/components/WhatsAppButton';
+import CustomFieldsSection, { useCustomFieldDefinitions } from '@/components/CustomFieldsSection';
 import { formatCurrency, formatDate, timeAgo, LEAD_SOURCES } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ export default function Leads() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: leads = [], isLoading: loading } = useEntityList('Lead', { sort: '-created_date', limit: 200 });
+  const { definitions: customDefs } = useCustomFieldDefinitions('Lead');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
@@ -54,6 +56,7 @@ export default function Leads() {
       Email: l.email || '', Origen: l.source || '', Interés: l.interest || '', Estado: l.status,
       'Valor potencial': l.potential_value || 0, 'Último contacto': l.last_contact ? formatDate(l.last_contact) : '',
       'Próxima acción': l.next_action || '',
+      ...Object.fromEntries(customDefs.map(d => [d.label, l.custom_fields?.[d.id] ?? ''])),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -162,8 +165,10 @@ function FilterChip({ children, active, onClick }) {
   );
 }
 
+const emptyLeadForm = { first_name: '', last_name: '', company: '', phone: '', email: '', source: 'WhatsApp', interest: '', potential_value: '', notes: '', custom_fields: {} };
+
 function LeadForm({ open, onClose, onSaved, user }) {
-  const [form, setForm] = useState({ first_name: '', last_name: '', company: '', phone: '', email: '', source: 'WhatsApp', interest: '', potential_value: '', notes: '' });
+  const [form, setForm] = useState(emptyLeadForm);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -177,7 +182,7 @@ function LeadForm({ open, onClose, onSaved, user }) {
         owner_id: user?.id,
         owner_name: user?.full_name,
       });
-      setForm({ first_name: '', last_name: '', company: '', phone: '', email: '', source: 'WhatsApp', interest: '', potential_value: '', notes: '' });
+      setForm(emptyLeadForm);
       onSaved();
       onClose();
     } finally { setSaving(false); }
@@ -203,6 +208,9 @@ function LeadForm({ open, onClose, onSaved, user }) {
           <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2}
             className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
         </div>
+      </div>
+      <div className="mt-4 pt-4 border-t border-border">
+        <CustomFieldsSection entity="Lead" values={form.custom_fields} onChange={v => setForm({ ...form, custom_fields: v })} />
       </div>
     </Modal>
   );

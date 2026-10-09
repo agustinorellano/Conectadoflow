@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3 } from 'lucide-react';
+import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import { LEAD_SOURCES, PAYMENT_METHODS, SALE_STATUS } from '@/lib/flowUtils';
 import { NAV_ITEMS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
+import { CUSTOM_FIELD_ENTITIES, FIELD_TYPES, suggestedProductFields } from '@/lib/customFields';
 import CommerceConfig from '@/components/CommerceConfig';
 import PaymentEntitiesConfig from '@/components/PaymentEntitiesConfig';
 import { Switch } from '@/components/ui/switch';
@@ -19,6 +20,7 @@ const TABS = [
   { key: 'products', label: 'Productos', icon: Package },
   { key: 'messages', label: 'Mensajes', icon: MessageCircle },
   { key: 'automations', label: 'Automatizaciones', icon: Zap },
+  { key: 'custom-fields', label: 'Campos personalizados', icon: SlidersHorizontal },
   { key: 'currency', label: 'Moneda', icon: Coins },
   { key: 'billing', label: 'Facturación', icon: Receipt },
   { key: 'commerces', label: 'Comercios', icon: Store },
@@ -134,6 +136,7 @@ export default function SettingsPage() {
           {tab === 'products' && <ProductsConfig />}
           {tab === 'messages' && <MessagesConfig />}
           {tab === 'automations' && <AutomationsConfig />}
+          {tab === 'custom-fields' && <CustomFieldsConfig />}
           {tab === 'currency' && (
             <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 space-y-4">
               <h2 className="font-semibold">Moneda e impuestos</h2>
@@ -473,6 +476,152 @@ function AutomationRuleForm({ open, onClose, onSaved, editRule, stages }) {
           <input type="number" min="0" value={form.action_days_offset} onChange={e => setForm({ ...form, action_days_offset: e.target.value })} className="inp w-28" />
         </Field>
         <p className="text-xs text-muted-foreground">La tarea queda vinculada al cliente (y a la oportunidad, si corresponde) y le aparece al vendedor dueño del registro en sus notificaciones el día que vence.</p>
+      </div>
+      <style>{`.inp{width:100%;padding:0.5rem 0.75rem;border-radius:0.75rem;border:1px solid hsl(var(--input));background:hsl(var(--background));font-size:0.875rem;outline:none}.inp:focus{border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/0.3)}`}</style>
+    </Modal>
+  );
+}
+
+function CustomFieldsConfig() {
+  const { config } = useData();
+  const [entity, setEntity] = useState('Client');
+  const [defs, setDefs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editDef, setEditDef] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try { setDefs(await base44.entities.CustomFieldDefinition.list().catch(() => [])); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const forEntity = defs.filter(d => d.entity === entity).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  const toggleActive = async (d) => { await base44.entities.CustomFieldDefinition.update(d.id, { is_active: !d.is_active }); load(); };
+  const del = async (d) => {
+    if (!confirm(`¿Eliminar el campo "${d.label}"? Los valores ya cargados en registros existentes no se borran, pero el campo deja de poder editarse.`)) return;
+    await base44.entities.CustomFieldDefinition.delete(d.id); load();
+  };
+
+  const quickAdd = async (suggestion) => {
+    await base44.entities.CustomFieldDefinition.create({
+      entity: 'Product', label: suggestion.label, field_type: suggestion.field_type, options: suggestion.options || [],
+      is_required: false, is_active: true, sort_order: forEntity.length,
+    });
+    load();
+  };
+
+  const suggestions = entity === 'Product'
+    ? suggestedProductFields(config?.industry).filter(s => !forEntity.some(d => d.label.toLowerCase() === s.label.toLowerCase()))
+    : [];
+
+  return (
+    <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="font-semibold">Campos personalizados</h2>
+        <button onClick={() => { setEditDef(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+          <Plus className="w-4 h-4" /> Nuevo campo
+        </button>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4">
+        Cada negocio necesita guardar datos distintos. En indumentaria quizás quieras el talle y el color de cada producto;
+        en gastronomía, los ingredientes. Acá definís tus propios campos — aparecen en el formulario y en la ficha
+        correspondiente, sin que haga falta tocar el sistema para cada caso.
+      </p>
+
+      <div className="flex gap-1.5 mb-4">
+        {CUSTOM_FIELD_ENTITIES.map(e => (
+          <button key={e.key} onClick={() => setEntity(e.key)}
+            className={cn('px-3.5 py-2 rounded-xl text-sm font-medium transition-colors', entity === e.key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-accent')}>
+            {e.label}
+          </button>
+        ))}
+      </div>
+
+      {suggestions.length > 0 && (
+        <div className="mb-4 p-3.5 rounded-xl bg-primary/5 border border-primary/15">
+          <p className="text-xs font-medium flex items-center gap-1.5 mb-2"><Sparkles className="w-3.5 h-3.5 text-primary" /> Sugerencias para tu rubro ({config?.industry})</p>
+          <div className="flex flex-wrap gap-1.5">
+            {suggestions.map(s => (
+              <button key={s.label} onClick={() => quickAdd(s)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card border border-border text-xs font-medium hover:border-primary hover:text-primary transition-colors">
+                <Plus className="w-3 h-3" /> {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {loading ? <p className="text-sm text-muted-foreground">Cargando…</p> : forEntity.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">Todavía no hay campos personalizados para {CUSTOM_FIELD_ENTITIES.find(e => e.key === entity).label.toLowerCase()}.</p>
+      ) : (
+        <div className="space-y-2">
+          {forEntity.map(d => (
+            <div key={d.id} className="flex items-center gap-3 p-3 rounded-xl border border-border">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{d.label}{d.is_required && <span className="text-destructive"> *</span>}</p>
+                <p className="text-xs text-muted-foreground">{FIELD_TYPES.find(t => t.value === d.field_type)?.label}{d.field_type === 'select' && d.options?.length ? `: ${d.options.join(', ')}` : ''}</p>
+              </div>
+              <Switch checked={d.is_active} onCheckedChange={() => toggleActive(d)} />
+              <button onClick={() => { setEditDef(d); setShowForm(true); }} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground shrink-0"><Edit3 className="w-3.5 h-3.5" /></button>
+              <button onClick={() => del(d)} className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-muted-foreground shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      <CustomFieldForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} editDef={editDef} defaultEntity={entity} nextOrder={forEntity.length} />
+    </div>
+  );
+}
+
+function CustomFieldForm({ open, onClose, onSaved, editDef, defaultEntity, nextOrder }) {
+  const [form, setForm] = useState({ entity: 'Client', label: '', field_type: 'text', optionsText: '', is_required: false });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (editDef) setForm({ entity: editDef.entity, label: editDef.label, field_type: editDef.field_type, optionsText: (editDef.options || []).join(', '), is_required: !!editDef.is_required });
+    else setForm({ entity: defaultEntity, label: '', field_type: 'text', optionsText: '', is_required: false });
+  }, [editDef, open, defaultEntity]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const options = form.field_type === 'select' ? form.optionsText.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const payload = { entity: form.entity, label: form.label, field_type: form.field_type, options, is_required: form.is_required };
+      if (editDef) await base44.entities.CustomFieldDefinition.update(editDef.id, payload);
+      else await base44.entities.CustomFieldDefinition.create({ ...payload, is_active: true, sort_order: nextOrder });
+      onSaved(); onClose();
+    } finally { setSaving(false); }
+  };
+
+  const canSave = form.label && (form.field_type !== 'select' || form.optionsText.trim());
+
+  return (
+    <Modal open={open} onClose={onClose} title={editDef ? 'Editar campo' : 'Nuevo campo personalizado'}
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
+        <button onClick={save} disabled={saving || !canSave} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar'}</button>
+      </>}>
+      <div className="space-y-3">
+        <Field label="Para">
+          <StyledSelect value={form.entity} onChange={e => setForm({ ...form, entity: e.target.value })} className="inp" disabled={!!editDef}>
+            {CUSTOM_FIELD_ENTITIES.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
+          </StyledSelect>
+        </Field>
+        <Field label="Nombre del campo">
+          <input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="Ej: Talle preferido" className="inp" />
+        </Field>
+        <Field label="Tipo">
+          <StyledSelect value={form.field_type} onChange={e => setForm({ ...form, field_type: e.target.value })} className="inp">
+            {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </StyledSelect>
+        </Field>
+        {form.field_type === 'select' && (
+          <Field label="Opciones (separadas por coma)">
+            <input value={form.optionsText} onChange={e => setForm({ ...form, optionsText: e.target.value })} placeholder="Ej: S, M, L, XL" className="inp" />
+          </Field>
+        )}
+        <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.is_required} onChange={e => setForm({ ...form, is_required: e.target.checked })} className="w-4 h-4 accent-primary" /> Obligatorio</label>
       </div>
       <style>{`.inp{width:100%;padding:0.5rem 0.75rem;border-radius:0.75rem;border:1px solid hsl(var(--input));background:hsl(var(--background));font-size:0.875rem;outline:none}.inp:focus{border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/0.3)}`}</style>
     </Modal>

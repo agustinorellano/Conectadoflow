@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
 import { Users, Search, Plus, ArrowRight, Building2, Mail, Phone, LayoutGrid, Rows3, MessageCircle, UserCheck, Wallet, DollarSign, Send, Clock, ChevronLeft, ChevronRight, Package, FileText, Upload, FileDown } from 'lucide-react';
 import DocumentGeneratorModal from '@/components/DocumentGeneratorModal';
+import CustomFieldsSection, { useCustomFieldDefinitions } from '@/components/CustomFieldsSection';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useEntityList } from '@/lib/useEntityQuery';
@@ -53,6 +54,7 @@ export default function Clients() {
   // Shares its cache key with Ventas (same sort/limit) — opening Clientes
   // after Ventas doesn't re-fetch sales again.
   const { data: sales = [] } = useEntityList('Sale', { sort: '-date', limit: 200 });
+  const { definitions: customDefs } = useCustomFieldDefinitions('Client');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [viewMode, setViewMode] = useState('rows');
@@ -113,6 +115,7 @@ export default function Clients() {
       'DNI/CUIT': c.tax_id || '', Dirección: c.address || '', Segmento: c.segment || '', Estado: c.status,
       Situación: c.situation_status || '', 'Total vendido': c.total_sold || 0, Cobrado: c.total_collected || 0,
       Saldo: c.balance || 0, 'Último contacto': c.last_contact ? formatDateShort(c.last_contact) : '',
+      ...Object.fromEntries(customDefs.map(d => [d.label, c.custom_fields?.[d.id] ?? ''])),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -431,14 +434,14 @@ function ClientMessageModal({ client, initialChannel, onClose }) {
   );
 }
 
-const emptyClientForm = { name: '', company: '', tax_id: '', phone: '', email: '', address: '', type: 'Consumidor', segment: '', notes: '', potential_value: '', preferred_channel: 'WhatsApp' };
+const emptyClientForm = { name: '', company: '', tax_id: '', phone: '', email: '', address: '', type: 'Consumidor', segment: '', notes: '', potential_value: '', preferred_channel: 'WhatsApp', custom_fields: {} };
 
 export function ClientForm({ open, onClose, onSaved, user, editClient }) {
   const [form, setForm] = useState(emptyClientForm);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (editClient) setForm({ ...emptyClientForm, ...editClient, potential_value: editClient.potential_value || '' });
+    if (editClient) setForm({ ...emptyClientForm, ...editClient, potential_value: editClient.potential_value || '', custom_fields: editClient.custom_fields || {} });
     else setForm(emptyClientForm);
   }, [editClient, open]);
 
@@ -474,6 +477,9 @@ export function ClientForm({ open, onClose, onSaved, user, editClient }) {
         <div className="col-span-2"><Field label="Dirección"><input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="inp" /></Field></div>
         <Field label="Valor potencial"><input type="number" value={form.potential_value} onChange={e => setForm({ ...form, potential_value: e.target.value })} className="inp" /></Field>
         <div className="col-span-2"><Field label="Notas"><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className="inp resize-none" /></Field></div>
+      </div>
+      <div className="mt-4 pt-4 border-t border-border">
+        <CustomFieldsSection entity="Client" values={form.custom_fields} onChange={v => setForm({ ...form, custom_fields: v })} />
       </div>
       <style>{`.inp{width:100%;padding:0.625rem 0.875rem;border-radius:0.75rem;border:1px solid hsl(var(--input));background:hsl(var(--background));font-size:0.875rem;outline:none}.inp:focus{border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/0.3)}`}</style>
     </Modal>

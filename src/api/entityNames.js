@@ -3,6 +3,7 @@ export const ENTITY_TABLES = {
   Activity: 'activities',
   AppConfig: 'app_config',
   AutomationRule: 'automation_rules',
+  CustomFieldDefinition: 'custom_field_definitions',
   Client: 'clients',
   ClientDocument: 'client_documents',
   ClientPaymentMethod: 'client_payment_methods',
