@@ -262,6 +262,28 @@ export const SALE_STATUS = ['Pendiente','Confirmada','Cancelada'];
 export const PAYMENT_STATUS = ['Pendiente','Parcial','Pagado','Vencido','Cancelado'];
 export const CLIENT_TYPES = ['Consumidor','Empresa'];
 
+// Reemplaza al viejo "valor potencial" numérico de Clientes: un nivel de
+// prioridad con colores de semáforo (mismo criterio que Leads). variant
+// referencia las clases de Badge.
+export const CLIENT_PRIORITIES = [
+  { key: 'Urgente', variant: 'destructive', dot: 'bg-destructive' },
+  { key: 'Alta', variant: 'warning', dot: 'bg-warning' },
+  { key: 'Media', variant: 'blue', dot: 'bg-blue-500' },
+  { key: 'Baja', variant: 'muted', dot: 'bg-muted-foreground' },
+];
+
+// Sugerencia de prioridad según el "Estado de situación" — se aplica sola
+// al cambiar el estado, pero la prioridad sigue siendo editable aparte en
+// cualquier momento (no se vuelve a pisar hasta el próximo cambio de estado).
+export const SITUATION_PRIORITY_SUGGESTION = {
+  'Primer contacto': 'Media',
+  'Seguimiento': 'Media',
+  'Propuesta enviada': 'Alta',
+  'Cliente activo': 'Baja',
+  'Saldo pendiente': 'Urgente',
+  'Inactivo': 'Baja',
+};
+
 export const STAGE_COLORS = {
   'Nuevo lead': '#94a3b8',
   'Contactado': '#6366f1',

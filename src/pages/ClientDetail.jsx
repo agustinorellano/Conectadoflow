@@ -107,7 +107,11 @@ export default function ClientDetail() {
 
       {/* Situation status */}
       <div className="mb-6">
-        <SituationStatus client={client} opportunity={opportunities[0]} />
+        <SituationStatus client={client} opportunity={opportunities[0]} onPriorityChange={async (priority) => {
+          queryClient.setQueryData(['Client', 'get', id], (prev) => prev ? { ...prev, priority: priority || null } : prev);
+          await base44.entities.Client.update(id, { priority: priority || null });
+          invalidate(['Client']);
+        }} />
       </div>
 
       {/* Financial summary */}

@@ -13,7 +13,7 @@ import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
 import KpiCard from '@/components/KpiCard';
-import { formatCurrency, formatDateShort, CLIENT_TYPES, COMMUNICATION_CHANNELS, buildWhatsAppUrl, buildMailtoUrl, normalizePhoneDigits, normalizeEmailLower } from '@/lib/flowUtils';
+import { formatCurrency, formatDateShort, CLIENT_TYPES, CLIENT_PRIORITIES, SITUATION_PRIORITY_SUGGESTION, COMMUNICATION_CHANNELS, buildWhatsAppUrl, buildMailtoUrl, normalizePhoneDigits, normalizeEmailLower } from '@/lib/flowUtils';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { cn } from '@/lib/utils';
 
@@ -69,10 +69,14 @@ export default function Clients() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['Client'] });
 
+  // Cambiar el estado de situación también sugiere una prioridad acorde
+  // (ej: "Saldo pendiente" -> Urgente) — la prioridad sigue siendo
+  // editable aparte en cualquier momento hasta el próximo cambio de estado.
   const updateSituation = async (client, situation_status) => {
+    const priority = SITUATION_PRIORITY_SUGGESTION[situation_status] || client.priority;
     queryClient.setQueryData(['Client', 'list', { filter: undefined, sort: '-created_date', limit: 200 }],
-      (prev) => (prev || []).map(c => c.id === client.id ? { ...c, situation_status } : c));
-    await base44.entities.Client.update(client.id, { situation_status });
+      (prev) => (prev || []).map(c => c.id === client.id ? { ...c, situation_status, priority } : c));
+    await base44.entities.Client.update(client.id, { situation_status, priority });
   };
 
   useEffect(() => { if (searchParams.get('new')) setShowForm(true); }, [searchParams]);
@@ -246,12 +250,10 @@ export default function Clients() {
                         <p className="text-xs text-muted-foreground">Vendido</p>
                         <p className="text-sm font-semibold">{formatCurrency(c.total_sold || 0)}</p>
                       </div>
-                      {c.balance > 0 && (
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Saldo</p>
-                          <p className="text-sm font-semibold text-warning">{formatCurrency(c.balance)}</p>
-                        </div>
-                      )}
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Saldo</p>
+                        <p className={cn('text-sm font-semibold', c.balance > 0 ? 'text-warning' : 'text-muted-foreground')}>{c.balance > 0 ? formatCurrency(c.balance) : '—'}</p>
+                      </div>
                       <div className="flex items-center gap-1 ml-2 shrink-0">
                         {c.phone && (
                           <button onClick={(e) => { e.stopPropagation(); openMessage(c, 'WhatsApp'); }} title="Mandar WhatsApp"
@@ -306,23 +308,21 @@ export default function Clients() {
                         <p className="text-xs text-muted-foreground truncate">{c.company || c.email || c.phone || '—'}</p>
                       )}
                     </div>
-                    <div className="text-right shrink-0 hidden lg:block">
+                    <div className="text-right shrink-0 hidden lg:block w-[104px]">
                       <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end"><Clock className="w-3 h-3" /> Últ. contacto</p>
                       <p className="text-xs font-medium">{c.last_contact ? formatDateShort(c.last_contact) : 'Nunca'}</p>
                     </div>
-                    <div onClick={e => e.stopPropagation()} className="shrink-0 hidden sm:block">
+                    <div onClick={e => e.stopPropagation()} className="shrink-0 hidden sm:flex sm:justify-end w-[150px]">
                       <SituationSelect client={c} onChange={updateSituation} />
                     </div>
-                    <div className="text-right shrink-0 hidden md:block">
+                    <div className="text-right shrink-0 hidden md:block w-[90px]">
                       <p className="text-xs text-muted-foreground">Vendido</p>
                       <p className="text-sm font-semibold">{formatCurrency(c.total_sold || 0)}</p>
                     </div>
-                    {c.balance > 0 && (
-                      <div className="text-right shrink-0 hidden lg:block">
-                        <p className="text-xs text-muted-foreground">Saldo</p>
-                        <p className="text-sm font-semibold text-warning">{formatCurrency(c.balance)}</p>
-                      </div>
-                    )}
+                    <div className="text-right shrink-0 hidden lg:block w-[90px]">
+                      <p className="text-xs text-muted-foreground">Saldo</p>
+                      <p className={cn('text-sm font-semibold', c.balance > 0 ? 'text-warning' : 'text-muted-foreground')}>{c.balance > 0 ? formatCurrency(c.balance) : '—'}</p>
+                    </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {c.phone && (
                         <button onClick={(e) => { e.stopPropagation(); openMessage(c, 'WhatsApp'); }} title="Mandar WhatsApp"
@@ -535,14 +535,14 @@ function ClientMessageModal({ client, initialChannel, onClose }) {
   );
 }
 
-const emptyClientForm = { name: '', company: '', tax_id: '', phone: '', email: '', address: '', type: 'Consumidor', segment: '', notes: '', potential_value: '', preferred_channel: 'WhatsApp', custom_fields: {} };
+const emptyClientForm = { name: '', company: '', tax_id: '', phone: '', email: '', address: '', type: 'Consumidor', segment: '', notes: '', priority: '', preferred_channel: 'WhatsApp', custom_fields: {} };
 
 export function ClientForm({ open, onClose, onSaved, user, editClient }) {
   const [form, setForm] = useState(emptyClientForm);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (editClient) setForm({ ...emptyClientForm, ...editClient, potential_value: editClient.potential_value || '', custom_fields: editClient.custom_fields || {} });
+    if (editClient) setForm({ ...emptyClientForm, ...editClient, priority: editClient.priority || '', custom_fields: editClient.custom_fields || {} });
     else setForm(emptyClientForm);
   }, [editClient, open]);
 
@@ -551,9 +551,9 @@ export function ClientForm({ open, onClose, onSaved, user, editClient }) {
     setSaving(true);
     try {
       if (editClient) {
-        await base44.entities.Client.update(editClient.id, { ...form, potential_value: Number(form.potential_value) || 0 });
+        await base44.entities.Client.update(editClient.id, { ...form, priority: form.priority || null });
       } else {
-        await base44.entities.Client.create({ ...form, potential_value: Number(form.potential_value) || 0, status: 'Activo', total_sold: 0, total_collected: 0, balance: 0, owner_id: user?.id, owner_name: user?.full_name });
+        await base44.entities.Client.create({ ...form, priority: form.priority || null, status: 'Activo', total_sold: 0, total_collected: 0, balance: 0, owner_id: user?.id, owner_name: user?.full_name });
       }
       onSaved?.();
       onClose();
@@ -576,7 +576,19 @@ export function ClientForm({ open, onClose, onSaved, user, editClient }) {
         <Field label="Segmento"><input value={form.segment} onChange={e => setForm({ ...form, segment: e.target.value })} className="inp" /></Field>
         <Field label="Canal preferido"><StyledSelect value={form.preferred_channel} onChange={e => setForm({ ...form, preferred_channel: e.target.value })} className="inp">{COMMUNICATION_CHANNELS.map(c => <option key={c} value={c}>{c === 'Email' ? 'Mail' : c}</option>)}</StyledSelect></Field>
         <div className="col-span-2"><Field label="Dirección"><input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="inp" /></Field></div>
-        <Field label="Valor potencial"><input type="number" value={form.potential_value} onChange={e => setForm({ ...form, potential_value: e.target.value })} className="inp" /></Field>
+        <div className="col-span-2">
+          <label className="text-sm font-medium mb-1.5 block">Prioridad</label>
+          <div className="flex items-center gap-2 flex-wrap">
+            {CLIENT_PRIORITIES.map(p => (
+              <button key={p.key} type="button" onClick={() => setForm({ ...form, priority: form.priority === p.key ? '' : p.key })}
+                className={cn('inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition-all',
+                  form.priority === p.key ? 'border-transparent' : 'border-border hover:border-primary/40',
+                  form.priority === p.key && (p.variant === 'destructive' ? 'bg-destructive/10 text-destructive' : p.variant === 'warning' ? 'bg-warning/15 text-warning' : p.variant === 'blue' ? 'bg-blue-500/10 text-blue-600' : 'bg-secondary text-secondary-foreground'))}>
+                <span className={cn('w-2 h-2 rounded-full', p.dot)} /> {p.key}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="col-span-2"><Field label="Notas"><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className="inp resize-none" /></Field></div>
       </div>
       <div className="mt-4 pt-4 border-t border-border">
