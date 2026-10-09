@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass } from 'lucide-react';
+import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
-import { LEAD_SOURCES, PAYMENT_METHODS } from '@/lib/flowUtils';
+import { LEAD_SOURCES, PAYMENT_METHODS, SALE_STATUS } from '@/lib/flowUtils';
 import { NAV_ITEMS, DEFAULT_HIDDEN_NAV } from '@/lib/navItems';
 import CommerceConfig from '@/components/CommerceConfig';
 import PaymentEntitiesConfig from '@/components/PaymentEntitiesConfig';
@@ -18,6 +18,7 @@ const TABS = [
   { key: 'pipeline', label: 'Pipeline', icon: KanbanSquare },
   { key: 'products', label: 'Productos', icon: Package },
   { key: 'messages', label: 'Mensajes', icon: MessageCircle },
+  { key: 'automations', label: 'Automatizaciones', icon: Zap },
   { key: 'currency', label: 'Moneda', icon: Coins },
   { key: 'billing', label: 'Facturación', icon: Receipt },
   { key: 'commerces', label: 'Comercios', icon: Store },
@@ -132,6 +133,7 @@ export default function SettingsPage() {
           {tab === 'payment-entities' && <PaymentEntitiesConfig />}
           {tab === 'products' && <ProductsConfig />}
           {tab === 'messages' && <MessagesConfig />}
+          {tab === 'automations' && <AutomationsConfig />}
           {tab === 'currency' && (
             <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 space-y-4">
               <h2 className="font-semibold">Moneda e impuestos</h2>
@@ -312,6 +314,168 @@ function MessagesConfig() {
         <MessageCircle className="w-4 h-4" /> Ir a Comunicación
       </a>
     </div>
+  );
+}
+
+// Static value sets for triggers whose options aren't a user-editable table
+// (unlike pipeline stages, which the org can rename/add — fetched live
+// instead). Mirrors the CHECK constraints on clients.status/situation_status
+// and sales.status/payment_status.
+const CLIENT_STATUS_VALUES = ['Activo', 'Inactivo', 'Potencial'];
+const CLIENT_SITUATION_VALUES = ['Primer contacto', 'Seguimiento', 'Propuesta enviada', 'Cliente activo', 'Saldo pendiente', 'Inactivo'];
+const SALE_PAYMENT_STATUS_VALUES = ['Pendiente', 'Parcial', 'Pagado', 'Vencido', 'Cancelado'];
+
+const TRIGGER_OPTIONS = [
+  { key: 'opportunity_stage', entity: 'Opportunity', field: 'stage', label: 'Oportunidad → cambia de etapa', dynamicStages: true },
+  { key: 'client_status', entity: 'Client', field: 'status', label: 'Cliente → cambia de estado', values: CLIENT_STATUS_VALUES },
+  { key: 'client_situation', entity: 'Client', field: 'situation_status', label: 'Cliente → cambia de situación', values: CLIENT_SITUATION_VALUES },
+  { key: 'sale_status', entity: 'Sale', field: 'status', label: 'Venta → cambia de estado', values: SALE_STATUS },
+  { key: 'sale_payment_status', entity: 'Sale', field: 'payment_status', label: 'Venta → cambia de estado de cobro', values: SALE_PAYMENT_STATUS_VALUES },
+];
+
+function triggerOptionFor(rule) {
+  return TRIGGER_OPTIONS.find(t => t.entity === rule.trigger_entity && t.field === rule.trigger_field);
+}
+
+function AutomationsConfig() {
+  const [rules, setRules] = useState([]);
+  const [stages, setStages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editRule, setEditRule] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [r, s] = await Promise.all([
+        base44.entities.AutomationRule.list().catch(() => []),
+        base44.entities.PipelineStage.list().catch(() => []),
+      ]);
+      setRules(r); setStages(s);
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggleActive = async (rule) => { await base44.entities.AutomationRule.update(rule.id, { is_active: !rule.is_active }); load(); };
+  const del = async (rule) => {
+    if (!confirm(`¿Eliminar la regla "${rule.name}"? Las tareas que ya creó no se borran, pero dejará de crear nuevas.`)) return;
+    await base44.entities.AutomationRule.delete(rule.id); load();
+  };
+
+  return (
+    <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="font-semibold">Automatizaciones</h2>
+        <button onClick={() => { setEditRule(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+          <Plus className="w-4 h-4" /> Nueva regla
+        </button>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4">
+        Definí tus propias reglas: cuando algo cambia a un valor específico, se crea automáticamente una tarea de seguimiento
+        (aparece en el historial del cliente y en las notificaciones el día que vence). Las alertas de "cliente sin seguimiento"
+        y "oportunidad estancada" del Dashboard son fijas y siguen funcionando aparte de esto.
+      </p>
+      {loading ? <p className="text-sm text-muted-foreground">Cargando…</p> : rules.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-6 text-center">Todavía no creaste ninguna regla.</p>
+      ) : (
+        <div className="space-y-2">
+          {rules.map(rule => {
+            const trigger = triggerOptionFor(rule);
+            return (
+              <div key={rule.id} className="flex items-center gap-3 p-3 rounded-xl border border-border">
+                <span className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><Zap className="w-4 h-4" /></span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{rule.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {trigger?.label || `${rule.trigger_entity} → ${rule.trigger_field}`} a "{rule.trigger_value}" → crear tarea "{rule.action_task_title}"
+                    {rule.action_days_offset > 0 ? ` en ${rule.action_days_offset} día${rule.action_days_offset === 1 ? '' : 's'}` : ' el mismo día'}
+                  </p>
+                </div>
+                <Switch checked={rule.is_active} onCheckedChange={() => toggleActive(rule)} />
+                <button onClick={() => { setEditRule(rule); setShowForm(true); }} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground shrink-0"><Edit3 className="w-3.5 h-3.5" /></button>
+                <button onClick={() => del(rule)} className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center text-muted-foreground shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <AutomationRuleForm open={showForm} onClose={() => setShowForm(false)} onSaved={load} editRule={editRule} stages={stages} />
+    </div>
+  );
+}
+
+function AutomationRuleForm({ open, onClose, onSaved, editRule, stages }) {
+  const [form, setForm] = useState({ name: '', triggerKey: TRIGGER_OPTIONS[0].key, trigger_value: '', action_task_title: '', action_task_description: '', action_days_offset: 3 });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (editRule) {
+      const trigger = triggerOptionFor(editRule);
+      setForm({
+        name: editRule.name, triggerKey: trigger?.key || TRIGGER_OPTIONS[0].key, trigger_value: editRule.trigger_value,
+        action_task_title: editRule.action_task_title, action_task_description: editRule.action_task_description || '',
+        action_days_offset: editRule.action_days_offset,
+      });
+    } else {
+      setForm({ name: '', triggerKey: TRIGGER_OPTIONS[0].key, trigger_value: '', action_task_title: '', action_task_description: '', action_days_offset: 3 });
+    }
+  }, [editRule, open]);
+
+  const selectedTrigger = TRIGGER_OPTIONS.find(t => t.key === form.triggerKey);
+  const valueOptions = selectedTrigger?.dynamicStages ? stages.map(s => s.name) : (selectedTrigger?.values || []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name, is_active: editRule ? editRule.is_active : true,
+        trigger_entity: selectedTrigger.entity, trigger_field: selectedTrigger.field, trigger_value: form.trigger_value,
+        action_task_title: form.action_task_title, action_task_description: form.action_task_description || null,
+        action_days_offset: Number(form.action_days_offset) || 0,
+      };
+      if (editRule) await base44.entities.AutomationRule.update(editRule.id, payload);
+      else await base44.entities.AutomationRule.create(payload);
+      onSaved(); onClose();
+    } finally { setSaving(false); }
+  };
+
+  const canSave = form.name && form.trigger_value && form.action_task_title;
+
+  return (
+    <Modal open={open} onClose={onClose} title={editRule ? 'Editar regla' : 'Nueva regla de automatización'}
+      footer={<>
+        <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
+        <button onClick={save} disabled={saving || !canSave} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar'}</button>
+      </>}>
+      <div className="space-y-3">
+        <Field label="Nombre de la regla">
+          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ej: Seguimiento tras enviar propuesta" className="inp" />
+        </Field>
+        <Field label="Cuándo">
+          <StyledSelect value={form.triggerKey} onChange={e => setForm({ ...form, triggerKey: e.target.value, trigger_value: '' })} className="inp">
+            {TRIGGER_OPTIONS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </StyledSelect>
+        </Field>
+        <Field label="Valor">
+          <StyledSelect value={form.trigger_value} onChange={e => setForm({ ...form, trigger_value: e.target.value })} className="inp">
+            <option value="">Elegí un valor…</option>
+            {valueOptions.map(v => <option key={v} value={v}>{v}</option>)}
+          </StyledSelect>
+        </Field>
+        <div className="pt-2 border-t border-border" />
+        <Field label="Entonces: crear tarea de seguimiento con el título">
+          <input value={form.action_task_title} onChange={e => setForm({ ...form, action_task_title: e.target.value })} placeholder="Ej: Llamar para confirmar la propuesta" className="inp" />
+        </Field>
+        <Field label="Descripción de la tarea (opcional)">
+          <textarea value={form.action_task_description} onChange={e => setForm({ ...form, action_task_description: e.target.value })} rows={2} className="inp resize-none" />
+        </Field>
+        <Field label="Días después del cambio (0 = el mismo día)">
+          <input type="number" min="0" value={form.action_days_offset} onChange={e => setForm({ ...form, action_days_offset: e.target.value })} className="inp w-28" />
+        </Field>
+        <p className="text-xs text-muted-foreground">La tarea queda vinculada al cliente (y a la oportunidad, si corresponde) y le aparece al vendedor dueño del registro en sus notificaciones el día que vence.</p>
+      </div>
+      <style>{`.inp{width:100%;padding:0.5rem 0.75rem;border-radius:0.75rem;border:1px solid hsl(var(--input));background:hsl(var(--background));font-size:0.875rem;outline:none}.inp:focus{border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/0.3)}`}</style>
+    </Modal>
   );
 }
 
