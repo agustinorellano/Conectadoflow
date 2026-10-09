@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Plus, Clock, Video, Phone, MapPin, MessageCircle, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Link as LinkIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Plus, Clock, Video, Phone, MapPin, MessageCircle, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Link as LinkIcon, Store, FileText, ArrowRight } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useCommerce } from '@/lib/CommerceContext';
 import { useEntityList } from '@/lib/useEntityQuery';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
+import SituationStatus from '@/components/SituationStatus';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { formatDateTime, MEETING_TYPES } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
@@ -20,7 +23,9 @@ export default function Meetings() {
   const queryClient = useQueryClient();
   const { data: meetings = [], isLoading: loading } = useEntityList('Meeting', { sort: '-date', limit: 200 });
   const { data: clients = [] } = useEntityList('Client');
+  const { data: commerces = [] } = useEntityList('Commerce');
   const [showForm, setShowForm] = useState(false);
+  const [detailMeeting, setDetailMeeting] = useState(null);
   const [tab, setTab] = useState('calendar');
   const [searchParams] = useSearchParams();
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
@@ -63,7 +68,7 @@ export default function Meetings() {
       </div>
 
       {tab === 'calendar' ? (
-        <MonthCalendar meetings={meetings} month={calendarMonth} setMonth={setCalendarMonth} selectedDay={selectedDay} setSelectedDay={setSelectedDay} />
+        <MonthCalendar meetings={meetings} month={calendarMonth} setMonth={setCalendarMonth} selectedDay={selectedDay} setSelectedDay={setSelectedDay} onSelectMeeting={setDetailMeeting} />
       ) : loading ? <div className="text-center py-16 text-muted-foreground">Cargando…</div> :
         list.length === 0 ? (
           <EmptyState icon={Calendar} title="Sin reuniones" subtitle="Programá reuniones con tus clientes y mantente al día."
@@ -75,7 +80,8 @@ export default function Meetings() {
                 const Icon = TYPE_ICONS[m.type] || Clock;
                 return (
                   <motion.div key={m.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    className="bg-card rounded-2xl border border-border card-shadow p-4 flex items-center gap-4">
+                    onClick={() => setDetailMeeting(m)}
+                    className="bg-card rounded-2xl border border-border card-shadow p-4 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-colors">
                     <span className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                       <Icon className="w-5 h-5" />
                     </span>
@@ -83,7 +89,7 @@ export default function Meetings() {
                       <p className="font-semibold truncate">{m.title}</p>
                       <p className="text-sm text-muted-foreground truncate">{m.client_name} · {formatDateTime(m.date)}</p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <Badge variant="primary">{m.type}</Badge>
                       {m.meeting_link && (
                         <a href={m.meeting_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
@@ -106,11 +112,62 @@ export default function Meetings() {
       }
 
       <MeetingForm open={showForm} onClose={() => setShowForm(false)} onSaved={invalidate} clients={clients} user={user} />
+      <MeetingDetailModal meeting={detailMeeting} onClose={() => setDetailMeeting(null)}
+        client={detailMeeting ? clients.find(c => c.id === detailMeeting.client_id) : null}
+        commerce={detailMeeting ? commerces.find(c => c.id === detailMeeting.commerce_id) : null} />
     </div>
   );
 }
 
+function MeetingDetailModal({ meeting, onClose, client, commerce }) {
+  const navigate = useNavigate();
+  if (!meeting) return null;
+  const Icon = TYPE_ICONS[meeting.type] || Clock;
+  return (
+    <Modal open={!!meeting} onClose={onClose} title={meeting.title} subtitle={formatDateTime(meeting.date)}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="primary"><Icon className="w-3 h-3 mr-1 inline" />{meeting.type}</Badge>
+          <Badge variant={meeting.status === 'Realizada' ? 'success' : meeting.status === 'Cancelada' ? 'destructive' : 'muted'}>{meeting.status}</Badge>
+          {commerce && <Badge variant="violet"><Store className="w-3 h-3 mr-1 inline" />{commerce.name}</Badge>}
+        </div>
+
+        {meeting.meeting_link && (
+          <a href={meeting.meeting_link} target="_blank" rel="noopener noreferrer"
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+            <LinkIcon className="w-4 h-4" /> Unirse a la reunión
+          </a>
+        )}
+
+        {meeting.notes && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Descripción</p>
+            <p className="text-sm whitespace-pre-wrap">{meeting.notes}</p>
+          </div>
+        )}
+
+        {meeting.result && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Resultado</p>
+            <p className="text-sm whitespace-pre-wrap">{meeting.result}</p>
+          </div>
+        )}
+
+        <div>
+          <button onClick={() => client && navigate(`/clientes/${client.id}`)} disabled={!client}
+            className="w-full flex items-center justify-between px-1 py-1.5 text-sm font-medium text-primary disabled:text-muted-foreground disabled:cursor-default hover:underline">
+            {meeting.client_name || 'Sin cliente'}
+            {client && <ArrowRight className="w-3.5 h-3.5" />}
+          </button>
+          {client && <SituationStatus client={client} />}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function MeetingForm({ open, onClose, onSaved, clients, user }) {
+  const { currentCommerceId } = useCommerce();
   const [form, setForm] = useState({ client_id: '', title: '', date: '', type: 'Videollamada', notes: '', meeting_link: '' });
   const [saving, setSaving] = useState(false);
   useEffect(() => { if (open) setForm(f => ({ ...f, client_id: clients[0]?.id || '' })); }, [open, clients]);
@@ -121,6 +178,7 @@ function MeetingForm({ open, onClose, onSaved, clients, user }) {
     try {
       await base44.entities.Meeting.create({
         ...form, date: new Date(form.date).toISOString(), client_id: form.client_id, client_name: client?.name || '',
+        commerce_id: currentCommerceId !== 'all' ? currentCommerceId : undefined,
         status: 'Programada', owner_id: user?.id, owner_name: user?.full_name,
       });
       if (client) await base44.entities.Client.update(client.id, { next_meeting_date: new Date(form.date).toISOString() });
@@ -151,6 +209,12 @@ function MeetingForm({ open, onClose, onSaved, clients, user }) {
           </div>
         </div>
         <Inp label="Link de la reunión (Zoom, Meet, Teams…)" value={form.meeting_link} onChange={v => setForm({ ...form, meeting_link: v })} />
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Descripción</label>
+          <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2}
+            placeholder="De qué se trata esta reunión…"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none" />
+        </div>
       </div>
     </Modal>
   );
@@ -168,7 +232,7 @@ function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMont
 function startOfWeek(date) { const d = new Date(date); const offset = (d.getDay() + 6) % 7; d.setDate(d.getDate() - offset); d.setHours(0, 0, 0, 0); return d; }
 function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n); return d; }
 
-function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay }) {
+function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay, onSelectMeeting }) {
   const year = month.getFullYear();
   const monthIdx = month.getMonth();
   const firstOfMonth = new Date(year, monthIdx, 1);
@@ -278,7 +342,8 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
               const mDate = new Date(m.date);
               const showDate = rangeFilter !== 'day';
               return (
-                <div key={m.id} className="p-3 rounded-xl border border-border">
+                <div key={m.id} onClick={() => onSelectMeeting?.(m)}
+                  className="p-3 rounded-xl border border-border cursor-pointer hover:border-primary/30 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><Icon className="w-3.5 h-3.5" /></span>
                     <p className="text-sm font-medium truncate">{m.title}</p>
@@ -287,7 +352,8 @@ function MonthCalendar({ meetings, month, setMonth, selectedDay, setSelectedDay 
                     {m.client_name} · {showDate ? formatDateTime(m.date) : mDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                   {m.meeting_link && (
-                    <a href={m.meeting_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
+                    <a href={m.meeting_link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
                       <LinkIcon className="w-3.5 h-3.5" /> Unirse
                     </a>
                   )}
