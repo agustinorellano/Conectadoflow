@@ -18,17 +18,33 @@ export function DataProvider({ children }) {
         return list[0];
       }
       // create default config
-      const created = await base44.entities.AppConfig.create({
-        company_name: 'Conectado Flow',
-        currency: 'ARS',
-        currency_symbol: '$',
-        tax_rate: 21,
-        mode: 'Independiente',
-        onboarded: false,
-        primary_color: '#465BE8',
-      });
-      setConfig(created);
-      return created;
+      try {
+        const created = await base44.entities.AppConfig.create({
+          company_name: 'Conectado Flow',
+          currency: 'ARS',
+          currency_symbol: '$',
+          tax_rate: 21,
+          mode: 'Independiente',
+          onboarded: false,
+          primary_color: '#465BE8',
+        });
+        setConfig(created);
+        return created;
+      } catch (createErr) {
+        // Otra llamada a loadConfig() en paralelo (ej. dos componentes
+        // montando a la vez) puede haber creado el config primero — la
+        // restricción única de app_config.organization_id hace fallar esta
+        // segunda inserción en vez de duplicarla. En ese caso el config ya
+        // existe: lo volvemos a buscar en vez de tratar esto como un error.
+        if (createErr?.code === '23505') {
+          const retryList = await base44.entities.AppConfig.list();
+          if (retryList && retryList.length > 0) {
+            setConfig(retryList[0]);
+            return retryList[0];
+          }
+        }
+        throw createErr;
+      }
     } catch (e) {
       console.error('loadConfig error', e);
       return null;
