@@ -164,6 +164,29 @@ async function getLastAuthorizedNumber(wsfeUrl: string, cuit: string, token: str
 function pad2(n: number) { return n < 10 ? `0${n}` : `${n}`; }
 function arcaDate(d: Date) { return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`; }
 
+// Nunca le mostramos a un usuario un error técnico crudo (de Postgres, de
+// una librería, de la red) — eso es nuestro para diagnosticar, no suyo
+// para leer. Todo lo que no sea un mensaje de validación ya redactado por
+// nosotros se traduce acá a algo entendible; el detalle real queda en los
+// logs de la función (console.error), donde lo podemos ir a buscar.
+function friendlyError(raw: unknown, context: string): string {
+  const message = raw instanceof Error ? raw.message : String(raw);
+  console.error(`[arca-invoice] ${context}:`, message);
+
+  // Errores de Postgres/infraestructura (nunca deberían llegar al usuario
+  // tal cual — son nuestros para diagnosticar, no suyos para leer).
+  if (/pgp_sym_|does not exist|relation .* does not exist|permission denied|column .* does not exist/i.test(message)) {
+    return 'Ocurrió un error técnico al leer la configuración de facturación de tu organización. Avisale al administrador del sistema.';
+  }
+  if (/fetch failed|network|ECONNREFUSED|timeout|respondió \d\d\d:|No se pudo leer la respuesta/i.test(message)) {
+    return 'No se pudo conectar con ARCA en este momento (puede estar caído o el certificado no es válido). Probá de nuevo en unos minutos; si sigue fallando, revisá el certificado cargado en Configuración → Facturación.';
+  }
+  // Lo que queda ya es un mensaje pensado para el usuario: nuestras
+  // propias validaciones, o el motivo que da ARCA al rechazar el
+  // comprobante (útil tal cual — lo necesita para corregir el dato).
+  return message;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -187,7 +210,7 @@ Deno.serve(async (req: Request) => {
     const { data: config } = await db.from('app_config').select('*').eq('organization_id', callerProfile.organization_id).maybeSingle();
 
     const { data: credsRows, error: credsErr } = await db.rpc('arca_get_decrypted_credentials', { org_id: callerProfile.organization_id });
-    if (credsErr) return json({ error: credsErr.message }, 400);
+    if (credsErr) return json({ error: friendlyError(credsErr, 'leyendo credenciales') }, 400);
     const creds = credsRows?.[0];
     if (!creds) return json({ error: 'Esta organización todavía no configuró su certificado de ARCA (Configuración → Facturación)' }, 400);
 
@@ -253,6 +276,6 @@ Deno.serve(async (req: Request) => {
 
     return json({ success: true, cae, cae_vencimiento: caeVtoIso, comprobante_tipo: cbteTipo, comprobante_numero: nextNro, punto_venta: creds.punto_venta });
   } catch (e) {
-    return json({ error: e?.message || 'Error inesperado generando la factura' }, 500);
+    return json({ error: friendlyError(e, 'error inesperado') }, 500);
   }
 });
