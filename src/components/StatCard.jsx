@@ -8,11 +8,20 @@ import { cn } from '@/lib/utils';
 // plainer than KpiCard, used only for this specific row.
 export default function StatCard({ label, value, sublabel, variation: v, icon: Icon, accent, onClick }) {
   const positive = v >= 0;
-  // A short number always fits at the big size, but a longer currency
-  // amount (e.g. "$1.318.750") or a product/client name (e.g. "Más
-  // vendido") gets cut off in the 2-column mobile grid — drop to a
-  // smaller size and wrap onto 2 lines instead of ellipsizing it on one.
-  const isLongText = typeof value === 'string' && value.length > 9;
+  // A binary "short or long" cutoff made sibling cards in the same row
+  // look mismatched: "$181.500" (8 chars) rendered at the full 26px size
+  // while "$1.318.750" (10 chars) — one digit longer — dropped straight to
+  // the small 2-line size right next to it. Three tiers instead of two:
+  // single digits/short counts stay big, most currency amounts land on a
+  // medium size that still fits one line, and only genuinely long text
+  // (a product/client name) wraps onto 2 lines.
+  const len = typeof value === 'string' ? value.length : String(value ?? '').length;
+  const isLongText = len > 10;
+  const sizeClass = isLongText
+    ? 'text-sm sm:text-base leading-snug line-clamp-2'
+    : len > 6
+      ? 'text-base sm:text-xl leading-tight truncate'
+      : 'text-lg sm:text-[26px] leading-none truncate';
   return (
     <div
       onClick={onClick}
@@ -30,10 +39,7 @@ export default function StatCard({ label, value, sublabel, variation: v, icon: I
         <p className="text-xs sm:text-sm text-muted-foreground leading-snug line-clamp-2">{label}</p>
       </div>
       <div className="flex items-center justify-between gap-2 min-w-0">
-        <p title={isLongText ? value : undefined} className={cn(
-          'font-bold tracking-tight',
-          isLongText ? 'text-sm sm:text-base leading-snug line-clamp-2' : 'text-lg sm:text-[26px] leading-none truncate'
-        )}>{value}</p>
+        <p title={isLongText ? value : undefined} className={cn('font-bold tracking-tight', sizeClass)}>{value}</p>
         {v !== undefined && v !== null && (
           <span className={cn(
             'inline-flex items-center gap-0.5 text-[11px] sm:text-[12px] font-semibold px-1.5 py-0.5 rounded-full shrink-0',
