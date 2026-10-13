@@ -243,6 +243,23 @@ const admin = {
   },
 };
 
+// supabase-js's FunctionsHttpError puts the Edge Function's JSON body (the
+// {error: "..."} we actually want to show) inside error.context, which is
+// the raw fetch Response — not already parsed. Reading error.context?.error
+// directly (like this used to) silently grabs nothing, so every failure
+// surfaced as the generic "Edge Function returned a non-2xx status code"
+// instead of the real reason. This reads the body properly.
+async function extractEdgeFunctionError(error, data, fallback) {
+  if (data?.error) return data.error;
+  if (error?.context?.json) {
+    try {
+      const body = await error.context.json();
+      if (body?.error) return body.error;
+    } catch { /* body wasn't JSON — fall through */ }
+  }
+  return error?.message || fallback;
+}
+
 const users = {
   // Creates the account directly with a password the admin chose, then
   // assigns the new profile to the caller's organization/role, via the
@@ -252,10 +269,7 @@ const users = {
     const { data, error } = await supabase.functions.invoke('invite-user', {
       body: { email, role, password, full_name: fullName },
     });
-    if (error) {
-      const message = data?.error || error.context?.error || error.message || 'No se pudo invitar';
-      throw new Error(message);
-    }
+    if (error) throw new Error(await extractEdgeFunctionError(error, data, 'No se pudo invitar'));
     if (data?.error) throw new Error(data.error);
     return data;
   },
@@ -267,10 +281,7 @@ const users = {
     const { data, error } = await supabase.functions.invoke('invite-user', {
       body: { action: 'reset_password', user_id: userId, password },
     });
-    if (error) {
-      const message = data?.error || error.context?.error || error.message || 'No se pudo restablecer la contraseña';
-      throw new Error(message);
-    }
+    if (error) throw new Error(await extractEdgeFunctionError(error, data, 'No se pudo restablecer la contraseña'));
     if (data?.error) throw new Error(data.error);
     return data;
   },
@@ -294,7 +305,7 @@ const fiscal = {
       body: { sale_id: saleId },
     });
     if (error) {
-      const message = data?.error || error.context?.error || error.message || 'No se pudo generar la factura';
+      const message = await extractEdgeFunctionError(error, data, 'No se pudo generar la factura');
       throw new Error(message);
     }
     if (data?.error) throw new Error(data.error);
