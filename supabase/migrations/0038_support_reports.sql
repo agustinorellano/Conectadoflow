@@ -202,6 +202,8 @@ begin
 end;
 $$;
 
+drop function if exists public.admin_get_organization(uuid);
+
 create or replace function public.admin_get_organization(p_org_id uuid)
 returns table (
   id uuid, name text, is_active boolean, created_date timestamptz,
