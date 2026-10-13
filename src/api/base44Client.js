@@ -232,6 +232,55 @@ const admin = {
     const { error } = await supabase.rpc('admin_set_organization_active', { org_id: orgId, active });
     if (error) throw error;
   },
+
+  // Ficha detallada de una organización (Panel de Administración Global,
+  // Etapa 3 — ver 0037_admin_organization_detail.sql). Cada pestaña de la
+  // ficha es una de estas llamadas, para no traer todo de una.
+  async getOrganization(orgId) {
+    const { data, error } = await supabase.rpc('admin_get_organization', { p_org_id: orgId });
+    if (error) throw error;
+    return data?.[0] || null;
+  },
+  async listOrganizationMembers(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_members', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
+  async listOrganizationCommerces(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_commerces', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
+  async listOrganizationBranches(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_branches', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
+  async listOrganizationProducts(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_products', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
+  async listOrganizationSales(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_sales', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
+  async listOrganizationLeads(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_leads', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
+  async listOrganizationClients(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_clients', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
+  async listOrganizationAuditLog(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_audit_log', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
   // orgId null = broadcast to every organization on the platform.
   async sendNotification(orgId, title, message) {
     const { data, error } = await supabase.rpc('admin_send_notification', {

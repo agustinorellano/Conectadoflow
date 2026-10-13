@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -157,10 +157,10 @@ export default function SuperAdmin() {
                 <span className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                   <Building2 className="w-5 h-5" />
                 </span>
-                <div className="flex-1 min-w-[160px]">
+                <Link to={`/super-admin/organizaciones/${o.id}`} className="flex-1 min-w-[160px] hover:underline">
                   <p className="font-semibold truncate">{o.name}</p>
                   <p className="text-xs text-muted-foreground">Alta: {formatDate(o.created_date)}</p>
-                </div>
+                </Link>
                 <div className="flex items-center gap-4 text-sm">
                   <div className="text-center">
                     <p className="font-semibold">{o.member_count}</p>

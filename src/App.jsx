@@ -34,6 +34,7 @@ import Profile from '@/pages/Profile';
 import Reports from '@/pages/Reports';
 import Products from '@/pages/Products';
 import SuperAdmin from '@/pages/SuperAdmin';
+import SuperAdminOrgDetail from '@/pages/SuperAdminOrgDetail';
 import CalendarCallback from '@/pages/CalendarCallback';
 
 const AuthenticatedApp = () => {
@@ -77,6 +78,7 @@ const AuthenticatedApp = () => {
           <Route path="/reportes" element={<Reports />} />
           <Route path="/productos" element={<Products />} />
           <Route path="/super-admin" element={<SuperAdmin />} />
+          <Route path="/super-admin/organizaciones/:id" element={<SuperAdminOrgDetail />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>
