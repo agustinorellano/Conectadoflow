@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles, AlertTriangle, ShieldCheck, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles, AlertTriangle, ShieldCheck, CheckCircle2, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -64,7 +64,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-1">Configuración</h1>
       <p className="text-sm text-muted-foreground mb-6">Personalizá Conectado Flow para tu negocio</p>
 
-      <div className="flex gap-1.5 mb-6 overflow-x-auto no-scrollbar">
+      <ScrollableTabs>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={cn('inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors',
@@ -72,7 +72,7 @@ export default function SettingsPage() {
             <t.icon className="w-4 h-4" /> {t.label}
           </button>
         ))}
-      </div>
+      </ScrollableTabs>
 
       <AnimatePresence mode="wait">
         <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
@@ -185,6 +185,57 @@ export default function SettingsPage() {
         </motion.div>
       </AnimatePresence>
       <style>{`.inp{width:100%;padding:0.625rem 0.875rem;border-radius:0.75rem;border:1px solid hsl(var(--input));background:hsl(var(--background));font-size:0.875rem;outline:none}.inp:focus{border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/0.3)}`}</style>
+    </div>
+  );
+}
+
+// Fila de pestañas con scroll horizontal: en desktop no siempre es obvio
+// que hay más contenido arrastrando con el mouse, así que se suman
+// flechitas para moverla con un click. Se ocultan solas en el extremo
+// correspondiente (no tiene sentido una flecha hacia la izquierda si ya
+// estás al principio) y desaparecen las dos si todo entra sin hacer scroll.
+function ScrollableTabs({ children }) {
+  const scrollRef = useRef(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const updateArrows = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    updateArrows();
+    const el = scrollRef.current;
+    if (!el) return;
+    const onResize = () => updateArrows();
+    window.addEventListener('resize', onResize);
+    const observer = new ResizeObserver(updateArrows);
+    observer.observe(el);
+    return () => { window.removeEventListener('resize', onResize); observer.disconnect(); };
+  }, []);
+
+  const scrollBy = (dir) => scrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+
+  return (
+    <div className="relative mb-6">
+      {canLeft && (
+        <button onClick={() => scrollBy(-1)} aria-label="Desplazar a la izquierda"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-card border border-border shadow-sm flex items-center justify-center hover:bg-accent">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+      )}
+      <div ref={scrollRef} onScroll={updateArrows} className="flex gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+        {children}
+      </div>
+      {canRight && (
+        <button onClick={() => scrollBy(1)} aria-label="Desplazar a la derecha"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-card border border-border shadow-sm flex items-center justify-center hover:bg-accent">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 }
