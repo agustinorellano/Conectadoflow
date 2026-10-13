@@ -276,4 +276,30 @@ const users = {
   },
 };
 
-export const base44 = { entities, auth, integrations, users, admin, documents };
+// Facturación electrónica con ARCA (ex AFIP) — ver supabase/migrations/0031.
+const fiscal = {
+  // Guarda (o reemplaza) el certificado digital de la organización. Viaja
+  // una sola vez a una función de Postgres que lo encripta antes de
+  // tocar disco; nunca se vuelve a leer en texto plano desde el cliente.
+  async saveArcaCredentials({ cuit, puntoVenta, environment, certificate, privateKey }) {
+    const { error } = await supabase.rpc('arca_store_credentials', {
+      cuit_in: cuit, punto_venta_in: puntoVenta, environment_in: environment,
+      certificate_in: certificate, private_key_in: privateKey,
+    });
+    if (error) throw error;
+  },
+  // Dispara la generación de la factura real contra ARCA para una venta.
+  async generateInvoice(saleId) {
+    const { data, error } = await supabase.functions.invoke('arca-invoice', {
+      body: { sale_id: saleId },
+    });
+    if (error) {
+      const message = data?.error || error.context?.error || error.message || 'No se pudo generar la factura';
+      throw new Error(message);
+    }
+    if (data?.error) throw new Error(data.error);
+    return data;
+  },
+};
+
+export const base44 = { entities, auth, integrations, users, admin, documents, fiscal };

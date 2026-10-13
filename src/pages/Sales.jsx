@@ -66,6 +66,8 @@ export default function Sales() {
   const [showForm, setShowForm] = useState(false);
   const [editingSale, setEditingSale] = useState(null);
   const [docSale, setDocSale] = useState(null);
+  const [invoicingId, setInvoicingId] = useState(null);
+  const [invoiceError, setInvoiceError] = useState(null); // { saleId, message } | null
   const [expanded, setExpanded] = useState(null);
   const [search, setSearch] = useState('');
   const [period, setPeriod] = useState('all');
@@ -118,6 +120,19 @@ export default function Sales() {
 
   const handleEdit = (s) => { setEditingSale(s); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditingSale(null); };
+
+  const handleInvoice = async (s) => {
+    setInvoiceError(null);
+    setInvoicingId(s.id);
+    try {
+      await base44.fiscal.generateInvoice(s.id);
+      invalidate();
+    } catch (e) {
+      setInvoiceError({ saleId: s.id, message: e.message || 'No se pudo generar la factura' });
+    } finally {
+      setInvoicingId(null);
+    }
+  };
 
   const handleDelete = async (s) => {
     if (!confirm(`¿Eliminar la venta ${s.number}? Esta acción no se puede deshacer y también va a borrar su plan de pagos.`)) return;
@@ -303,6 +318,18 @@ export default function Sales() {
                          </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                        {s.arca_status === 'Facturada' ? (
+                          <span title={`CAE ${s.arca_cae} · vence ${s.arca_cae_vencimiento ? formatDate(s.arca_cae_vencimiento) : ''}`}
+                            className="w-8 h-8 rounded-lg bg-success/10 text-success flex items-center justify-center">
+                            <Receipt className="w-4 h-4" />
+                          </span>
+                        ) : (
+                          <button onClick={() => handleInvoice(s)} disabled={invoicingId === s.id}
+                            className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-success/10 hover:text-success flex items-center justify-center disabled:opacity-50"
+                            title="Facturar con ARCA">
+                            <Receipt className="w-4 h-4" />
+                          </button>
+                        )}
                         <button onClick={() => setDocSale(s)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-violet-500/10 hover:text-violet-500 flex items-center justify-center" title="Generar documento">
                           <FileText className="w-4 h-4" />
                         </button>
@@ -315,6 +342,9 @@ export default function Sales() {
                       </div>
                       {isOpen ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
                     </div>
+                    {invoiceError?.saleId === s.id && (
+                      <p className="px-4 pb-3 -mt-1 text-xs text-destructive">No se pudo facturar: {invoiceError.message}</p>
+                    )}
                     <AnimatePresence>
                       {isOpen && (
                         <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles, AlertTriangle } from 'lucide-react';
+import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles, AlertTriangle, ShieldCheck, CheckCircle2, ExternalLink } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -181,6 +181,7 @@ export default function SettingsPage() {
               <SaveBar saving={saving} saved={saved} onSave={save} />
             </div>
           )}
+          {tab === 'billing' && <ArcaConfig />}
         </motion.div>
       </AnimatePresence>
       <style>{`.inp{width:100%;padding:0.625rem 0.875rem;border-radius:0.75rem;border:1px solid hsl(var(--input));background:hsl(var(--background));font-size:0.875rem;outline:none}.inp:focus{border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/0.3)}`}</style>
@@ -225,6 +226,135 @@ function DangerZone() {
       <DeleteOrganizationModal org={confirmOpen ? org : null} onClose={() => setConfirmOpen(false)}
         onDeleted={() => { base44.auth.logout('/login'); }} />
     </>
+  );
+}
+
+// Facturación electrónica con ARCA (ex AFIP). El certificado nunca se
+// vuelve a mostrar una vez cargado (ver supabase/migrations/0031) — esta
+// pantalla solo sabe "configurado sí/no", no puede leer la clave privada.
+function ArcaConfig() {
+  const { user } = useAuth();
+  const [status, setStatus] = useState(null); // { cuit, punto_venta, environment, is_active } | null
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const rows = await base44.entities.ArcaCredential.list().catch(() => []);
+      setStatus(rows[0] || null);
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  if (user?.role !== 'admin') return null;
+
+  return (
+    <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="w-5 h-5 text-primary" />
+        <h2 className="font-semibold">Facturación electrónica (ARCA)</h2>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Conectá el certificado digital de tu CUIT para poder emitir facturas con CAE real directo desde Ventas.
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Cargando…</p>
+      ) : status && !editing ? (
+        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-success/10 border border-success/20">
+          <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
+          <div className="flex-1 min-w-0 text-sm">
+            <p className="font-medium">Configurado — CUIT {status.cuit} · Punto de venta {String(status.punto_venta).padStart(4, '0')}</p>
+            <p className="text-muted-foreground">Ambiente: {status.environment === 'produccion' ? 'Producción' : 'Homologación (pruebas)'}</p>
+          </div>
+          <button onClick={() => setEditing(true)} className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-accent shrink-0">Cambiar</button>
+        </div>
+      ) : (
+        <ArcaSetupWizard onSaved={() => { setEditing(false); load(); }} onCancel={status ? () => setEditing(false) : null} />
+      )}
+    </div>
+  );
+}
+
+function ArcaSetupWizard({ onSaved, onCancel }) {
+  const [cuit, setCuit] = useState('');
+  const [puntoVenta, setPuntoVenta] = useState('1');
+  const [environment, setEnvironment] = useState('homologacion');
+  const [certificate, setCertificate] = useState('');
+  const [privateKey, setPrivateKey] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const readFile = (file, setter) => {
+    const reader = new FileReader();
+    reader.onload = () => setter(String(reader.result || ''));
+    reader.readAsText(file);
+  };
+
+  const save = async () => {
+    if (!cuit || !certificate || !privateKey) return;
+    setSaving(true); setError('');
+    try {
+      await base44.fiscal.saveArcaCredentials({
+        cuit: cuit.replace(/\D/g, ''), puntoVenta: Number(puntoVenta) || 1, environment, certificate, privateKey,
+      });
+      onSaved();
+    } catch (e) {
+      setError(e.message || 'No se pudo guardar el certificado');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="p-3.5 rounded-xl bg-secondary/60 text-sm space-y-2">
+        <p className="font-medium">Antes de cargar esto, necesitás pedirle el certificado a ARCA (una sola vez):</p>
+        <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+          <li>Entrá a ARCA con tu Clave Fiscal → Administrador de Relaciones de Clave Fiscal.</li>
+          <li>Generá una Solicitud de Certificado (CSR) para "Web Services" y descargá el certificado (.crt) que te entrega.</li>
+          <li>Guardá también la clave privada (.key) que generaste junto con el CSR — ARCA no te la vuelve a dar.</li>
+          <li>Adherí el servicio "wsfe" (Facturación Electrónica) a ese certificado, para tu CUIT.</li>
+        </ol>
+        <a href="https://www.afip.gob.ar/ws/WSAA/Especificacion_Tecnica_WSAA_1.2.2.pdf" target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-primary font-medium hover:underline">
+          Ver guía oficial <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Field label="CUIT"><input value={cuit} onChange={e => setCuit(e.target.value)} placeholder="20123456789" className="inp" /></Field>
+        <Field label="Punto de venta"><input type="number" value={puntoVenta} onChange={e => setPuntoVenta(e.target.value)} className="inp" /></Field>
+        <Field label="Ambiente">
+          <StyledSelect value={environment} onChange={e => setEnvironment(e.target.value)} className="inp">
+            <option value="homologacion">Homologación (pruebas)</option>
+            <option value="produccion">Producción</option>
+          </StyledSelect>
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Certificado (.crt)</label>
+          <input type="file" accept=".crt,.pem" onChange={e => e.target.files?.[0] && readFile(e.target.files[0], setCertificate)} className="text-sm" />
+          {certificate && <p className="text-xs text-success mt-1">Archivo cargado</p>}
+        </div>
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Clave privada (.key)</label>
+          <input type="file" accept=".key,.pem" onChange={e => e.target.files?.[0] && readFile(e.target.files[0], setPrivateKey)} className="text-sm" />
+          {privateKey && <p className="text-xs text-success mt-1">Archivo cargado</p>}
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={saving || !cuit || !certificate || !privateKey}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
+          {saving ? 'Guardando…' : 'Guardar certificado'}
+        </button>
+        {onCancel && <button onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>}
+      </div>
+    </div>
   );
 }
 

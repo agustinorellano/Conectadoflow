@@ -2,6 +2,7 @@
 export const ENTITY_TABLES = {
   Activity: 'activities',
   AppConfig: 'app_config',
+  ArcaCredential: 'arca_credentials',
   AutomationRule: 'automation_rules',
   Branch: 'branches',
   BranchManager: 'branch_managers',
