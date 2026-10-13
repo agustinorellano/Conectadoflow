@@ -4,7 +4,7 @@ import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   ShoppingCart, UserPlus, Wallet, Package, Award,
-  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing, MapPin, Receipt, Share2,
+  ArrowRight, CheckCircle2, Circle, Store, Eye, EyeOff, Trophy, Calendar, BellRing, MapPin, Receipt, Share2, Plus, Check, LayoutGrid,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
@@ -41,6 +41,24 @@ export default function Dashboard() {
   const toggleIncomeChart = () => setShowIncomeChart(prev => {
     const next = !prev;
     try { localStorage.setItem('cf_show_income_chart', next ? '1' : '0'); } catch { /* ignore */ }
+    return next;
+  });
+  // Widgets opcionales (Meta mensual, Mejor vendedor, Próximas reuniones,
+  // Funnel comercial, Tareas pendientes, Ventas por canal, Clientes de
+  // mayor valor): apagados por default, el dashboard arranca solo con lo
+  // esencial (Ingresos, los 6 StatCard, Últimas transacciones, Ventas por
+  // entidad) y cada uno se prende desde los botones de "Agregar al
+  // dashboard" al final de la página. Se recuerda entre visitas.
+  const [visibleWidgets, setVisibleWidgets] = useState(() => {
+    try {
+      const raw = localStorage.getItem('cf_dashboard_widgets');
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch { return new Set(); }
+  });
+  const toggleWidget = (key) => setVisibleWidgets(prev => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    try { localStorage.setItem('cf_dashboard_widgets', JSON.stringify([...next])); } catch { /* ignore */ }
     return next;
   });
   // Shared by every widget on the page (Ingresos, Ventas, Leads, Mejor
@@ -408,27 +426,32 @@ export default function Dashboard() {
         </>
       )}
 
-      <div className={cn('grid grid-cols-1 gap-3 mb-4', showTopSeller && 'sm:grid-cols-2')}>
-        <MonthlyGoalCard goal={stats.monthlyGoal} achieved={stats.monthRevenue} formatValue={amount} />
-        {showTopSeller && (
-          <div className="bg-card rounded-2xl border border-border card-shadow p-3.5 h-full flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <Trophy className="w-3 h-3" />
-              </span>
-              <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Mejor vendedor</p>
+      {(() => {
+        const rowA = [
+          visibleWidgets.has('monthlyGoal') && <MonthlyGoalCard key="monthlyGoal" goal={stats.monthlyGoal} achieved={stats.monthRevenue} formatValue={amount} />,
+          showTopSeller && visibleWidgets.has('topSeller') && (
+            <div key="topSeller" className="bg-card rounded-2xl border border-border card-shadow p-3.5 h-full flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Trophy className="w-3 h-3" />
+                </span>
+                <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Mejor vendedor</p>
+              </div>
+              {stats.topSeller ? (
+                <>
+                  <p className="text-base font-bold tracking-tight truncate">{stats.topSeller.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{amount(stats.topSeller.revenue)} · {stats.topSeller.count} ventas</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin ventas en el período</p>
+              )}
             </div>
-            {stats.topSeller ? (
-              <>
-                <p className="text-base font-bold tracking-tight truncate">{stats.topSeller.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{amount(stats.topSeller.revenue)} · {stats.topSeller.count} ventas</p>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">Sin ventas en el período</p>
-            )}
-          </div>
-        )}
-      </div>
+          ),
+        ].filter(Boolean);
+        return rowA.length > 0 && (
+          <div className={cn('grid grid-cols-1 gap-3 mb-4', rowA.length > 1 && 'sm:grid-cols-2')}>{rowA}</div>
+        );
+      })()}
 
       {view === 'commerce' && (
         <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5 mb-4">
@@ -479,82 +502,146 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className={cn('grid grid-cols-1 gap-3 mb-4', !isVendedor && 'lg:grid-cols-2')}>
-      {!isVendedor && meetingsCard}
-      <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-3.5">
-          <h2 className="font-semibold text-sm">Funnel comercial</h2>
-          <button onClick={() => navigate('/pipeline')} className="text-xs text-primary font-medium inline-flex items-center gap-1 hover:gap-1.5 transition-all">Ver pipeline <ArrowRight className="w-3 h-3" /></button>
-        </div>
-        <div className="space-y-1.5">
-          {stats.funnel.map((f, i) => (
-            <div key={f.stage} className="flex items-center gap-2.5">
-              <span className="w-20 sm:w-24 text-xs text-muted-foreground shrink-0">{f.stage}</span>
-              <div className="flex-1 h-6 bg-secondary/50 rounded-lg overflow-hidden relative">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${(f.count / maxFunnel) * 100}%` }} transition={{ delay: i * 0.06, duration: 0.5, ease: 'easeOut' }}
-                  className="h-full rounded-lg flex items-center justify-end pr-2" style={{ background: `linear-gradient(90deg, hsl(var(--primary)/0.5), hsl(var(--primary)))` }}>
-                  <span className="text-[11px] font-semibold text-white">{f.count}</span>
-                </motion.div>
+      {(() => {
+        const rowB = [
+          !isVendedor && visibleWidgets.has('meetings') && <React.Fragment key="meetings">{meetingsCard}</React.Fragment>,
+          visibleWidgets.has('funnel') && (
+            <div key="funnel" className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-3.5">
+                <h2 className="font-semibold text-sm">Funnel comercial</h2>
+                <button onClick={() => navigate('/pipeline')} className="text-xs text-primary font-medium inline-flex items-center gap-1 hover:gap-1.5 transition-all">Ver pipeline <ArrowRight className="w-3 h-3" /></button>
+              </div>
+              <div className="space-y-1.5">
+                {stats.funnel.map((f, i) => (
+                  <div key={f.stage} className="flex items-center gap-2.5">
+                    <span className="w-20 sm:w-24 text-xs text-muted-foreground shrink-0">{f.stage}</span>
+                    <div className="flex-1 h-6 bg-secondary/50 rounded-lg overflow-hidden relative">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${(f.count / maxFunnel) * 100}%` }} transition={{ delay: i * 0.06, duration: 0.5, ease: 'easeOut' }}
+                        className="h-full rounded-lg flex items-center justify-end pr-2" style={{ background: `linear-gradient(90deg, hsl(var(--primary)/0.5), hsl(var(--primary)))` }}>
+                        <span className="text-[11px] font-semibold text-white">{f.count}</span>
+                      </motion.div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3.5 pt-3.5 border-t border-border grid grid-cols-2 gap-3">
+                <div><p className="text-xs text-muted-foreground">En proceso (pipeline)</p><p className="text-lg font-bold">{amount(stats.inPipeline)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Cobrado en período</p><p className="text-lg font-bold text-success">{amount(stats.collected)}</p></div>
+              </div>
+              {stats.funnelRecommendation && (
+                <button onClick={() => navigate('/pipeline')}
+                  className="mt-3.5 w-full flex items-start gap-2.5 p-3 rounded-xl bg-primary-soft/60 hover:bg-primary-soft transition-colors text-left">
+                  <span className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                    <Award className="w-3.5 h-3.5" />
+                  </span>
+                  <p className="text-sm min-w-0">
+                    <span className="font-semibold">{stats.funnelRecommendation.action}</span>{' '}
+                    {stats.funnelRecommendation.opportunity.client_name || 'este cliente'}
+                    <span className="text-muted-foreground"> — está en "{stats.funnelRecommendation.stage}" hace tiempo.</span>
+                  </p>
+                </button>
+              )}
+            </div>
+          ),
+        ].filter(Boolean);
+        return rowB.length > 0 && (
+          <div className={cn('grid grid-cols-1 gap-3 mb-4', rowB.length > 1 && 'lg:grid-cols-2')}>{rowB}</div>
+        );
+      })()}
+
+      {(() => {
+        const rowC = [
+          !isVendedor && visibleWidgets.has('tasks') && <React.Fragment key="tasks">{tasksCard}</React.Fragment>,
+          stats.channelSales.length > 0 && visibleWidgets.has('channelSales') && (
+            <div key="channelSales" className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-3.5">
+                <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Share2 className="w-4 h-4" />
+                </span>
+                <h2 className="font-semibold text-sm">Ventas por canal</h2>
+              </div>
+              <div className="space-y-3.5">
+                {stats.channelSales.map(c => (
+                  <ProgressBar key={c.name} label={c.name} value={c.revenue} max={stats.channelSales[0].revenue}
+                    formatValue={amount} sublabel={`${c.count} venta${c.count === 1 ? '' : 's'}`} />
+                ))}
               </div>
             </div>
-          ))}
-        </div>
-        <div className="mt-3.5 pt-3.5 border-t border-border grid grid-cols-2 gap-3">
-          <div><p className="text-xs text-muted-foreground">En proceso (pipeline)</p><p className="text-lg font-bold">{amount(stats.inPipeline)}</p></div>
-          <div><p className="text-xs text-muted-foreground">Cobrado en período</p><p className="text-lg font-bold text-success">{amount(stats.collected)}</p></div>
-        </div>
-        {stats.funnelRecommendation && (
-          <button onClick={() => navigate('/pipeline')}
-            className="mt-3.5 w-full flex items-start gap-2.5 p-3 rounded-xl bg-primary-soft/60 hover:bg-primary-soft transition-colors text-left">
-            <span className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
-              <Award className="w-3.5 h-3.5" />
-            </span>
-            <p className="text-sm min-w-0">
-              <span className="font-semibold">{stats.funnelRecommendation.action}</span>{' '}
-              {stats.funnelRecommendation.opportunity.client_name || 'este cliente'}
-              <span className="text-muted-foreground"> — está en "{stats.funnelRecommendation.stage}" hace tiempo.</span>
-            </p>
-          </button>
-        )}
-      </div>
-      </div>
-
-      <div className={cn('grid grid-cols-1 gap-3 sm:gap-4 mb-4', !isVendedor ? 'lg:grid-cols-3' : 'lg:grid-cols-2')}>
-        {!isVendedor && tasksCard}
-
-        {stats.channelSales.length > 0 && (
-          <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-            <div className="flex items-center gap-2 mb-3.5">
-              <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <Share2 className="w-4 h-4" />
-              </span>
-              <h2 className="font-semibold text-sm">Ventas por canal</h2>
+          ),
+          visibleWidgets.has('topClients') && (
+            <div key="topClients" className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-2.5">
+                <h2 className="font-semibold text-sm">Clientes de mayor valor</h2>
+                <button onClick={() => navigate('/clientes')} className="text-xs text-primary font-medium inline-flex items-center gap-1 hover:gap-1.5 transition-all">Ver todos <ArrowRight className="w-3 h-3" /></button>
+              </div>
+              <div className="space-y-1">
+                {stats.topClients.length === 0 && <p className="text-sm text-muted-foreground py-3 text-center">Sin clientes aún</p>}
+                {stats.topClients.map((c, i) => (
+                  <button key={c.id} onClick={() => navigate(`/clientes/${c.id}`)} className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-accent/50 transition-colors text-left">
+                    <span className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/60 text-white flex items-center justify-center text-xs font-semibold shrink-0">{i + 1}</span>
+                    <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{c.name}</p><p className="text-xs text-muted-foreground truncate">{c.company || c.segment || 'Cliente'}</p></div>
+                    <span className="text-sm font-semibold">{amount(c.total_sold)}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-3.5">
-              {stats.channelSales.map(c => (
-                <ProgressBar key={c.name} label={c.name} value={c.revenue} max={stats.channelSales[0].revenue}
-                  formatValue={amount} sublabel={`${c.count} venta${c.count === 1 ? '' : 's'}`} />
-              ))}
-            </div>
-          </div>
-        )}
+          ),
+        ].filter(Boolean);
+        return rowC.length > 0 && (
+          <div className={cn('grid grid-cols-1 gap-3 sm:gap-4 mb-4', rowC.length >= 3 ? 'lg:grid-cols-3' : rowC.length === 2 ? 'lg:grid-cols-2' : '')}>{rowC}</div>
+        );
+      })()}
 
-        <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-2.5">
-            <h2 className="font-semibold text-sm">Clientes de mayor valor</h2>
-            <button onClick={() => navigate('/clientes')} className="text-xs text-primary font-medium inline-flex items-center gap-1 hover:gap-1.5 transition-all">Ver todos <ArrowRight className="w-3 h-3" /></button>
-          </div>
-          <div className="space-y-1">
-            {stats.topClients.length === 0 && <p className="text-sm text-muted-foreground py-3 text-center">Sin clientes aún</p>}
-            {stats.topClients.map((c, i) => (
-              <button key={c.id} onClick={() => navigate(`/clientes/${c.id}`)} className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-accent/50 transition-colors text-left">
-                <span className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/60 text-white flex items-center justify-center text-xs font-semibold shrink-0">{i + 1}</span>
-                <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{c.name}</p><p className="text-xs text-muted-foreground truncate">{c.company || c.segment || 'Cliente'}</p></div>
-                <span className="text-sm font-semibold">{amount(c.total_sold)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+      <OptionalWidgetsBar
+        visibleWidgets={visibleWidgets}
+        onToggle={toggleWidget}
+        isVendedor={isVendedor}
+        showTopSeller={showTopSeller}
+        hasChannelSales={stats.channelSales.length > 0}
+      />
+    </div>
+  );
+}
+
+const OPTIONAL_WIDGET_DEFS = [
+  { key: 'monthlyGoal', label: 'Meta mensual' },
+  { key: 'topSeller', label: 'Mejor vendedor', when: 'showTopSeller' },
+  { key: 'meetings', label: 'Próximas reuniones', when: 'notVendedor' },
+  { key: 'funnel', label: 'Funnel comercial' },
+  { key: 'tasks', label: 'Tareas pendientes', when: 'notVendedor' },
+  { key: 'channelSales', label: 'Ventas por canal', when: 'hasChannelSales' },
+  { key: 'topClients', label: 'Clientes de mayor valor' },
+];
+
+// Widgets opcionales apagados por default (ver comentario junto al estado
+// `visibleWidgets` en Dashboard) — esto es la fila de botones para
+// prenderlos/apagarlos, siempre al final de la página.
+function OptionalWidgetsBar({ visibleWidgets, onToggle, isVendedor, showTopSeller, hasChannelSales }) {
+  const available = OPTIONAL_WIDGET_DEFS.filter(w => {
+    if (w.when === 'showTopSeller') return showTopSeller;
+    if (w.when === 'notVendedor') return !isVendedor;
+    if (w.when === 'hasChannelSales') return hasChannelSales;
+    return true;
+  });
+  if (available.length === 0) return null;
+
+  return (
+    <div className="bg-card rounded-2xl border border-border card-shadow p-4 sm:p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <LayoutGrid className="w-4 h-4 text-muted-foreground" />
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agregar al dashboard</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {available.map(w => {
+          const active = visibleWidgets.has(w.key);
+          return (
+            <button key={w.key} onClick={() => onToggle(w.key)}
+              className={cn('inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors',
+                active ? 'bg-primary text-primary-foreground' : 'bg-secondary border border-border hover:bg-accent')}>
+              {active ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} {w.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
