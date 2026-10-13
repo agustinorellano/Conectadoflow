@@ -210,10 +210,18 @@ const documents = {
 // public.platform_admins (see 0006_platform_admin.sql); every RPC call
 // re-checks that server-side and throws for anyone else.
 const admin = {
-  async listOrganizations() {
-    const { data, error } = await supabase.rpc('admin_list_organizations');
+  // search/industry/mode/minUsers combinables; sort en {name, member_count,
+  // sales_count, total_revenue, created_date}. Devuelve también
+  // total_count (misma cifra en cada fila, vía count(*) over()) para
+  // poder paginar sin una segunda consulta.
+  async listOrganizations({ search, industry, mode, minUsers, sort = 'created_date', sortDir = 'desc', page = 1, pageSize = 20 } = {}) {
+    const { data, error } = await supabase.rpc('admin_list_organizations', {
+      p_search: search || null, p_industry: industry || null, p_mode: mode || null,
+      p_min_users: minUsers || null, p_sort: sort, p_sort_dir: sortDir,
+      p_page: page, p_page_size: pageSize,
+    });
     if (error) throw error;
-    return data || [];
+    return { rows: data || [], total: data?.[0]?.total_count ?? 0 };
   },
   async listUsers() {
     const { data, error } = await supabase.rpc('admin_list_users');

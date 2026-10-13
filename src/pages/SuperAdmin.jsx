@@ -1,19 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2 } from 'lucide-react';
+import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
 import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
 import DeleteOrganizationModal from '@/components/DeleteOrganizationModal';
+import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
+
+const PAGE_SIZE = 20;
+const SORT_OPTIONS = [
+  { value: 'created_date', label: 'Fecha de alta' },
+  { value: 'name', label: 'Nombre' },
+  { value: 'member_count', label: 'Usuarios' },
+  { value: 'sales_count', label: 'Ventas' },
+  { value: 'total_revenue', label: 'Facturado' },
+];
 
 export default function SuperAdmin() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [orgs, setOrgs] = useState([]);
+  const [orgsTotal, setOrgsTotal] = useState(0);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('orgs');
@@ -21,11 +32,27 @@ export default function SuperAdmin() {
   const [loadError, setLoadError] = useState('');
   const [deleteOrg, setDeleteOrg] = useState(null);
 
+  // Filtros combinables del listado de organizaciones (Etapa 2).
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [mode, setMode] = useState('');
+  const [minUsers, setMinUsers] = useState('');
+  const [sort, setSort] = useState('created_date');
+  const [sortDir, setSortDir] = useState('desc');
+  const [page, setPage] = useState(1);
+
   useEffect(() => {
     if (user && !user.is_platform_admin) {
       navigate('/', { replace: true });
     }
   }, [user, navigate]);
+
+  // Debounce: no dispara una query por cada tecla.
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   // Antes tragaba cualquier error de admin_list_organizations/admin_list_users
   // (.catch(() => [])) y mostraba 0/0 sin ninguna pista de qué pasó — si la
@@ -37,17 +64,24 @@ export default function SuperAdmin() {
     setLoadError('');
     try {
       const [o, u] = await Promise.allSettled([
-        base44.admin.listOrganizations(),
+        base44.admin.listOrganizations({
+          search, industry, mode, minUsers: minUsers ? Number(minUsers) : null,
+          sort, sortDir, page, pageSize: PAGE_SIZE,
+        }),
         base44.admin.listUsers(),
       ]);
-      if (o.status === 'fulfilled') setOrgs(o.value); else setOrgs([]);
+      if (o.status === 'fulfilled') { setOrgs(o.value.rows); setOrgsTotal(o.value.total); } else { setOrgs([]); setOrgsTotal(0); }
       if (u.status === 'fulfilled') setUsers(u.value); else setUsers([]);
       const failed = [o, u].find(r => r.status === 'rejected');
       if (failed) setLoadError(failed.reason?.message || 'No se pudieron cargar los datos');
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { if (user?.is_platform_admin) load(); }, [user]);
+  useEffect(() => { if (user?.is_platform_admin) load(); }, [user, search, industry, mode, minUsers, sort, sortDir, page]);
+
+  const totalPages = Math.max(1, Math.ceil(orgsTotal / PAGE_SIZE));
+  const clearFilters = () => { setSearchInput(''); setSearch(''); setIndustry(''); setMode(''); setMinUsers(''); setPage(1); };
+  const hasFilters = search || industry || mode || minUsers;
 
   const toggleOrg = async (org) => {
     setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, is_active: !o.is_active } : o));
@@ -77,15 +111,46 @@ export default function SuperAdmin() {
       )}
 
       <div className="flex items-center gap-1.5 p-1 bg-secondary/60 rounded-xl w-fit mb-6">
-        <button onClick={() => setTab('orgs')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'orgs' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Organizaciones ({orgs.length})</button>
+        <button onClick={() => setTab('orgs')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'orgs' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Organizaciones ({orgsTotal})</button>
         <button onClick={() => setTab('users')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'users' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Usuarios ({users.length})</button>
       </div>
+
+      {tab === 'orgs' && (
+        <div className="bg-card rounded-2xl border border-border card-shadow p-3 sm:p-4 mb-4 space-y-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Buscar por nombre, email o contacto…"
+              className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={industry} onChange={e => { setIndustry(e.target.value); setPage(1); }} placeholder="Rubro"
+              className="w-36 px-3 py-2 rounded-lg border border-input bg-background text-xs outline-none focus:ring-2 focus:ring-primary/30" />
+            <StyledSelect value={mode} onChange={e => { setMode(e.target.value); setPage(1); }} className="w-40 px-3 py-2 rounded-lg border border-input bg-background text-xs">
+              <option value="">Tipo de cuenta (todos)</option>
+              <option value="Independiente">Independiente</option>
+              <option value="Equipo">Equipo</option>
+            </StyledSelect>
+            <input type="number" min="0" value={minUsers} onChange={e => { setMinUsers(e.target.value); setPage(1); }} placeholder="Mín. usuarios"
+              className="w-32 px-3 py-2 rounded-lg border border-input bg-background text-xs outline-none focus:ring-2 focus:ring-primary/30" />
+            <span className="w-px h-6 bg-border mx-1" />
+            <StyledSelect value={sort} onChange={e => setSort(e.target.value)} className="w-40 px-3 py-2 rounded-lg border border-input bg-background text-xs">
+              {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </StyledSelect>
+            <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent text-muted-foreground" title={sortDir === 'asc' ? 'Ascendente' : 'Descendente'}>
+              <ArrowUpDown className="w-3.5 h-3.5" />
+            </button>
+            {hasFilters && (
+              <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground underline ml-1">Limpiar filtros</button>
+            )}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-16 text-muted-foreground">Cargando…</div>
       ) : tab === 'orgs' ? (
         <div className="space-y-3">
-          {orgs.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">Sin organizaciones aún</p>}
+          {orgs.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">{hasFilters ? 'Ninguna organización coincide con estos filtros.' : 'Sin organizaciones aún'}</p>}
           {orgs.map(o => (
             <div key={o.id} className="bg-card rounded-2xl border border-border card-shadow p-4">
               <div className="flex items-center gap-4 flex-wrap mb-3">
@@ -99,11 +164,11 @@ export default function SuperAdmin() {
                 <div className="flex items-center gap-4 text-sm">
                   <div className="text-center">
                     <p className="font-semibold">{o.member_count}</p>
-                    <p className="text-[11px] text-muted-foreground">miembros</p>
+                    <p className="text-[11px] text-muted-foreground">usuarios</p>
                   </div>
                   <div className="text-center">
                     <p className="font-semibold">{o.sales_count}</p>
-                    <p className="text-[11px] text-muted-foreground">ventas</p>
+                    <p className="text-[11px] text-muted-foreground">facturas</p>
                   </div>
                   <div className="text-center">
                     <p className="font-semibold">{formatCurrency(o.total_revenue, 'ARS')}</p>
@@ -126,8 +191,25 @@ export default function SuperAdmin() {
                 <InfoField icon={Phone} label="Teléfono" value={o.admin_phone || o.billing_phone || '—'} />
               </div>
               {o.admin_name && <p className="text-xs text-muted-foreground mt-2">Admin: {o.admin_name}</p>}
+
+              <div className="flex items-center gap-4 flex-wrap mt-3 pt-3 border-t border-border/70 text-xs text-muted-foreground">
+                <CountPill icon={Store} value={o.commerces_count} label="comercios" />
+                <CountPill icon={GitBranch} value={o.branches_count} label="sucursales" />
+                <CountPill icon={Package} value={o.products_count} label="productos" />
+                <CountPill icon={UserPlus} value={o.leads_count} label="leads" />
+                <CountPill icon={Contact} value={o.clients_count} label="clientes" />
+              </div>
             </div>
           ))}
+          {orgsTotal > PAGE_SIZE && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-muted-foreground">Página {page} de {totalPages} · {orgsTotal} organizaciones</p>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -154,6 +236,14 @@ export default function SuperAdmin() {
       <NotifyModal target={notifyTarget} onClose={() => setNotifyTarget(null)} />
       <DeleteOrganizationModal org={deleteOrg} onClose={() => setDeleteOrg(null)} onDeleted={load} />
     </div>
+  );
+}
+
+function CountPill({ icon: Icon, value, label }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Icon className="w-3 h-3" /> <span className="font-medium text-foreground">{value ?? 0}</span> {label}
+    </span>
   );
 }
 
