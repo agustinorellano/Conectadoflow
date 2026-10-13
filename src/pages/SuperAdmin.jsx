@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact, AlertTriangle } from 'lucide-react';
+import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact, AlertTriangle, ShieldCheck, History } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
@@ -133,6 +133,7 @@ export default function SuperAdmin() {
         <button onClick={() => setTab('orgs')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'orgs' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Organizaciones ({orgsTotal})</button>
         <button onClick={() => setTab('users')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'users' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Usuarios ({users.length})</button>
         <button onClick={() => setTab('reportes')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'reportes' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Reportes</button>
+        <button onClick={() => setTab('permisos')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'permisos' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Permisos</button>
       </div>
 
       {tab === 'orgs' && (
@@ -275,8 +276,10 @@ export default function SuperAdmin() {
             </div>
           ))}
         </div>
-      ) : (
+      ) : tab === 'reportes' ? (
         <ReportsTab />
+      ) : (
+        <PermissionsTab currentUserEmail={user?.email} />
       )}
 
       <NotifyModal target={notifyTarget} onClose={() => setNotifyTarget(null)} />
@@ -345,6 +348,128 @@ function ReportsTab() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Pestaña "Permisos" (Etapa 7) — el backend ya existía desde la Etapa 1
+// (admin_grant_platform_admin/admin_revoke_platform_admin, auditados y
+// con guarda para no dejar la plataforma sin ningún superadmin); esto es
+// la UI que faltaba, para no tener que seguir dando de alta por SQL.
+function PermissionsTab({ currentUserEmail }) {
+  const [admins, setAdmins] = useState([]);
+  const [auditLog, setAuditLog] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [confirmGrant, setConfirmGrant] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(null); // email | null
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  const load = () => {
+    setLoading(true); setError('');
+    Promise.all([base44.admin.listPlatformAdmins(), base44.admin.listAuditLog(50)])
+      .then(([a, l]) => { setAdmins(a); setAuditLog(l); })
+      .catch(e => setError(e.message || 'No se pudo cargar'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const grant = async () => {
+    setBusy(true); setActionError('');
+    try {
+      await base44.admin.grantPlatformAdmin(newEmail.trim());
+      setNewEmail(''); setConfirmGrant(false);
+      load();
+    } catch (e) { setActionError(e.message || 'No se pudo otorgar el acceso'); }
+    finally { setBusy(false); }
+  };
+
+  const revoke = async (email) => {
+    setBusy(true); setActionError('');
+    try {
+      await base44.admin.revokePlatformAdmin(email);
+      setConfirmRevoke(null);
+      load();
+    } catch (e) { setActionError(e.message || 'No se pudo quitar el acceso'); }
+    finally { setBusy(false); }
+  };
+
+  if (loading) return <div className="text-center py-16 text-muted-foreground">Cargando…</div>;
+  if (error) return <div className="p-4 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-card rounded-2xl border border-border card-shadow p-5 space-y-4">
+        <h2 className="font-semibold flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Superadministradores de la plataforma</h2>
+        <p className="text-sm text-muted-foreground">Tienen acceso a este panel global, independiente de cualquier rol dentro de una organización. No se puede quitar al último que queda.</p>
+
+        <div className="space-y-2">
+          {admins.map(a => (
+            <div key={a.email} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border">
+              <span className="text-sm font-medium truncate">
+                {a.email} {a.email === currentUserEmail && <span className="text-xs text-muted-foreground font-normal">(vos)</span>}
+              </span>
+              <button onClick={() => setConfirmRevoke(a.email)} disabled={admins.length <= 1}
+                className="text-xs text-destructive hover:underline disabled:opacity-40 disabled:no-underline shrink-0" title={admins.length <= 1 ? 'No se puede quitar al único superadministrador' : 'Quitar acceso'}>
+                Quitar acceso
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 pt-3 border-t border-border/70">
+          <input value={newEmail} onChange={e => setNewEmail(e.target.value)} type="email" placeholder="email@ejemplo.com"
+            className="flex-1 px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+          <button onClick={() => setConfirmGrant(true)} disabled={!newEmail.trim()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 shrink-0">
+            <UserPlus className="w-4 h-4" /> Otorgar acceso
+          </button>
+        </div>
+        {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+      </div>
+
+      <div className="bg-card rounded-2xl border border-border card-shadow p-5 space-y-3">
+        <h2 className="font-semibold flex items-center gap-2"><History className="w-4 h-4" /> Historial de auditoría</h2>
+        {auditLog.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">Sin acciones administrativas registradas todavía.</p>
+        ) : (
+          <div className="space-y-2">
+            {auditLog.map(a => (
+              <div key={a.id} className="flex items-center gap-3 flex-wrap text-sm py-2 border-b border-border/50 last:border-0">
+                <span className="font-medium">{a.action}</span>
+                <span className="text-muted-foreground">{a.actor_email}</span>
+                {a.target_organization_id && (
+                  <Link to={`/super-admin/organizaciones/${a.target_organization_id}`} className="text-primary hover:underline text-xs">
+                    {a.target_organization_name || 'organización'}
+                  </Link>
+                )}
+                <span className="text-xs text-muted-foreground ml-auto">{formatDateTime(a.created_date)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Modal open={confirmGrant} onClose={() => setConfirmGrant(false)} title="Otorgar acceso de superadministrador"
+        subtitle={`${newEmail.trim()} va a poder consultar y gestionar TODAS las organizaciones de la plataforma.`}
+        footer={<>
+          <button onClick={() => setConfirmGrant(false)} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
+          <button onClick={grant} disabled={busy} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{busy ? 'Otorgando…' : 'Confirmar'}</button>
+        </>}>
+        <p className="text-sm text-muted-foreground">Esta acción queda registrada en el historial de auditoría.</p>
+      </Modal>
+
+      <Modal open={!!confirmRevoke} onClose={() => setConfirmRevoke(null)} title="Quitar acceso de superadministrador"
+        subtitle={confirmRevoke || ''}
+        footer={<>
+          <button onClick={() => setConfirmRevoke(null)} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
+          <button onClick={() => revoke(confirmRevoke)} disabled={busy} className="px-4 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">{busy ? 'Quitando…' : 'Quitar acceso'}</button>
+        </>}>
+        <p className="text-sm text-muted-foreground">Esta persona deja de poder acceder al panel global. Queda registrado en el historial de auditoría.</p>
+      </Modal>
     </div>
   );
 }
