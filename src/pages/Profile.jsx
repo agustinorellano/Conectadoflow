@@ -288,8 +288,8 @@ function SupportReportCard() {
   };
 
   return (
-    <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 mb-6 space-y-4">
-      <h2 className="font-semibold flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Reportar un problema</h2>
+    <div className="bg-card rounded-2xl border border-destructive/30 card-shadow p-5 sm:p-6 mb-6 space-y-4">
+      <h2 className="font-semibold flex items-center gap-2 text-destructive"><ShieldAlert className="w-4 h-4" /> Reportar un problema</h2>
       <p className="text-sm text-muted-foreground">
         Si algo no funciona como esperás en Conectado Flow, contanos acá. Lo recibe directo el equipo de la plataforma.
       </p>
@@ -300,7 +300,7 @@ function SupportReportCard() {
           placeholder="Contanos qué pasó, en qué pantalla y qué esperabas que pasara…" className="inp resize-none" />
         <div className="flex items-center gap-3">
           <button onClick={submit} disabled={sending || !form.title.trim() || !form.description.trim()}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-destructive text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
             <Send className="w-4 h-4" /> {sending ? 'Enviando…' : 'Enviar reporte'}
           </button>
           {sent && <span className="inline-flex items-center gap-1 text-sm text-success"><Check className="w-4 h-4" /> Enviado</span>}
