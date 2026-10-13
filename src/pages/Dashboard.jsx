@@ -33,6 +33,16 @@ export default function Dashboard() {
   const { filterByCommerce, currentCommerceId, setCurrentCommerceId, commerces } = useCommerce();
   const [view, setView] = useState('general');
   const [hideAmounts, setHideAmounts] = useState(false);
+  // Preferencia de pantalla, no un dato — se guarda en localStorage (no en
+  // la cuenta) para no andar sincronizando algo tan menor con el backend.
+  const [showIncomeChart, setShowIncomeChart] = useState(() => {
+    try { return localStorage.getItem('cf_show_income_chart') !== '0'; } catch { return true; }
+  });
+  const toggleIncomeChart = () => setShowIncomeChart(prev => {
+    const next = !prev;
+    try { localStorage.setItem('cf_show_income_chart', next ? '1' : '0'); } catch { /* ignore */ }
+    return next;
+  });
   // Shared by every widget on the page (Ingresos, Ventas, Leads, Mejor
   // vendedor, Funnel) — the pills live inside IncomeReportCard, but
   // changing them now moves the whole dashboard's window, not just that
@@ -383,6 +393,8 @@ export default function Dashboard() {
                 onToggleHidden={() => setHideAmounts(!hideAmounts)}
                 period={period}
                 onPeriodChange={setPeriod}
+                showChart={showIncomeChart}
+                onToggleChart={toggleIncomeChart}
               />
               <RecentSalesTable sales={stats.recentSales} formatValue={amount} onRowClick={() => navigate('/ventas')} />
             </div>

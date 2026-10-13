@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Eye, EyeOff, TrendingUp, TrendingDown } from 'lucide-react';
+import { DollarSign, Eye, EyeOff, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { fetchRates, convertAmount } from '@/lib/currencyRates';
 import { buildPeriodSeries } from '@/lib/salesSeries';
 import { inPeriod, previousPeriodAmount, variation as calcVariation } from '@/lib/flowUtils';
@@ -43,7 +43,7 @@ function ChartTooltip({ active, payload, label, formatValue }) {
 // is controlled by the parent (Dashboard) so every other widget on the
 // page — Ventas, Leads, Mejor vendedor, Funnel — shares the exact same
 // window instead of each one quietly meaning something different.
-export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, onToggleHidden, period: chartPeriod, onPeriodChange }) {
+export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, onToggleHidden, period: chartPeriod, onPeriodChange, showChart = true, onToggleChart }) {
   const [rates, setRates] = useState(null);
   const [error, setError] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('BASE');
@@ -136,39 +136,50 @@ export default function IncomeReportCard({ sales, baseCurrency = 'ARS', hidden, 
       <p className="text-[32px] sm:text-[36px] font-bold tracking-tight leading-none">
         {hidden ? '••••••' : error ? '—' : display.value == null ? 'Cargando…' : `${display.prefix} ${display.value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
       </p>
-      {variationPct !== undefined && variationPct !== null && (
-        <p className={cn('inline-flex items-center gap-1 text-[13px] font-medium mt-1.5', positive ? 'text-success' : 'text-destructive')}>
-          {positive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-          {positive ? '+' : ''}{variationPct.toFixed(1)}% vs. período anterior
-        </p>
-      )}
-
-      <div className="flex items-center gap-1 p-0.5 bg-secondary/60 rounded-lg w-fit mt-4 overflow-x-auto no-scrollbar">
-        {CHART_PERIODS.map(p => (
-          <button
-            key={p.key}
-            onClick={() => onPeriodChange(p.key)}
-            className={cn(
-              'px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors',
-              chartPeriod === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {p.label}
+      <div className="flex items-center gap-3 flex-wrap mt-1.5">
+        {variationPct !== undefined && variationPct !== null && (
+          <p className={cn('inline-flex items-center gap-1 text-[13px] font-medium', positive ? 'text-success' : 'text-destructive')}>
+            {positive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+            {positive ? '+' : ''}{variationPct.toFixed(1)}% vs. período anterior
+          </p>
+        )}
+        {onToggleChart && (
+          <button onClick={onToggleChart} className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground hover:text-foreground ml-auto">
+            {showChart ? <>Ocultar gráfico <ChevronUp className="w-3.5 h-3.5" /></> : <>Mostrar gráfico <ChevronDown className="w-3.5 h-3.5" /></>}
           </button>
-        ))}
+        )}
       </div>
 
-      <div className="h-[200px] -mx-2 mt-2">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
-            <YAxis hide />
-            <Tooltip content={<ChartTooltip formatValue={(v) => hidden ? '••••••' : `${display.prefix} ${v.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`} />} />
-            <Line type="monotone" dataKey="v" stroke="#465BE8" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      {showChart && (
+        <>
+          <div className="flex items-center gap-1 p-0.5 bg-secondary/60 rounded-lg w-fit mt-4 overflow-x-auto no-scrollbar">
+            {CHART_PERIODS.map(p => (
+              <button
+                key={p.key}
+                onClick={() => onPeriodChange(p.key)}
+                className={cn(
+                  'px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors',
+                  chartPeriod === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-[200px] -mx-2 mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
+                <YAxis hide />
+                <Tooltip content={<ChartTooltip formatValue={(v) => hidden ? '••••••' : `${display.prefix} ${v.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`} />} />
+                <Line type="monotone" dataKey="v" stroke="#465BE8" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
     </div>
   );
 }
