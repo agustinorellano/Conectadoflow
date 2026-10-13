@@ -302,10 +302,17 @@ const admin = {
     if (error) throw error;
     return data || [];
   },
-  // orgId null = broadcast to every organization on the platform.
-  async sendNotification(orgId, title, message) {
+  // orgIds null/undefined = broadcast a toda la plataforma; un array = esas
+  // organizaciones puntuales (una sola, o un grupo armado con los filtros
+  // del listado — Etapa 6).
+  async countNotificationTargets(orgIds) {
+    const { data, error } = await supabase.rpc('admin_count_notification_targets', { org_ids: orgIds || null });
+    if (error) throw error;
+    return data?.[0] || { org_count: 0, user_count: 0 };
+  },
+  async sendNotification(orgIds, title, message) {
     const { data, error } = await supabase.rpc('admin_send_notification', {
-      org_id: orgId, notif_title: title, notif_message: message,
+      org_ids: orgIds || null, notif_title: title, notif_message: message,
     });
     if (error) throw error;
     return data; // number of notifications created

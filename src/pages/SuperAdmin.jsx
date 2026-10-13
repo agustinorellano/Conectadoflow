@@ -29,9 +29,10 @@ export default function SuperAdmin() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('orgs');
-  const [notifyTarget, setNotifyTarget] = useState(null); // { orgId, orgName } | 'broadcast' | null
+  const [notifyTarget, setNotifyTarget] = useState(null); // { orgIds, label } | 'broadcast' | null
   const [loadError, setLoadError] = useState('');
   const [deleteOrg, setDeleteOrg] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
 
   // Filtros combinables del listado de organizaciones (Etapa 2).
   const [searchInput, setSearchInput] = useState('');
@@ -90,6 +91,23 @@ export default function SuperAdmin() {
     catch { setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, is_active: org.is_active } : o)); }
   };
 
+  const toggleSelected = (id) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const allVisibleSelected = orgs.length > 0 && orgs.every(o => selected.has(o.id));
+  const toggleSelectAllVisible = () => setSelected(prev => {
+    if (allVisibleSelected) {
+      const next = new Set(prev);
+      orgs.forEach(o => next.delete(o.id));
+      return next;
+    }
+    const next = new Set(prev);
+    orgs.forEach(o => next.add(o.id));
+    return next;
+  });
+
   if (!user?.is_platform_admin) return null;
 
   return (
@@ -145,6 +163,22 @@ export default function SuperAdmin() {
               <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground underline ml-1">Limpiar filtros</button>
             )}
           </div>
+          <div className="flex items-center gap-2 pt-1 border-t border-border/70">
+            <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+              <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} className="rounded" />
+              Seleccionar todas las visibles
+            </label>
+            {selected.size > 0 && (
+              <>
+                <span className="text-xs text-muted-foreground">· {selected.size} seleccionada{selected.size === 1 ? '' : 's'}</span>
+                <button onClick={() => setNotifyTarget({ orgIds: [...selected], label: `${selected.size} organización(es) seleccionada(s)` })}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
+                  <Send className="w-3.5 h-3.5" /> Notificar a selección
+                </button>
+                <button onClick={() => setSelected(new Set())} className="text-xs text-muted-foreground hover:text-foreground underline">Limpiar selección</button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -154,8 +188,9 @@ export default function SuperAdmin() {
         <div className="space-y-3">
           {orgs.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">{hasFilters ? 'Ninguna organización coincide con estos filtros.' : 'Sin organizaciones aún'}</p>}
           {orgs.map(o => (
-            <div key={o.id} className="bg-card rounded-2xl border border-border card-shadow p-4">
+            <div key={o.id} className={`bg-card rounded-2xl border card-shadow p-4 ${selected.has(o.id) ? 'border-primary' : 'border-border'}`}>
               <div className="flex items-center gap-4 flex-wrap mb-3">
+                <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelected(o.id)} className="rounded shrink-0" />
                 <span className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                   <Building2 className="w-5 h-5" />
                 </span>
@@ -184,7 +219,7 @@ export default function SuperAdmin() {
                     <p className="text-[11px] text-muted-foreground">facturado</p>
                   </div>
                 </div>
-                <button onClick={() => setNotifyTarget({ orgId: o.id, orgName: o.name })} className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-primary transition-colors shrink-0" title="Enviar notificación">
+                <button onClick={() => setNotifyTarget({ orgIds: [o.id], label: o.name })} className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-primary transition-colors shrink-0" title="Enviar notificación">
                   <Send className="w-4 h-4" />
                 </button>
                 <button onClick={() => setDeleteOrg(o)} className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0" title="Eliminar organización">
@@ -334,27 +369,46 @@ function InfoField({ icon: Icon, label, value }) {
   );
 }
 
+// Flujo de 3 pasos (Etapa 6): redactar -> resumen de alcance (cuántas
+// organizaciones/usuarios lo van a recibir, antes de mandar nada) ->
+// confirmar. "Notificación masiva" (broadcast) y la fila/selección
+// comparten este mismo modal.
 function NotifyModal({ target, onClose }) {
+  const [step, setStep] = useState('compose'); // compose | review | done
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
   const isBroadcast = target === 'broadcast';
+  const orgIds = isBroadcast ? null : target?.orgIds;
   const open = !!target;
 
   useEffect(() => {
-    if (open) { setTitle(''); setMessage(''); setResult(null); setError(''); }
+    if (open) { setStep('compose'); setTitle(''); setMessage(''); setPreview(null); setResult(null); setError(''); }
   }, [open]);
 
-  const send = async () => {
+  const goToReview = async () => {
     if (!title.trim() || !message.trim()) return;
+    setLoadingPreview(true); setError('');
+    try {
+      const counts = await base44.admin.countNotificationTargets(orgIds);
+      setPreview(counts);
+      setStep('review');
+    } catch (e) {
+      setError(e.message || 'No se pudo calcular el alcance');
+    } finally { setLoadingPreview(false); }
+  };
+
+  const confirmSend = async () => {
     setSending(true); setError('');
     try {
-      const orgId = isBroadcast ? null : target.orgId;
-      const count = await base44.admin.sendNotification(orgId, title.trim(), message.trim());
+      const count = await base44.admin.sendNotification(orgIds, title.trim(), message.trim());
       setResult(count);
+      setStep('done');
     } catch (e) {
       setError(e.message || 'No se pudo enviar');
     } finally { setSending(false); }
@@ -364,14 +418,24 @@ function NotifyModal({ target, onClose }) {
     <Modal
       open={open}
       onClose={onClose}
-      title={isBroadcast ? 'Notificación masiva' : `Notificar a ${target?.orgName || ''}`}
-      subtitle={isBroadcast ? 'Se envía a todos los usuarios de todas las organizaciones' : 'Se envía a todos los miembros de esta organización'}
+      title={isBroadcast ? 'Notificación masiva' : `Notificar a ${target?.label || ''}`}
+      subtitle={
+        step === 'compose' ? (isBroadcast ? 'Se envía a todos los usuarios de todas las organizaciones' : 'Redactá el mensaje — el alcance se confirma en el próximo paso')
+        : step === 'review' ? 'Revisá el alcance antes de confirmar' : undefined
+      }
       footer={
-        result == null ? (
+        step === 'compose' ? (
           <>
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Cancelar</button>
-            <button onClick={send} disabled={sending || !title.trim() || !message.trim()} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
-              {sending ? 'Enviando…' : 'Enviar'}
+            <button onClick={goToReview} disabled={loadingPreview || !title.trim() || !message.trim()} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
+              {loadingPreview ? 'Calculando…' : 'Continuar'}
+            </button>
+          </>
+        ) : step === 'review' ? (
+          <>
+            <button onClick={() => setStep('compose')} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-accent">Volver</button>
+            <button onClick={confirmSend} disabled={sending} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
+              {sending ? 'Enviando…' : 'Confirmar envío'}
             </button>
           </>
         ) : (
@@ -379,8 +443,20 @@ function NotifyModal({ target, onClose }) {
         )
       }
     >
-      {result != null ? (
-        <p className="text-sm text-center py-4">Notificación enviada a <span className="font-semibold">{result}</span> usuario{result === 1 ? '' : 's'}.</p>
+      {step === 'done' ? (
+        <p className="text-sm text-center py-4">Notificación creada para <span className="font-semibold">{result}</span> usuario{result === 1 ? '' : 's'}.</p>
+      ) : step === 'review' ? (
+        <div className="space-y-3">
+          <div className="p-4 rounded-xl bg-secondary/60 space-y-1 text-sm">
+            <p>Organizaciones destinatarias: <span className="font-semibold">{preview?.org_count ?? 0}</span></p>
+            <p>Usuarios que la van a recibir: <span className="font-semibold">{preview?.user_count ?? 0}</span></p>
+          </div>
+          <div className="p-3.5 rounded-xl border border-border">
+            <p className="text-sm font-semibold">{title}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{message}</p>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
       ) : (
         <div className="space-y-3">
           <div>
