@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Lock, Bell, Check, Save, Shield, Mail, Upload, Camera } from 'lucide-react';
+import { User, Lock, Bell, Check, Save, Shield, Mail, Upload, Camera, CalendarDays, RefreshCw, Unlink } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
 import { roleLabel } from '@/lib/roles';
+import { googleCalendar, getGoogleAuthUrl } from '@/lib/googleCalendar';
 
 export default function Profile() {
   const { user, checkUserAuth } = useAuth();
@@ -139,6 +140,8 @@ export default function Profile() {
         </Link>
       </div>
 
+      <GoogleCalendarCard />
+
       <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 space-y-4">
         <h2 className="font-semibold flex items-center gap-2"><Bell className="w-4 h-4" /> Preferencias de notificaciones</h2>
         <div className="space-y-1">
@@ -157,6 +160,88 @@ export default function Profile() {
         </div>
       </div>
       <style>{`.inp{width:100%;padding:0.625rem 0.875rem;border-radius:0.75rem;border:1px solid hsl(var(--input));background:hsl(var(--background));font-size:0.875rem;outline:none}.inp:focus{border-color:hsl(var(--primary));box-shadow:0 0 0 2px hsl(var(--primary)/0.3)}`}</style>
+    </div>
+  );
+}
+
+// Cada usuario conecta su propia cuenta de Google (calendar_connections
+// es 1 fila por user_id, ver 0007_calendar_sync.sql) — por eso vive en el
+// perfil personal y no en Configuración, que es por organización.
+function GoogleCalendarCard() {
+  const [connected, setConnected] = useState(null); // null = cargando
+  const [syncing, setSyncing] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [message, setMessage] = useState(null); // { type: 'success'|'error', text }
+
+  const refresh = () => {
+    googleCalendar.isConnected().then(setConnected);
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const connect = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setMessage({ type: 'error', text: 'La integración con Google Calendar todavía no está configurada en este entorno.' });
+      return;
+    }
+    window.location.href = getGoogleAuthUrl();
+  };
+
+  const syncNow = async () => {
+    setSyncing(true);
+    setMessage(null);
+    try {
+      const res = await googleCalendar.pullEvents();
+      setMessage({ type: 'success', text: `Listo: ${res.created} reuniones nuevas, ${res.updated} actualizadas.` });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'No se pudo sincronizar' });
+    } finally { setSyncing(false); }
+  };
+
+  const disconnect = async () => {
+    setDisconnecting(true);
+    setMessage(null);
+    try {
+      await googleCalendar.disconnect();
+      setConnected(false);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'No se pudo desconectar' });
+    } finally { setDisconnecting(false); }
+  };
+
+  return (
+    <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 mb-6 space-y-4">
+      <h2 className="font-semibold flex items-center gap-2"><CalendarDays className="w-4 h-4" /> Google Calendar</h2>
+      <p className="text-sm text-muted-foreground">
+        Conectá tu Google Calendar para que las reuniones que creás en Conectado Flow aparezcan ahí, y para traer de vuelta los cambios que hagas directo en Google.
+      </p>
+
+      {connected === null ? (
+        <p className="text-sm text-muted-foreground">Verificando conexión…</p>
+      ) : connected ? (
+        <>
+          <div className="flex items-center gap-2 text-sm text-success font-medium">
+            <Check className="w-4 h-4" /> Conectado
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={syncNow} disabled={syncing} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary border border-border text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50">
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Sincronizando…' : 'Sincronizar ahora'}
+            </button>
+            <button onClick={disconnect} disabled={disconnecting} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
+              <Unlink className="w-4 h-4" /> {disconnecting ? 'Desconectando…' : 'Desconectar'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <button onClick={connect} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+          <CalendarDays className="w-4 h-4" /> Conectar con Google Calendar
+        </button>
+      )}
+
+      {message && (
+        <p className={`text-sm ${message.type === 'error' ? 'text-destructive' : 'text-success'}`}>{message.text}</p>
+      )}
     </div>
   );
 }

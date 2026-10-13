@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Mail, Phone, MapPin, Building2, Plus, DollarSign, Calendar, FileText, CheckCircle2, MessageCircle, TrendingUp, Edit3 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { googleCalendar } from '@/lib/googleCalendar';
 import SituationStatus from '@/components/SituationStatus';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import DocumentGeneratorModal from '@/components/DocumentGeneratorModal';
@@ -253,10 +254,11 @@ function MeetingFormModal({ open, onClose, onSaved, client, user }) {
   const save = async () => {
     setSaving(true);
     try {
-      await base44.entities.Meeting.create({
+      const created = await base44.entities.Meeting.create({
         ...form, date: new Date(form.date).toISOString(), client_id: client.id, client_name: client.name,
         status: 'Programada', owner_id: user?.id, owner_name: user?.full_name,
       });
+      googleCalendar.syncMeeting(created.id).catch(() => {});
       await base44.entities.Client.update(client.id, { next_meeting_date: new Date(form.date).toISOString() });
       onSaved(); onClose();
       setForm({ title: '', date: '', type: 'Videollamada', notes: '' });

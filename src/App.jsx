@@ -34,6 +34,7 @@ import Profile from '@/pages/Profile';
 import Reports from '@/pages/Reports';
 import Products from '@/pages/Products';
 import SuperAdmin from '@/pages/SuperAdmin';
+import CalendarCallback from '@/pages/CalendarCallback';
 
 const AuthenticatedApp = () => {
   // Only the very first auth check (before authChecked is ever set) should
@@ -56,6 +57,7 @@ const AuthenticatedApp = () => {
       <CommerceProvider>
       <Routes>
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/calendar/callback" element={<CalendarCallback />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/leads" element={<Leads />} />

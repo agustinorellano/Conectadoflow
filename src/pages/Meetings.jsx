@@ -8,6 +8,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useCommerce } from '@/lib/CommerceContext';
 import { useEntityList } from '@/lib/useEntityQuery';
+import { googleCalendar } from '@/lib/googleCalendar';
 import Modal from '@/components/Modal';
 import Badge from '@/components/Badge';
 import EmptyState from '@/components/EmptyState';
@@ -17,6 +18,14 @@ import { formatDateTime, MEETING_TYPES } from '@/lib/flowUtils';
 import { cn } from '@/lib/utils';
 
 const TYPE_ICONS = { Presencial: MapPin, Videollamada: Video, Teléfono: Phone, WhatsApp: MessageCircle, Otro: Clock };
+
+// Best-effort push to Google Calendar: la mayoría de los usuarios no tiene
+// la cuenta conectada (ver Profile.jsx), así que un error acá ("No hay una
+// cuenta de Google Calendar conectada") es el caso normal, no algo para
+// mostrarle al vendedor cada vez que agenda una reunión.
+function syncToGoogle(meetingId, action = 'upsert') {
+  googleCalendar.syncMeeting(meetingId, action).catch(() => {});
+}
 
 export default function Meetings() {
   const { user } = useAuth();
@@ -47,6 +56,7 @@ export default function Meetings() {
   const setStatus = async (m, status) => {
     await base44.entities.Meeting.update(m.id, { status });
     queryClient.invalidateQueries({ queryKey: ['Meeting'] });
+    syncToGoogle(m.id);
   };
 
   return (
@@ -176,11 +186,12 @@ function MeetingForm({ open, onClose, onSaved, clients, user }) {
     if (!form.title || !form.date) return;
     setSaving(true);
     try {
-      await base44.entities.Meeting.create({
+      const created = await base44.entities.Meeting.create({
         ...form, date: new Date(form.date).toISOString(), client_id: form.client_id, client_name: client?.name || '',
         commerce_id: currentCommerceId !== 'all' ? currentCommerceId : undefined,
         status: 'Programada', owner_id: user?.id, owner_name: user?.full_name,
       });
+      syncToGoogle(created.id);
       if (client) await base44.entities.Client.update(client.id, { next_meeting_date: new Date(form.date).toISOString() });
       onSaved(); onClose();
       setForm({ client_id: '', title: '', date: '', type: 'Videollamada', notes: '', meeting_link: '' });
