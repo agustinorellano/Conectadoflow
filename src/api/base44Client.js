@@ -241,6 +241,28 @@ const admin = {
     const { error } = await supabase.rpc('delete_organization', { org_id: orgId });
     if (error) throw error;
   },
+
+  // Panel de Administración Global — gestión de quién tiene acceso de
+  // superadministrador (ver 0035_platform_admin_hardening.sql). Reemplaza
+  // el INSERT manual por SQL que se usaba para dar de alta el primer admin.
+  async listPlatformAdmins() {
+    const { data, error } = await supabase.rpc('admin_list_platform_admins');
+    if (error) throw error;
+    return data || [];
+  },
+  async grantPlatformAdmin(email) {
+    const { error } = await supabase.rpc('admin_grant_platform_admin', { target_email: email });
+    if (error) throw error;
+  },
+  async revokePlatformAdmin(email) {
+    const { error } = await supabase.rpc('admin_revoke_platform_admin', { target_email: email });
+    if (error) throw error;
+  },
+  async listAuditLog(limit = 100) {
+    const { data, error } = await supabase.rpc('admin_list_audit_log', { limit_count: limit });
+    if (error) throw error;
+    return data || [];
+  },
 };
 
 // supabase-js's FunctionsHttpError puts the Edge Function's JSON body (the
