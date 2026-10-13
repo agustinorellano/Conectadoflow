@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, CheckCircle2, Clock, AlertCircle, Search, Pencil, Trash2, Receipt } from 'lucide-react';
+import { Wallet, CheckCircle2, Clock, AlertCircle, Search, Pencil, Trash2, Receipt, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useEntityList } from '@/lib/useEntityQuery';
@@ -79,31 +79,43 @@ export default function Payments() {
 
   const payVariant = (s) => ({ Pagado: 'success', Parcial: 'warning', Pendiente: 'muted', Vencido: 'destructive', Cancelado: 'muted' }[s] || 'muted');
 
+  // Deshace lo que `register` sumó: resta el monto de la venta y del
+  // cliente. La usan tanto "Eliminar" (cuando el cobro que se borra ya
+  // estaba pagado) como "Cancelar cobro" (lo deja pendiente de nuevo).
+  const reverseCollection = async (p) => {
+    if (!p.sale_id) return;
+    const sale = await base44.entities.Sale.get(p.sale_id).catch(() => null);
+    if (!sale) return;
+    const newCollected = Math.max(0, (Number(sale.collected_amount) || 0) - (Number(p.amount) || 0));
+    const newBalance = Math.max(0, (Number(sale.total_amount) || 0) - newCollected);
+    let ps = 'Pendiente';
+    if (newBalance <= 0) ps = 'Pagado';
+    else if (newCollected > 0) ps = 'Parcial';
+    await base44.entities.Sale.update(sale.id, { collected_amount: newCollected, balance: newBalance, payment_status: ps });
+    if (sale.client_id) {
+      const client = await base44.entities.Client.get(sale.client_id).catch(() => null);
+      if (client) {
+        const amountInBase = toBase(p.amount, p.currency);
+        await base44.entities.Client.update(client.id, {
+          total_collected: Math.max(0, (Number(client.total_collected) || 0) - amountInBase),
+          balance: (Number(client.balance) || 0) + amountInBase,
+        });
+      }
+    }
+  };
+
+  const unregister = async (p) => {
+    if (!confirm(`¿Cancelar este cobro de ${formatCurrency(p.amount, p.currency || currency)} y volver a dejarlo pendiente?`)) return;
+    await base44.entities.Payment.update(p.id, { status: 'Pendiente', paid_date: null });
+    await reverseCollection(p);
+    invalidate();
+  };
+
   const handleDelete = async (p) => {
     if (!confirm(`¿Eliminar este cobro de ${formatCurrency(p.amount, p.currency || currency)}?`)) return;
     const wasPaid = p.status === 'Pagado';
     await base44.entities.Payment.delete(p.id);
-    if (wasPaid && p.sale_id) {
-      const sale = await base44.entities.Sale.get(p.sale_id).catch(() => null);
-      if (sale) {
-        const newCollected = Math.max(0, (Number(sale.collected_amount) || 0) - (Number(p.amount) || 0));
-        const newBalance = Math.max(0, (Number(sale.total_amount) || 0) - newCollected);
-        let ps = 'Pendiente';
-        if (newBalance <= 0) ps = 'Pagado';
-        else if (newCollected > 0) ps = 'Parcial';
-        await base44.entities.Sale.update(sale.id, { collected_amount: newCollected, balance: newBalance, payment_status: ps });
-        if (sale.client_id) {
-          const client = await base44.entities.Client.get(sale.client_id).catch(() => null);
-          if (client) {
-            const amountInBase = toBase(p.amount, p.currency);
-            await base44.entities.Client.update(client.id, {
-              total_collected: Math.max(0, (Number(client.total_collected) || 0) - amountInBase),
-              balance: (Number(client.balance) || 0) + amountInBase,
-            });
-          }
-        }
-      }
-    }
+    if (wasPaid) await reverseCollection(p);
     invalidate();
   };
 
@@ -156,6 +168,11 @@ export default function Payments() {
                         <Badge variant={payVariant(overdue ? 'Vencido' : p.status)} dot>{overdue && p.status !== 'Pagado' ? 'Vencido' : p.status}</Badge>
                         {p.status !== 'Pagado' && p.status !== 'Cancelado' && (
                           <button onClick={() => register(p)} className="px-3 py-1 rounded-lg bg-success text-white text-xs font-medium hover:opacity-90">Cobrar</button>
+                        )}
+                        {p.status === 'Pagado' && (
+                          <button onClick={() => unregister(p)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground text-xs font-medium" title="Cancelar cobro y volver a Pendiente">
+                            <RotateCcw className="w-3 h-3" /> Cancelar cobro
+                          </button>
                         )}
                       </div>
                     </div>
