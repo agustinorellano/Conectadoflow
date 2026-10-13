@@ -276,6 +276,27 @@ const admin = {
     if (error) throw error;
     return data || [];
   },
+
+  // Reportes e incidencias (Panel de Administración Global, Etapa 5 — ver
+  // 0038_support_reports.sql). Crear/ver un reporte es una entidad normal
+  // (base44.entities.SupportReport, scoped por RLS a la propia
+  // organización); cambiar el estado es admin-only y queda auditado.
+  async listReports({ status } = {}) {
+    const { data, error } = await supabase.rpc('admin_list_reports', { p_status: status || null });
+    if (error) throw error;
+    return data || [];
+  },
+  async listOrganizationReports(orgId) {
+    const { data, error } = await supabase.rpc('admin_list_organization_reports', { p_org_id: orgId });
+    if (error) throw error;
+    return data || [];
+  },
+  async updateReportStatus(reportId, status, resolutionNotes) {
+    const { error } = await supabase.rpc('admin_update_report_status', {
+      p_report_id: reportId, p_status: status, p_resolution_notes: resolutionNotes || null,
+    });
+    if (error) throw error;
+  },
   async listOrganizationAuditLog(orgId) {
     const { data, error } = await supabase.rpc('admin_list_organization_audit_log', { p_org_id: orgId });
     if (error) throw error;

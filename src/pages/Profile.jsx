@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Lock, Bell, Check, Save, Shield, Mail, Upload, Camera, CalendarDays, RefreshCw, Unlink } from 'lucide-react';
+import { User, Lock, Bell, Check, Save, Shield, Mail, Upload, Camera, CalendarDays, RefreshCw, Unlink, ShieldAlert, Send } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
@@ -141,6 +141,7 @@ export default function Profile() {
       </div>
 
       <GoogleCalendarCard />
+      <SupportReportCard />
 
       <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 space-y-4">
         <h2 className="font-semibold flex items-center gap-2"><Bell className="w-4 h-4" /> Preferencias de notificaciones</h2>
@@ -241,6 +242,82 @@ function GoogleCalendarCard() {
 
       {message && (
         <p className={`text-sm ${message.type === 'error' ? 'text-destructive' : 'text-success'}`}>{message.text}</p>
+      )}
+    </div>
+  );
+}
+
+// Reportar un problema a Conectado Flow (Panel de Administración Global,
+// Etapa 5 — ver 0038_support_reports.sql). Cualquier usuario de la
+// organización puede crear uno y ver el estado de los que ya mandó —
+// cambiar el estado es exclusivo del superadmin, desde el panel global.
+function SupportReportCard() {
+  const { user } = useAuth();
+  const [reports, setReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(true);
+  const [form, setForm] = useState({ title: '', description: '' });
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadReports = () => {
+    setLoadingReports(true);
+    base44.entities.SupportReport.list('-created_date')
+      .then(setReports)
+      .catch(() => setReports([]))
+      .finally(() => setLoadingReports(false));
+  };
+
+  useEffect(() => { loadReports(); }, []);
+
+  const submit = async () => {
+    if (!form.title.trim() || !form.description.trim()) return;
+    setSending(true); setError(''); setSent(false);
+    try {
+      await base44.entities.SupportReport.create({
+        title: form.title.trim(), description: form.description.trim(),
+        reported_by_id: user?.id, reported_by_name: user?.full_name,
+      });
+      setForm({ title: '', description: '' });
+      setSent(true);
+      loadReports();
+      setTimeout(() => setSent(false), 3000);
+    } catch (e) {
+      setError(e.message || 'No se pudo enviar el reporte');
+    } finally { setSending(false); }
+  };
+
+  return (
+    <div className="bg-card rounded-2xl border border-border card-shadow p-5 sm:p-6 mb-6 space-y-4">
+      <h2 className="font-semibold flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Reportar un problema</h2>
+      <p className="text-sm text-muted-foreground">
+        Si algo no funciona como esperás en Conectado Flow, contanos acá. Lo recibe directo el equipo de la plataforma.
+      </p>
+      <div className="space-y-3">
+        <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Título del problema"
+          className="inp" />
+        <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3}
+          placeholder="Contanos qué pasó, en qué pantalla y qué esperabas que pasara…" className="inp resize-none" />
+        <div className="flex items-center gap-3">
+          <button onClick={submit} disabled={sending || !form.title.trim() || !form.description.trim()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
+            <Send className="w-4 h-4" /> {sending ? 'Enviando…' : 'Enviar reporte'}
+          </button>
+          {sent && <span className="inline-flex items-center gap-1 text-sm text-success"><Check className="w-4 h-4" /> Enviado</span>}
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+
+      {!loadingReports && reports.length > 0 && (
+        <div className="pt-3 border-t border-border/70 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reportes anteriores de tu organización</p>
+          {reports.map(r => (
+            <div key={r.id} className="flex items-center justify-between gap-3 text-sm">
+              <span className="truncate flex-1 min-w-0">{r.title}</span>
+              <span className={`text-xs font-medium shrink-0 ${r.status === 'Resuelto' ? 'text-success' : r.status === 'En revisión' ? 'text-primary' : 'text-destructive'}`}>{r.status}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

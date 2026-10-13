@@ -68,6 +68,9 @@ export default function SuperAdminOrgDetail() {
               <button key={t.key} onClick={() => setTab(t.key)}
                 className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${tab === t.key ? 'bg-primary text-primary-foreground' : 'bg-card border border-border hover:bg-accent'}`}>
                 <t.icon className="w-4 h-4" /> {t.label}
+                {t.key === 'reportes' && org.pending_reports_count > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">{org.pending_reports_count}</span>
+                )}
               </button>
             ))}
           </div>
@@ -78,7 +81,7 @@ export default function SuperAdminOrgDetail() {
           {tab === 'productos' && <ProductosTab orgId={id} />}
           {tab === 'facturacion' && <FacturacionTab orgId={id} />}
           {tab === 'contactos' && <ContactosTab orgId={id} />}
-          {tab === 'reportes' && <ReportesTab />}
+          {tab === 'reportes' && <ReportesTab orgId={id} />}
           {tab === 'historial' && <HistorialTab orgId={id} />}
         </>
       )}
@@ -101,7 +104,7 @@ function OrgHeader({ org }) {
           <p className="text-sm text-muted-foreground mt-0.5">Alta: {formatDate(org.created_date)} · {org.industry || 'Sin rubro registrado'}</p>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-5 pt-5 border-t border-border/70">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mt-5 pt-5 border-t border-border/70">
         <Stat label="Usuarios" value={org.member_count} />
         <Stat label="Comercios" value={org.commerces_count} />
         <Stat label="Sucursales" value={org.branches_count} />
@@ -109,15 +112,16 @@ function OrgHeader({ org }) {
         <Stat label="Leads" value={org.leads_count} />
         <Stat label="Clientes" value={org.clients_count} />
         <Stat label="Facturado" value={formatCurrency(org.total_revenue, org.currency || 'ARS')} />
+        <Stat label="Reportes pendientes" value={org.pending_reports_count} alert={org.pending_reports_count > 0} />
       </div>
     </div>
   );
 }
 
-function Stat({ label, value }) {
+function Stat({ label, value, alert }) {
   return (
     <div>
-      <p className="text-lg font-bold leading-tight">{value ?? 0}</p>
+      <p className={`text-lg font-bold leading-tight ${alert ? 'text-destructive' : ''}`}>{value ?? 0}</p>
       <p className="text-[11px] text-muted-foreground">{label}</p>
     </div>
   );
@@ -323,11 +327,41 @@ function ContactosTab({ orgId }) {
   );
 }
 
-function ReportesTab() {
+const REPORT_STATUSES = ['Pendiente', 'En revisión', 'Resuelto'];
+
+function ReportesTab({ orgId }) {
+  const { data, loading, error } = useTabData(base44.admin.listOrganizationReports, orgId);
+  const [items, setItems] = useState(data);
+  useEffect(() => { setItems(data); }, [data]);
+
+  const changeStatus = async (report, status) => {
+    setItems(prev => prev.map(r => r.id === report.id ? { ...r, status } : r));
+    try { await base44.admin.updateReportStatus(report.id, status); }
+    catch { setItems(prev => prev.map(r => r.id === report.id ? { ...r, status: report.status } : r)); }
+  };
+
   return (
-    <div className="text-center py-12 text-muted-foreground text-sm bg-card rounded-2xl border border-border">
-      Todavía no existe un sistema de reportes/incidencias en Conectado Flow — se construye en la próxima etapa del panel global.
-    </div>
+    <TabShell loading={loading} error={error} empty={items.length === 0} emptyLabel="Esta organización no reportó ningún problema.">
+      <div className="space-y-2">
+        {items.map(r => (
+          <div key={r.id} className="bg-card rounded-xl border border-border p-3.5">
+            <div className="flex items-center gap-3 flex-wrap mb-1.5">
+              <ShieldAlert className={`w-4 h-4 shrink-0 ${r.status === 'Pendiente' ? 'text-destructive' : 'text-muted-foreground'}`} />
+              <div className="flex-1 min-w-[160px]">
+                <p className="font-medium text-sm truncate">{r.title}</p>
+                <p className="text-xs text-muted-foreground">{r.reported_by_name || 'Usuario desconocido'} · {formatDateTime(r.created_date)}</p>
+              </div>
+              <select value={r.status} onChange={e => changeStatus(r, e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs outline-none">
+                {REPORT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <p className="text-sm whitespace-pre-wrap pl-7">{r.description}</p>
+            {r.resolution_notes && <p className="text-xs text-muted-foreground pl-7 mt-1.5">Notas: {r.resolution_notes}</p>}
+          </div>
+        ))}
+      </div>
+    </TabShell>
   );
 }
 

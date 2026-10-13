@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact } from 'lucide-react';
+import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact, AlertTriangle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
@@ -8,7 +8,7 @@ import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
 import DeleteOrganizationModal from '@/components/DeleteOrganizationModal';
 import { StyledSelect } from '@/components/ui/styled-select';
-import { formatCurrency, formatDate } from '@/lib/flowUtils';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
 
 const PAGE_SIZE = 20;
@@ -19,6 +19,7 @@ const SORT_OPTIONS = [
   { value: 'sales_count', label: 'Ventas' },
   { value: 'total_revenue', label: 'Facturado' },
 ];
+const REPORT_STATUSES = ['Pendiente', 'En revisión', 'Resuelto'];
 
 export default function SuperAdmin() {
   const { user } = useAuth();
@@ -113,6 +114,7 @@ export default function SuperAdmin() {
       <div className="flex items-center gap-1.5 p-1 bg-secondary/60 rounded-xl w-fit mb-6">
         <button onClick={() => setTab('orgs')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'orgs' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Organizaciones ({orgsTotal})</button>
         <button onClick={() => setTab('users')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'users' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Usuarios ({users.length})</button>
+        <button onClick={() => setTab('reportes')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'reportes' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Reportes</button>
       </div>
 
       {tab === 'orgs' && (
@@ -158,7 +160,14 @@ export default function SuperAdmin() {
                   <Building2 className="w-5 h-5" />
                 </span>
                 <Link to={`/super-admin/organizaciones/${o.id}`} className="flex-1 min-w-[160px] hover:underline">
-                  <p className="font-semibold truncate">{o.name}</p>
+                  <p className="font-semibold truncate flex items-center gap-1.5">
+                    {o.name}
+                    {o.pending_reports_count > 0 && (
+                      <span title={`${o.pending_reports_count} reporte(s) pendiente(s)`} className="inline-flex items-center gap-1 text-destructive text-[11px] font-semibold">
+                        <AlertTriangle className="w-3 h-3" /> {o.pending_reports_count}
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">Alta: {formatDate(o.created_date)}</p>
                 </Link>
                 <div className="flex items-center gap-4 text-sm">
@@ -211,7 +220,7 @@ export default function SuperAdmin() {
             </div>
           )}
         </div>
-      ) : (
+      ) : tab === 'users' ? (
         <div className="space-y-2">
           {users.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">Sin usuarios aún</p>}
           {users.map(u => (
@@ -231,10 +240,76 @@ export default function SuperAdmin() {
             </div>
           ))}
         </div>
+      ) : (
+        <ReportsTab />
       )}
 
       <NotifyModal target={notifyTarget} onClose={() => setNotifyTarget(null)} />
       <DeleteOrganizationModal org={deleteOrg} onClose={() => setDeleteOrg(null)} onDeleted={load} />
+    </div>
+  );
+}
+
+// Pestaña "Reportes" del panel global — todas las organizaciones, con
+// filtro de estado. La ficha de cada organización (Etapa 3) tiene la
+// misma vista acotada a esa organización sola.
+function ReportsTab() {
+  const [status, setStatus] = useState('');
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = () => {
+    setLoading(true); setError('');
+    base44.admin.listReports({ status: status || null })
+      .then(setReports)
+      .catch(e => setError(e.message || 'No se pudieron cargar los reportes'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [status]);
+
+  const changeStatus = async (report, newStatus) => {
+    setReports(prev => prev.map(r => r.id === report.id ? { ...r, status: newStatus } : r));
+    try { await base44.admin.updateReportStatus(report.id, newStatus); }
+    catch { setReports(prev => prev.map(r => r.id === report.id ? { ...r, status: report.status } : r)); }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <StyledSelect value={status} onChange={e => setStatus(e.target.value)} className="w-44 px-3 py-2 rounded-lg border border-input bg-background text-xs">
+          <option value="">Todos los estados</option>
+          {REPORT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        </StyledSelect>
+      </div>
+      {loading ? (
+        <div className="text-center py-16 text-muted-foreground">Cargando…</div>
+      ) : error ? (
+        <div className="p-4 rounded-xl bg-destructive/10 text-destructive text-sm">{error}</div>
+      ) : reports.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-8 text-center">Sin reportes{status ? ` en estado "${status}"` : ''}.</p>
+      ) : (
+        <div className="space-y-2">
+          {reports.map(r => (
+            <div key={r.id} className="bg-card rounded-xl border border-border card-shadow p-3.5">
+              <div className="flex items-center gap-3 flex-wrap mb-1.5">
+                <ShieldAlert className={`w-4 h-4 shrink-0 ${r.status === 'Pendiente' ? 'text-destructive' : 'text-muted-foreground'}`} />
+                <div className="flex-1 min-w-[160px]">
+                  <p className="font-medium text-sm truncate">{r.title}</p>
+                  <Link to={`/super-admin/organizaciones/${r.organization_id}`} className="text-xs text-primary hover:underline">{r.organization_name}</Link>
+                  <span className="text-xs text-muted-foreground"> · {r.reported_by_name || 'Usuario desconocido'} · {formatDateTime(r.created_date)}</span>
+                </div>
+                <select value={r.status} onChange={e => changeStatus(r, e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs outline-none">
+                  {REPORT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <p className="text-sm whitespace-pre-wrap pl-7">{r.description}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

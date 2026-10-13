@@ -25,5 +25,6 @@ export const ENTITY_TABLES = {
   PipelineStage: 'pipeline_stages',
   Product: 'products',
   Sale: 'sales',
+  SupportReport: 'support_reports',
   User: 'profiles',
 };
