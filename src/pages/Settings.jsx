@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles, AlertTriangle, ShieldCheck, CheckCircle2, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Building2, KanbanSquare, Package, MessageCircle, Coins, Plus, Trash2, GripVertical, Check, Save, Receipt, Upload, Store, CreditCard, Compass, Zap, Edit3, SlidersHorizontal, Sparkles, AlertTriangle, ShieldCheck, CheckCircle2, ExternalLink, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useData } from '@/lib/DataContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -254,6 +254,9 @@ function DangerZone() {
   const { user } = useAuth();
   const [org, setOrg] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Colapsada por default a propósito: un botón que borra toda la cuenta
+  // no debería estar al alcance de un click accidental al scrollear.
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!user?.organization_id) return;
@@ -265,16 +268,24 @@ function DangerZone() {
   return (
     <>
       <div className="border-t border-border pt-4 mt-2">
-        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/5 border border-destructive/20">
-          <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-destructive">Eliminar organización</p>
-            <p className="text-sm text-muted-foreground mt-0.5">Borra toda la cuenta — clientes, ventas, documentos y el acceso de todo el equipo. No se puede deshacer.</p>
+        <button onClick={() => setExpanded(e => !e)} className="w-full flex items-center justify-between gap-2 text-left">
+          <span className="text-sm font-semibold text-destructive flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4" /> Zona peligrosa
+          </span>
+          <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', expanded && 'rotate-180')} />
+        </button>
+        {expanded && (
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/5 border border-destructive/20 mt-3">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-destructive">Eliminar organización</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Borra toda la cuenta — clientes, ventas, documentos y el acceso de todo el equipo. No se puede deshacer.</p>
+            </div>
+            <button onClick={() => setConfirmOpen(true)} className="px-3.5 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:opacity-90 shrink-0">Eliminar</button>
           </div>
-          <button onClick={() => setConfirmOpen(true)} className="px-3.5 py-2 rounded-xl bg-destructive text-white text-sm font-medium hover:opacity-90 shrink-0">Eliminar</button>
-        </div>
+        )}
       </div>
-      <DeleteOrganizationModal org={confirmOpen ? org : null} onClose={() => setConfirmOpen(false)}
+      <DeleteOrganizationModal org={confirmOpen ? org : null} onClose={() => setConfirmOpen(false)} requireReason
         onDeleted={() => { base44.auth.logout('/login'); }} />
     </>
   );

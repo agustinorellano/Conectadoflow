@@ -322,8 +322,8 @@ const admin = {
   // sea admin de plataforma o admin de esa misma organización — se usa
   // tanto desde el Panel de administración como desde "Eliminar mi
   // organización" en Configuración.
-  async deleteOrganization(orgId) {
-    const { error } = await supabase.rpc('delete_organization', { org_id: orgId });
+  async deleteOrganization(orgId, reason) {
+    const { error } = await supabase.rpc('delete_organization', { org_id: orgId, p_reason: reason || null });
     if (error) throw error;
   },
 

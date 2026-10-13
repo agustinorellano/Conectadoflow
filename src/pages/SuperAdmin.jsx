@@ -438,15 +438,25 @@ function PermissionsTab({ currentUserEmail }) {
         ) : (
           <div className="space-y-2">
             {auditLog.map(a => (
-              <div key={a.id} className="flex items-center gap-3 flex-wrap text-sm py-2 border-b border-border/50 last:border-0">
-                <span className="font-medium">{a.action}</span>
-                <span className="text-muted-foreground">{a.actor_email}</span>
-                {a.target_organization_id && (
-                  <Link to={`/super-admin/organizaciones/${a.target_organization_id}`} className="text-primary hover:underline text-xs">
-                    {a.target_organization_name || 'organización'}
-                  </Link>
+              <div key={a.id} className="py-2 border-b border-border/50 last:border-0">
+                <div className="flex items-center gap-3 flex-wrap text-sm">
+                  <span className="font-medium">{a.action}</span>
+                  <span className="text-muted-foreground">{a.actor_email}</span>
+                  {a.target_organization_name && (
+                    a.target_organization_id ? (
+                      <Link to={`/super-admin/organizaciones/${a.target_organization_id}`} className="text-primary hover:underline text-xs">{a.target_organization_name}</Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground" title="La organización ya no existe">{a.target_organization_name} (eliminada)</span>
+                    )
+                  )}
+                  <span className="text-xs text-muted-foreground ml-auto">{formatDateTime(a.created_date)}</span>
+                </div>
+                {/* Motivo de baja que el admin completó al eliminar su propia
+                    organización desde Configuración (ver DeleteOrganizationModal) —
+                    la única forma de verlo es acá, porque la organización ya no existe. */}
+                {a.action === 'delete_organization' && a.details?.reason && (
+                  <p className="text-xs text-muted-foreground mt-1 pl-0.5">Motivo: <span className="text-foreground">{a.details.reason}</span></p>
                 )}
-                <span className="text-xs text-muted-foreground ml-auto">{formatDateTime(a.created_date)}</span>
               </div>
             ))}
           </div>
