@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/AuthContext';
 import Badge from '@/components/Badge';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
-import { AdminReportChat } from '@/pages/SuperAdmin';
+import { AdminReportChat, ReportStatusSelect } from '@/pages/SuperAdmin';
 import SlideOverPanel from '@/components/SlideOverPanel';
 
 // Ficha detallada de una organización dentro del Panel de Administración
@@ -354,10 +354,7 @@ function ReportesTab({ orgId }) {
                 <p className="font-medium text-sm truncate">{r.title}</p>
                 <p className="text-xs text-muted-foreground">{r.reported_by_name || 'Usuario desconocido'} · {formatDateTime(r.created_date)}</p>
               </div>
-              <select value={r.status} onChange={e => changeStatus(r, e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs outline-none">
-                {REPORT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <ReportStatusSelect value={r.status} onChange={v => changeStatus(r, v)} />
             </div>
             <p className="text-sm whitespace-pre-wrap pl-7">{r.description}</p>
             {r.resolution_notes && <p className="text-xs text-muted-foreground pl-7 mt-1.5">Notas: {r.resolution_notes}</p>}

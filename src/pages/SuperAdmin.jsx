@@ -9,6 +9,7 @@ import Modal from '@/components/Modal';
 import DeleteOrganizationModal from '@/components/DeleteOrganizationModal';
 import SlideOverPanel from '@/components/SlideOverPanel';
 import { StyledSelect } from '@/components/ui/styled-select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,45 @@ const SORT_OPTIONS = [
   { value: 'total_revenue', label: 'Facturado' },
 ];
 const REPORT_STATUSES = ['Pendiente', 'En revisión', 'Resuelto'];
+// Un color distinto por estado, para que el selector de estado del
+// reporte se reconozca de un vistazo en vez de ser un <select> gris
+// genérico — igual que un Badge, pero interactivo.
+const REPORT_STATUS_STYLES = {
+  'Pendiente': { chip: 'bg-destructive/10 text-destructive', ring: 'focus:ring-destructive/30' },
+  'En revisión': { chip: 'bg-warning/15 text-warning', ring: 'focus:ring-warning/30' },
+  'Resuelto': { chip: 'bg-success/15 text-success', ring: 'focus:ring-success/30' },
+};
+
+// Selector de estado de reporte: cada opción es un chip redondeado con el
+// color propio de ese estado (no solo resaltado azul genérico), así se
+// distingue de un vistazo cuál está seleccionado y a cuál se puede pasar.
+export function ReportStatusSelect({ value, onChange, className }) {
+  const style = REPORT_STATUS_STYLES[value] || REPORT_STATUS_STYLES['Pendiente'];
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={cn(
+        'h-auto w-auto gap-1.5 rounded-full border-0 px-3 py-1.5 text-xs font-medium shadow-none',
+        style.chip, style.ring, className
+      )}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="rounded-xl p-1.5 min-w-[9rem]">
+        {REPORT_STATUSES.map(s => {
+          const sStyle = REPORT_STATUS_STYLES[s];
+          return (
+            <SelectItem key={s} value={s} className={cn(
+              'rounded-full pl-3 py-1.5 mb-1 last:mb-0 text-xs font-medium cursor-pointer',
+              'data-[state=checked]:font-semibold',
+              sStyle.chip
+            )}>
+              {s}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export default function SuperAdmin() {
   const { user } = useAuth();
@@ -352,10 +392,7 @@ function ReportsTab({ onChanged }) {
                   <Link to={`/super-admin/organizaciones/${r.organization_id}`} className="text-xs text-primary hover:underline">{r.organization_name}</Link>
                   <span className="text-xs text-muted-foreground"> · {r.reported_by_name || 'Usuario desconocido'} · {formatDateTime(r.created_date)}</span>
                 </div>
-                <select value={r.status} onChange={e => changeStatus(r, e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs outline-none">
-                  {REPORT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <ReportStatusSelect value={r.status} onChange={v => changeStatus(r, v)} />
               </div>
               <p className="text-sm whitespace-pre-wrap pl-7">{r.description}</p>
               <button onClick={() => setOpenChat(r.id)}
