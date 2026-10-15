@@ -425,9 +425,13 @@ const users = {
 // mostrarle a el usuario una lista/historial, y marcar como leídos los
 // mensajes del soporte (confirmación de lectura).
 const support = {
+  // El reporte "activo" es el más reciente que no esté Resuelto — así,
+  // una vez que soporte cierra un reporte viejo, no se queda pegado para
+  // siempre como título/chat vigente: el próximo que abra el chat o la
+  // página arranca uno nuevo.
   async latestReport() {
-    const rows = await entities.SupportReport.list('-created_date', 1);
-    return rows[0] || null;
+    const rows = await entities.SupportReport.list('-created_date', 10);
+    return rows.find(r => r.status !== 'Resuelto') || null;
   },
   async listMessages(reportId) {
     return entities.SupportReportMessage.filter({ report_id: reportId }, 'created_date');

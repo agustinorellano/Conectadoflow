@@ -7,7 +7,7 @@ import { X } from 'lucide-react';
 // soporte (abajo a la derecha) — distinta del SlideOverPanel de borde a
 // borde que usa el superadmin: esto es para el lado de la organización,
 // pensado para convivir con el resto de la pantalla en vez de taparla.
-export default function FloatingChatCard({ open, onClose, title, subtitle, children }) {
+export default function FloatingChatCard({ open, onClose, title, subtitle, avatar, children }) {
   return createPortal(
     <AnimatePresence>
       {open && (
@@ -19,6 +19,7 @@ export default function FloatingChatCard({ open, onClose, title, subtitle, child
           className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[70] w-[calc(100vw-2rem)] max-w-[380px] h-[min(560px,70vh)] bg-card rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden"
         >
           <div className="h-14 flex items-center px-4 gap-3 border-b border-border shrink-0 bg-secondary/30">
+            {avatar && <img src={avatar} alt="" className="w-8 h-8 rounded-lg shrink-0 shadow-sm" />}
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm truncate">{title}</p>
               {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
