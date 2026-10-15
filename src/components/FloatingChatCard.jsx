@@ -12,10 +12,10 @@ export default function FloatingChatCard({ open, onClose, title, subtitle, avata
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0, y: 16, scale: 0.96 }}
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.96 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+          exit={{ opacity: 0, y: 10, scale: 0.98 }}
+          transition={{ type: 'tween', duration: 0.18, ease: 'easeOut' }}
           className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[70] w-[calc(100vw-2rem)] max-w-[380px] h-[min(560px,70vh)] bg-card rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden"
         >
           <div className="h-14 flex items-center px-4 gap-3 border-b border-border shrink-0 bg-secondary/30">

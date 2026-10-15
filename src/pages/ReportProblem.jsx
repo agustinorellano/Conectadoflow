@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldAlert, Send, Check, CheckCheck, UserRound } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatDateTime } from '@/lib/flowUtils';
@@ -83,13 +84,20 @@ export default function ReportProblem() {
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 
-      {!chatOpen && (
-        <button onClick={() => setChatOpen(true)}
-          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[65] w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:opacity-90"
-          title="Chatear con soporte">
-          <UserRound className="w-6 h-6" />
-        </button>
-      )}
+      <AnimatePresence>
+        {!chatOpen && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            onClick={() => setChatOpen(true)}
+            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[65] w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:opacity-90"
+            title="Chatear con soporte">
+            <UserRound className="w-6 h-6" />
+          </motion.button>
+        )}
+      </AnimatePresence>
       <FloatingChatCard open={chatOpen} onClose={() => setChatOpen(false)}
         avatar="/logo.png" title="Soporte de Conectado Flow" subtitle={activeReport?.title}>
         {loadingReport ? (
