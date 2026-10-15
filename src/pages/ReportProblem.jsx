@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldAlert, Send, Check, CheckCheck, MessageCircle } from 'lucide-react';
+import { ShieldAlert, Send, Check, CheckCheck, LifeBuoy } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatDateTime } from '@/lib/flowUtils';
@@ -70,21 +70,24 @@ export default function ReportProblem() {
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 
-      {activeReport && (
-        <>
-          {!chatOpen && (
-            <button onClick={() => setChatOpen(true)}
-              className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[65] w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:opacity-90"
-              title="Chatear con soporte">
-              <MessageCircle className="w-6 h-6" />
-            </button>
-          )}
-          <FloatingChatCard open={chatOpen} onClose={() => setChatOpen(false)}
-            title="Soporte de Conectado Flow" subtitle={activeReport.title}>
-            <OrgReportChat reportId={activeReport.id} active={chatOpen} />
-          </FloatingChatCard>
-        </>
+      {!chatOpen && (
+        <button onClick={() => setChatOpen(true)}
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[65] w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:opacity-90"
+          title="Chatear con soporte">
+          <LifeBuoy className="w-6 h-6" />
+        </button>
       )}
+      <FloatingChatCard open={chatOpen} onClose={() => setChatOpen(false)}
+        title="Soporte de Conectado Flow" subtitle={activeReport?.title}>
+        {activeReport ? (
+          <OrgReportChat reportId={activeReport.id} active={chatOpen} />
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 px-4">
+            <LifeBuoy className="w-8 h-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Todavía no enviaste ningún reporte. Contanos tu problema arriba y acá vas a poder chatear con soporte.</p>
+          </div>
+        )}
+      </FloatingChatCard>
     </div>
   );
 }
