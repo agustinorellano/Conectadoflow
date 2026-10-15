@@ -297,6 +297,26 @@ const admin = {
     });
     if (error) throw error;
   },
+  // Cantidad de reportes en estado "Pendiente" en toda la plataforma —
+  // para el globito de la pestaña "Reportes" del panel global.
+  async countPendingReports() {
+    const { data, error } = await supabase.rpc('admin_count_pending_reports');
+    if (error) throw error;
+    return data || 0;
+  },
+  // Chat por reporte (ver 0043_report_notifications_and_chat.sql). El
+  // lado de la organización usa base44.entities.SupportReportMessage
+  // directo (RLS scoped a su propia org); esto es el lado del superadmin,
+  // que puede ver y responder cualquier reporte.
+  async listReportMessages(reportId) {
+    const { data, error } = await supabase.rpc('admin_list_report_messages', { p_report_id: reportId });
+    if (error) throw error;
+    return data || [];
+  },
+  async sendReportMessage(reportId, message) {
+    const { error } = await supabase.rpc('admin_send_report_message', { p_report_id: reportId, p_message: message });
+    if (error) throw error;
+  },
   async listOrganizationAuditLog(orgId) {
     const { data, error } = await supabase.rpc('admin_list_organization_audit_log', { p_org_id: orgId });
     if (error) throw error;

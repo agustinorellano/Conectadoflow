@@ -26,5 +26,6 @@ export const ENTITY_TABLES = {
   Product: 'products',
   Sale: 'sales',
   SupportReport: 'support_reports',
+  SupportReportMessage: 'support_report_messages',
   User: 'profiles',
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact, AlertTriangle, ShieldCheck, History } from 'lucide-react';
+import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact, AlertTriangle, ShieldCheck, History, MessageSquare } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
@@ -10,6 +10,7 @@ import DeleteOrganizationModal from '@/components/DeleteOrganizationModal';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
 const SORT_OPTIONS = [
@@ -33,6 +34,7 @@ export default function SuperAdmin() {
   const [loadError, setLoadError] = useState('');
   const [deleteOrg, setDeleteOrg] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
+  const [pendingReports, setPendingReports] = useState(0);
 
   // Filtros combinables del listado de organizaciones (Etapa 2).
   const [searchInput, setSearchInput] = useState('');
@@ -80,6 +82,11 @@ export default function SuperAdmin() {
   };
 
   useEffect(() => { if (user?.is_platform_admin) load(); }, [user, search, industry, mode, minUsers, sort, sortDir, page]);
+
+  const refreshPendingReports = () => {
+    base44.admin.countPendingReports().then(setPendingReports).catch(() => {});
+  };
+  useEffect(() => { if (user?.is_platform_admin) refreshPendingReports(); }, [user]);
 
   const totalPages = Math.max(1, Math.ceil(orgsTotal / PAGE_SIZE));
   const clearFilters = () => { setSearchInput(''); setSearch(''); setIndustry(''); setMode(''); setMinUsers(''); setPage(1); };
@@ -132,7 +139,12 @@ export default function SuperAdmin() {
       <div className="flex items-center gap-1.5 p-1 bg-secondary/60 rounded-xl w-fit mb-6">
         <button onClick={() => setTab('orgs')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'orgs' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Organizaciones ({orgsTotal})</button>
         <button onClick={() => setTab('users')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'users' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Usuarios ({users.length})</button>
-        <button onClick={() => setTab('reportes')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'reportes' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Reportes</button>
+        <button onClick={() => setTab('reportes')} className={`relative px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'reportes' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+          Reportes
+          {pendingReports > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">{pendingReports}</span>
+          )}
+        </button>
         <button onClick={() => setTab('permisos')} className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'permisos' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>Permisos</button>
       </div>
 
@@ -277,7 +289,7 @@ export default function SuperAdmin() {
           ))}
         </div>
       ) : tab === 'reportes' ? (
-        <ReportsTab />
+        <ReportsTab onChanged={refreshPendingReports} />
       ) : (
         <PermissionsTab currentUserEmail={user?.email} />
       )}
@@ -291,11 +303,12 @@ export default function SuperAdmin() {
 // Pestaña "Reportes" del panel global — todas las organizaciones, con
 // filtro de estado. La ficha de cada organización (Etapa 3) tiene la
 // misma vista acotada a esa organización sola.
-function ReportsTab() {
+function ReportsTab({ onChanged }) {
   const [status, setStatus] = useState('');
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [openChat, setOpenChat] = useState(null); // report id | null
 
   const load = () => {
     setLoading(true); setError('');
@@ -309,7 +322,7 @@ function ReportsTab() {
 
   const changeStatus = async (report, newStatus) => {
     setReports(prev => prev.map(r => r.id === report.id ? { ...r, status: newStatus } : r));
-    try { await base44.admin.updateReportStatus(report.id, newStatus); }
+    try { await base44.admin.updateReportStatus(report.id, newStatus); onChanged?.(); }
     catch { setReports(prev => prev.map(r => r.id === report.id ? { ...r, status: report.status } : r)); }
   };
 
@@ -344,10 +357,72 @@ function ReportsTab() {
                 </select>
               </div>
               <p className="text-sm whitespace-pre-wrap pl-7">{r.description}</p>
+              <button onClick={() => setOpenChat(openChat === r.id ? null : r.id)}
+                className="mt-2 ml-7 inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline">
+                <MessageSquare className="w-3.5 h-3.5" /> {openChat === r.id ? 'Ocultar conversación' : 'Ver conversación'}
+              </button>
+              {openChat === r.id && <div className="ml-7 mt-2"><AdminReportChat reportId={r.id} /></div>}
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Chat entre la organización que reportó y el superadmin, sobre un
+// reporte puntual. Se usa tanto en la pestaña global de Reportes como en
+// la ficha de cada organización (SuperAdminOrgDetail.jsx).
+export function AdminReportChat({ reportId }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = () => {
+    setLoading(true);
+    base44.admin.listReportMessages(reportId).then(setMessages).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [reportId]);
+
+  const send = async () => {
+    if (!draft.trim()) return;
+    setSending(true); setError('');
+    try {
+      await base44.admin.sendReportMessage(reportId, draft.trim());
+      setDraft('');
+      load();
+    } catch (e) { setError(e.message || 'No se pudo enviar'); }
+    finally { setSending(false); }
+  };
+
+  return (
+    <div className="bg-secondary/40 rounded-xl p-3 space-y-2.5 max-w-lg">
+      {loading ? (
+        <p className="text-xs text-muted-foreground py-2">Cargando…</p>
+      ) : messages.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-2">Todavía no hay mensajes. Escribí el primero.</p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {messages.map(m => (
+            <div key={m.id} className={cn('max-w-[85%] rounded-xl px-3 py-2', m.is_admin ? 'ml-auto bg-primary text-primary-foreground' : 'bg-card border border-border')}>
+              <p className="text-xs font-semibold opacity-80">{m.sender_name || (m.is_admin ? 'Soporte' : 'Usuario')}</p>
+              <p className="text-sm whitespace-pre-wrap">{m.message}</p>
+              <p className="text-[10px] opacity-60 mt-0.5">{formatDateTime(m.created_date)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-end gap-2">
+        <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={2} placeholder="Responder…"
+          className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+        <button onClick={send} disabled={sending || !draft.trim()} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 disabled:opacity-50 shrink-0">
+          {sending ? 'Enviando…' : 'Enviar'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

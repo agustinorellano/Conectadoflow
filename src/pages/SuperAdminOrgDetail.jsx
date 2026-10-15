@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Users2, Store, GitBranch, Package, Receipt,
-  UserPlus, Contact, History, ShieldAlert, Mail, Phone, Briefcase,
+  UserPlus, Contact, History, ShieldAlert, Mail, Phone, Briefcase, MessageSquare,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import Badge from '@/components/Badge';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
+import { AdminReportChat } from '@/pages/SuperAdmin';
 
 // Ficha detallada de una organización dentro del Panel de Administración
 // Global (Etapa 3). Cada pestaña trae sus propios datos on-demand — no
@@ -332,6 +333,7 @@ const REPORT_STATUSES = ['Pendiente', 'En revisión', 'Resuelto'];
 function ReportesTab({ orgId }) {
   const { data, loading, error } = useTabData(base44.admin.listOrganizationReports, orgId);
   const [items, setItems] = useState(data);
+  const [openChat, setOpenChat] = useState(null);
   useEffect(() => { setItems(data); }, [data]);
 
   const changeStatus = async (report, status) => {
@@ -358,6 +360,11 @@ function ReportesTab({ orgId }) {
             </div>
             <p className="text-sm whitespace-pre-wrap pl-7">{r.description}</p>
             {r.resolution_notes && <p className="text-xs text-muted-foreground pl-7 mt-1.5">Notas: {r.resolution_notes}</p>}
+            <button onClick={() => setOpenChat(openChat === r.id ? null : r.id)}
+              className="mt-2 ml-7 inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline">
+              <MessageSquare className="w-3.5 h-3.5" /> {openChat === r.id ? 'Ocultar conversación' : 'Ver conversación'}
+            </button>
+            {openChat === r.id && <div className="ml-7 mt-2"><AdminReportChat reportId={r.id} /></div>}
           </div>
         ))}
       </div>

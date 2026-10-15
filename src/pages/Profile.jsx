@@ -312,13 +312,80 @@ function SupportReportCard() {
         <div className="pt-3 border-t border-border/70 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reportes anteriores de tu organización</p>
           {reports.map(r => (
-            <div key={r.id} className="flex items-center justify-between gap-3 text-sm">
-              <span className="truncate flex-1 min-w-0">{r.title}</span>
-              <span className={`text-xs font-medium shrink-0 ${r.status === 'Resuelto' ? 'text-success' : r.status === 'En revisión' ? 'text-primary' : 'text-destructive'}`}>{r.status}</span>
+            <ReportRow key={r.id} report={r} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Una fila por reporte, que se puede abrir para ver/mandar mensajes en
+// la conversación con el equipo de Conectado Flow sobre ese problema
+// puntual (ver 0043_report_notifications_and_chat.sql).
+function ReportRow({ report }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between gap-3 text-sm py-0.5 text-left hover:opacity-80">
+        <span className="truncate flex-1 min-w-0">{report.title}</span>
+        <span className={`text-xs font-medium shrink-0 ${report.status === 'Resuelto' ? 'text-success' : report.status === 'En revisión' ? 'text-primary' : 'text-destructive'}`}>{report.status}</span>
+      </button>
+      {open && <div className="mt-2"><OrgReportChat reportId={report.id} /></div>}
+    </div>
+  );
+}
+
+function OrgReportChat({ reportId }) {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    base44.entities.SupportReportMessage.filter({ report_id: reportId }, 'created_date')
+      .then(setMessages).catch(() => setMessages([])).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [reportId]);
+
+  const send = async () => {
+    if (!draft.trim()) return;
+    setSending(true);
+    try {
+      await base44.entities.SupportReportMessage.create({
+        report_id: reportId, message: draft.trim(), sender_name: user?.full_name,
+      });
+      setDraft('');
+      load();
+    } finally { setSending(false); }
+  };
+
+  return (
+    <div className="bg-secondary/40 rounded-xl p-3 space-y-2.5">
+      {loading ? (
+        <p className="text-xs text-muted-foreground py-2">Cargando…</p>
+      ) : messages.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-2">Todavía no hay respuestas. Si necesitás agregar algo, escribilo acá.</p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {messages.map(m => (
+            <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 ${m.is_admin ? 'bg-card border border-border' : 'ml-auto bg-primary text-primary-foreground'}`}>
+              <p className="text-xs font-semibold opacity-80">{m.sender_name || (m.is_admin ? 'Soporte' : 'Vos')}</p>
+              <p className="text-sm whitespace-pre-wrap">{m.message}</p>
             </div>
           ))}
         </div>
       )}
+      <div className="flex items-end gap-2">
+        <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={2} placeholder="Escribir…"
+          className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+        <button onClick={send} disabled={sending || !draft.trim()} className="px-3 py-2 rounded-lg bg-destructive text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 shrink-0">
+          {sending ? 'Enviando…' : 'Enviar'}
+        </button>
+      </div>
     </div>
   );
 }
