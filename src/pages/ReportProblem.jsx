@@ -19,6 +19,41 @@ const PROBLEM_CATEGORIES = [
 ];
 const CUSTOM_CHIP = 'bg-secondary text-foreground border-border';
 
+// Chips de categoría + "Personalizado" — compartido entre el formulario
+// de arriba de la página y el que aparece dentro del chat, para que las
+// mismas opciones (y el mismo título en vivo) se vean en los dos lados.
+function ProblemTitlePicker({ category, onCategory, customTitle, onCustomTitle, title }) {
+  const isCustom = category === 'custom';
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">¿Qué tipo de problema es?</p>
+      <div className="flex flex-wrap gap-1.5">
+        {PROBLEM_CATEGORIES.map(c => (
+          <button key={c.value} type="button" onClick={() => onCategory(c.value)}
+            className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-opacity',
+              c.chip, category === c.value ? 'opacity-100 ring-2 ring-offset-1 ring-offset-card' : 'opacity-50 hover:opacity-80')}>
+            {c.value}
+          </button>
+        ))}
+        <button type="button" onClick={() => onCategory('custom')}
+          className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-opacity',
+            CUSTOM_CHIP, isCustom ? 'opacity-100 ring-2 ring-offset-1 ring-offset-card' : 'opacity-50 hover:opacity-80')}>
+          Personalizado
+        </button>
+      </div>
+      {isCustom && (
+        <input value={customTitle} onChange={e => onCustomTitle(e.target.value)} placeholder="Escribí el título del problema"
+          className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+      )}
+      {category && (
+        <p className="text-xs text-muted-foreground">
+          Título: <span className="font-medium text-foreground">{title || '…'}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Pantalla propia para reportar un problema a Conectado Flow (antes era
 // una tarjeta más dentro de Mi Perfil — ahora tiene su propio ítem de
 // menú, "Reportar problema", debajo de Configuración). El seguimiento
@@ -28,7 +63,9 @@ const CUSTOM_CHIP = 'bg-secondary text-foreground border-border';
 // el reporte (con una categoría elegida o un título personalizado).
 export default function ReportProblem() {
   const { user } = useAuth();
-  const [form, setForm] = useState({ title: '', description: '' });
+  const [category, setCategory] = useState(null);
+  const [customTitle, setCustomTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
@@ -36,20 +73,23 @@ export default function ReportProblem() {
   const [loadingReport, setLoadingReport] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
 
+  const isCustom = category === 'custom';
+  const title = isCustom ? customTitle.trim() : (category || '');
+
   useEffect(() => {
     base44.support.latestReport().then(setActiveReport).catch(() => {}).finally(() => setLoadingReport(false));
   }, []);
 
   const submit = async () => {
-    if (!form.title.trim() || !form.description.trim()) return;
+    if (!title || !description.trim()) return;
     setSending(true); setError(''); setSent(false);
     try {
       const created = await base44.entities.SupportReport.create({
-        title: form.title.trim(), description: form.description.trim(),
+        title, description: description.trim(),
         reported_by_id: user?.id, reported_by_name: user?.full_name,
       });
-      await base44.support.sendMessage(created.id, form.description.trim(), user?.full_name).catch(() => {});
-      setForm({ title: '', description: '' });
+      await base44.support.sendMessage(created.id, description.trim(), user?.full_name).catch(() => {});
+      setCategory(null); setCustomTitle(''); setDescription('');
       setSent(true);
       setActiveReport(created);
       setTimeout(() => setSent(false), 4000);
@@ -69,13 +109,12 @@ export default function ReportProblem() {
       </p>
 
       <div className="bg-card rounded-2xl border border-destructive/30 card-shadow p-5 sm:p-6 space-y-3">
-        <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Título del problema"
-          className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-        <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4}
+        <ProblemTitlePicker category={category} onCategory={setCategory} customTitle={customTitle} onCustomTitle={setCustomTitle} title={title} />
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4}
           placeholder="Contanos qué pasó, en qué pantalla y qué esperabas que pasara…"
           className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
         <div className="flex items-center gap-3">
-          <button onClick={submit} disabled={sending || !form.title.trim() || !form.description.trim()}
+          <button onClick={submit} disabled={sending || !title || !description.trim()}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-destructive text-white text-sm font-medium hover:opacity-90 disabled:opacity-50">
             <Send className="w-4 h-4" /> {sending ? 'Enviando…' : 'Enviar reporte'}
           </button>
@@ -150,34 +189,7 @@ function NewReportForm({ onCreated }) {
     <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-1">
       <p className="text-xs text-muted-foreground">Para empezar a chatear con soporte, contanos primero de qué se trata.</p>
 
-      <div>
-        <p className="text-xs font-medium text-muted-foreground mb-1.5">¿Qué tipo de problema es?</p>
-        <div className="flex flex-wrap gap-1.5">
-          {PROBLEM_CATEGORIES.map(c => (
-            <button key={c.value} type="button" onClick={() => setCategory(c.value)}
-              className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-opacity',
-                c.chip, category === c.value ? 'opacity-100 ring-2 ring-offset-1 ring-offset-card' : 'opacity-50 hover:opacity-80')}>
-              {c.value}
-            </button>
-          ))}
-          <button type="button" onClick={() => setCategory('custom')}
-            className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-opacity',
-              CUSTOM_CHIP, isCustom ? 'opacity-100 ring-2 ring-offset-1 ring-offset-card' : 'opacity-50 hover:opacity-80')}>
-            Personalizado
-          </button>
-        </div>
-      </div>
-
-      {isCustom && (
-        <input value={customTitle} onChange={e => setCustomTitle(e.target.value)} placeholder="Escribí el título del problema"
-          className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
-      )}
-
-      {category && (
-        <p className="text-xs text-muted-foreground">
-          Título: <span className="font-medium text-foreground">{title || '…'}</span>
-        </p>
-      )}
+      <ProblemTitlePicker category={category} onCategory={setCategory} customTitle={customTitle} onCustomTitle={setCustomTitle} title={title} />
 
       <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4}
         placeholder="Contanos qué pasó, en qué pantalla y qué esperabas que pasara…"
