@@ -248,27 +248,16 @@ function GoogleCalendarCard() {
 }
 
 // Reportar un problema a Conectado Flow (Panel de Administración Global,
-// Etapa 5 — ver 0038_support_reports.sql). Cualquier usuario de la
-// organización puede crear uno y ver el estado de los que ya mandó —
-// cambiar el estado es exclusivo del superadmin, desde el panel global.
+// Etapa 5 — ver 0038_support_reports.sql). Solo el formulario de envío —
+// el historial de reportes y la conversación son exclusivos del
+// superadmin desde el panel global (ver también /reportar-problema,
+// pantalla dedicada para lo mismo desde el menú).
 function SupportReportCard() {
   const { user } = useAuth();
-  const [reports, setReports] = useState([]);
-  const [loadingReports, setLoadingReports] = useState(true);
   const [form, setForm] = useState({ title: '', description: '' });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
-
-  const loadReports = () => {
-    setLoadingReports(true);
-    base44.entities.SupportReport.list('-created_date')
-      .then(setReports)
-      .catch(() => setReports([]))
-      .finally(() => setLoadingReports(false));
-  };
-
-  useEffect(() => { loadReports(); }, []);
 
   const submit = async () => {
     if (!form.title.trim() || !form.description.trim()) return;
@@ -280,7 +269,6 @@ function SupportReportCard() {
       });
       setForm({ title: '', description: '' });
       setSent(true);
-      loadReports();
       setTimeout(() => setSent(false), 3000);
     } catch (e) {
       setError(e.message || 'No se pudo enviar el reporte');
@@ -306,85 +294,6 @@ function SupportReportCard() {
           {sent && <span className="inline-flex items-center gap-1 text-sm text-success"><Check className="w-4 h-4" /> Enviado</span>}
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
-
-      {!loadingReports && reports.length > 0 && (
-        <div className="pt-3 border-t border-border/70 space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reportes anteriores de tu organización</p>
-          {reports.map(r => (
-            <ReportRow key={r.id} report={r} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Una fila por reporte, que se puede abrir para ver/mandar mensajes en
-// la conversación con el equipo de Conectado Flow sobre ese problema
-// puntual (ver 0043_report_notifications_and_chat.sql).
-function ReportRow({ report }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div>
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between gap-3 text-sm py-0.5 text-left hover:opacity-80">
-        <span className="truncate flex-1 min-w-0">{report.title}</span>
-        <span className={`text-xs font-medium shrink-0 ${report.status === 'Resuelto' ? 'text-success' : report.status === 'En revisión' ? 'text-primary' : 'text-destructive'}`}>{report.status}</span>
-      </button>
-      {open && <div className="mt-2"><OrgReportChat reportId={report.id} /></div>}
-    </div>
-  );
-}
-
-function OrgReportChat({ reportId }) {
-  const { user } = useAuth();
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
-
-  const load = () => {
-    setLoading(true);
-    base44.entities.SupportReportMessage.filter({ report_id: reportId }, 'created_date')
-      .then(setMessages).catch(() => setMessages([])).finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, [reportId]);
-
-  const send = async () => {
-    if (!draft.trim()) return;
-    setSending(true);
-    try {
-      await base44.entities.SupportReportMessage.create({
-        report_id: reportId, message: draft.trim(), sender_name: user?.full_name,
-      });
-      setDraft('');
-      load();
-    } finally { setSending(false); }
-  };
-
-  return (
-    <div className="bg-secondary/40 rounded-xl p-3 space-y-2.5">
-      {loading ? (
-        <p className="text-xs text-muted-foreground py-2">Cargando…</p>
-      ) : messages.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-2">Todavía no hay respuestas. Si necesitás agregar algo, escribilo acá.</p>
-      ) : (
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {messages.map(m => (
-            <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 ${m.is_admin ? 'bg-card border border-border' : 'ml-auto bg-primary text-primary-foreground'}`}>
-              <p className="text-xs font-semibold opacity-80">{m.sender_name || (m.is_admin ? 'Soporte' : 'Vos')}</p>
-              <p className="text-sm whitespace-pre-wrap">{m.message}</p>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex items-end gap-2">
-        <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={2} placeholder="Escribir…"
-          className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
-        <button onClick={send} disabled={sending || !draft.trim()} className="px-3 py-2 rounded-lg bg-destructive text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 shrink-0">
-          {sending ? 'Enviando…' : 'Enviar'}
-        </button>
       </div>
     </div>
   );

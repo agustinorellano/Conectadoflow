@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import Badge from '@/components/Badge';
 import Modal from '@/components/Modal';
 import DeleteOrganizationModal from '@/components/DeleteOrganizationModal';
+import SlideOverPanel from '@/components/SlideOverPanel';
 import { StyledSelect } from '@/components/ui/styled-select';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
@@ -357,15 +358,18 @@ function ReportsTab({ onChanged }) {
                 </select>
               </div>
               <p className="text-sm whitespace-pre-wrap pl-7">{r.description}</p>
-              <button onClick={() => setOpenChat(openChat === r.id ? null : r.id)}
+              <button onClick={() => setOpenChat(r.id)}
                 className="mt-2 ml-7 inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline">
-                <MessageSquare className="w-3.5 h-3.5" /> {openChat === r.id ? 'Ocultar conversación' : 'Ver conversación'}
+                <MessageSquare className="w-3.5 h-3.5" /> Ver conversación
               </button>
-              {openChat === r.id && <div className="ml-7 mt-2"><AdminReportChat reportId={r.id} /></div>}
             </div>
           ))}
         </div>
       )}
+      <SlideOverPanel open={!!openChat} onClose={() => setOpenChat(null)}
+        title="Conversación del reporte" subtitle={reports.find(r => r.id === openChat)?.title}>
+        {openChat && <AdminReportChat reportId={openChat} />}
+      </SlideOverPanel>
     </div>
   );
 }
@@ -399,30 +403,32 @@ export function AdminReportChat({ reportId }) {
   };
 
   return (
-    <div className="bg-secondary/40 rounded-xl p-3 space-y-2.5 max-w-lg">
-      {loading ? (
-        <p className="text-xs text-muted-foreground py-2">Cargando…</p>
-      ) : messages.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-2">Todavía no hay mensajes. Escribí el primero.</p>
-      ) : (
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {messages.map(m => (
-            <div key={m.id} className={cn('max-w-[85%] rounded-xl px-3 py-2', m.is_admin ? 'ml-auto bg-primary text-primary-foreground' : 'bg-card border border-border')}>
+    <div className="flex-1 min-h-0 flex flex-col gap-2.5">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
+        {loading ? (
+          <p className="text-xs text-muted-foreground py-2">Cargando…</p>
+        ) : messages.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-2">Todavía no hay mensajes. Escribí el primero.</p>
+        ) : (
+          messages.map(m => (
+            <div key={m.id} className={cn('max-w-[85%] rounded-xl px-3 py-2', m.is_admin ? 'ml-auto bg-primary text-primary-foreground' : 'bg-secondary/60')}>
               <p className="text-xs font-semibold opacity-80">{m.sender_name || (m.is_admin ? 'Soporte' : 'Usuario')}</p>
               <p className="text-sm whitespace-pre-wrap">{m.message}</p>
               <p className="text-[10px] opacity-60 mt-0.5">{formatDateTime(m.created_date)}</p>
             </div>
-          ))}
-        </div>
-      )}
-      <div className="flex items-end gap-2">
-        <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={2} placeholder="Responder…"
-          className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
-        <button onClick={send} disabled={sending || !draft.trim()} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 disabled:opacity-50 shrink-0">
-          {sending ? 'Enviando…' : 'Enviar'}
-        </button>
+          ))
+        )}
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="shrink-0 space-y-1.5">
+        <div className="flex items-end gap-2">
+          <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={2} placeholder="Responder…"
+            className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+          <button onClick={send} disabled={sending || !draft.trim()} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 disabled:opacity-50 shrink-0">
+            {sending ? 'Enviando…' : 'Enviar'}
+          </button>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
     </div>
   );
 }

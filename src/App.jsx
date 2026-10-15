@@ -33,6 +33,7 @@ import SettingsPage from '@/pages/Settings';
 import Profile from '@/pages/Profile';
 import Reports from '@/pages/Reports';
 import Products from '@/pages/Products';
+import ReportProblem from '@/pages/ReportProblem';
 import SuperAdmin from '@/pages/SuperAdmin';
 import SuperAdminOrgDetail from '@/pages/SuperAdminOrgDetail';
 import CalendarCallback from '@/pages/CalendarCallback';
@@ -75,6 +76,7 @@ const AuthenticatedApp = () => {
           <Route path="/equipo" element={<Team />} />
           <Route path="/configuracion" element={<SettingsPage />} />
           <Route path="/perfil" element={<Profile />} />
+          <Route path="/reportar-problema" element={<ReportProblem />} />
           <Route path="/reportes" element={<Reports />} />
           <Route path="/productos" element={<Products />} />
           <Route path="/super-admin" element={<SuperAdmin />} />

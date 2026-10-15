@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, UserPlus, KanbanSquare, ShoppingCart,
   Wallet, Calendar, MessageCircle, FileText, BarChart3, Users2,
-  Settings, User, ClipboardList, Package,
+  Settings, User, ClipboardList, Package, ShieldAlert,
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
@@ -20,6 +20,7 @@ export const NAV_ITEMS = [
   { to: '/equipo', label: 'Equipo', icon: Users2, section: 'Organización', description: 'Gestión de miembros del equipo y asignación de roles.' },
   { to: '/perfil', label: 'Perfil', icon: User, section: 'Organización', description: 'Tu información personal y preferencias de cuenta.' },
   { to: '/configuracion', label: 'Configuración', icon: Settings, section: 'Organización', description: 'Ajustes generales de la aplicación, comercios y medios de pago.' },
+  { to: '/reportar-problema', label: 'Reportar problema', icon: ShieldAlert, section: 'Organización', description: 'Avisanos si algo no funciona como esperás en Conectado Flow.' },
 ];
 
 export const NAV_SECTIONS = ['Principal', 'Comercial', 'Gestión', 'Analytics', 'Organización'];

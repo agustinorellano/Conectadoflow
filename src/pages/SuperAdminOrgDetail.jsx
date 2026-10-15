@@ -10,6 +10,7 @@ import Badge from '@/components/Badge';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/flowUtils';
 import { roleLabel } from '@/lib/roles';
 import { AdminReportChat } from '@/pages/SuperAdmin';
+import SlideOverPanel from '@/components/SlideOverPanel';
 
 // Ficha detallada de una organización dentro del Panel de Administración
 // Global (Etapa 3). Cada pestaña trae sus propios datos on-demand — no
@@ -360,14 +361,17 @@ function ReportesTab({ orgId }) {
             </div>
             <p className="text-sm whitespace-pre-wrap pl-7">{r.description}</p>
             {r.resolution_notes && <p className="text-xs text-muted-foreground pl-7 mt-1.5">Notas: {r.resolution_notes}</p>}
-            <button onClick={() => setOpenChat(openChat === r.id ? null : r.id)}
+            <button onClick={() => setOpenChat(r.id)}
               className="mt-2 ml-7 inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline">
-              <MessageSquare className="w-3.5 h-3.5" /> {openChat === r.id ? 'Ocultar conversación' : 'Ver conversación'}
+              <MessageSquare className="w-3.5 h-3.5" /> Ver conversación
             </button>
-            {openChat === r.id && <div className="ml-7 mt-2"><AdminReportChat reportId={r.id} /></div>}
           </div>
         ))}
       </div>
+      <SlideOverPanel open={!!openChat} onClose={() => setOpenChat(null)}
+        title="Conversación del reporte" subtitle={items.find(r => r.id === openChat)?.title}>
+        {openChat && <AdminReportChat reportId={openChat} />}
+      </SlideOverPanel>
     </TabShell>
   );
 }
