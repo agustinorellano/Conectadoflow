@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact, AlertTriangle, ShieldCheck, History, MessageSquare } from 'lucide-react';
+import { Building2, ShieldAlert, Mail, Phone, Briefcase, Users2, Send, Megaphone, Trash2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Store, GitBranch, Package, UserPlus, Contact, AlertTriangle, ShieldCheck, History, MessageSquare, Check, CheckCheck } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Switch } from '@/components/ui/switch';
@@ -421,12 +421,14 @@ export function AdminReportChat({ reportId }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const load = () => {
-    setLoading(true);
-    base44.admin.listReportMessages(reportId).then(setMessages).catch(() => {}).finally(() => setLoading(false));
+  const load = (markRead = true) => {
+    base44.admin.listReportMessages(reportId).then(rows => {
+      setMessages(rows);
+      if (markRead) base44.admin.markReportMessagesRead(reportId).catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [reportId]);
+  useEffect(() => { setLoading(true); load(); }, [reportId]);
 
   const send = async () => {
     if (!draft.trim()) return;
@@ -434,7 +436,7 @@ export function AdminReportChat({ reportId }) {
     try {
       await base44.admin.sendReportMessage(reportId, draft.trim());
       setDraft('');
-      load();
+      load(false);
     } catch (e) { setError(e.message || 'No se pudo enviar'); }
     finally { setSending(false); }
   };
@@ -451,7 +453,12 @@ export function AdminReportChat({ reportId }) {
             <div key={m.id} className={cn('max-w-[85%] rounded-xl px-3 py-2', m.is_admin ? 'ml-auto bg-primary text-primary-foreground' : 'bg-secondary/60')}>
               <p className="text-xs font-semibold opacity-80">{m.sender_name || (m.is_admin ? 'Soporte' : 'Usuario')}</p>
               <p className="text-sm whitespace-pre-wrap">{m.message}</p>
-              <p className="text-[10px] opacity-60 mt-0.5">{formatDateTime(m.created_date)}</p>
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <p className="text-[10px] opacity-60">{formatDateTime(m.created_date)}</p>
+                {m.is_admin && (m.read_at
+                  ? <CheckCheck className="w-3 h-3 opacity-80" />
+                  : <Check className="w-3 h-3 opacity-60" />)}
+              </div>
             </div>
           ))
         )}

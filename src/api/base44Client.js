@@ -317,6 +317,10 @@ const admin = {
     const { error } = await supabase.rpc('admin_send_report_message', { p_report_id: reportId, p_message: message });
     if (error) throw error;
   },
+  async markReportMessagesRead(reportId) {
+    const { error } = await supabase.rpc('admin_mark_report_messages_read', { p_report_id: reportId });
+    if (error) throw error;
+  },
   async listOrganizationAuditLog(orgId) {
     const { data, error } = await supabase.rpc('admin_list_organization_audit_log', { p_org_id: orgId });
     if (error) throw error;
@@ -414,6 +418,29 @@ const users = {
   },
 };
 
+// Chat de soporte visto desde el lado de la organización (no admin). Leer
+// y mandar mensajes es una entidad normal (base44.entities.SupportReportMessage,
+// scoped por RLS a la propia organización) — esto cubre lo que no es
+// tabla directa: encontrar el reporte más reciente para abrir el chat sin
+// mostrarle a el usuario una lista/historial, y marcar como leídos los
+// mensajes del soporte (confirmación de lectura).
+const support = {
+  async latestReport() {
+    const rows = await entities.SupportReport.list('-created_date', 1);
+    return rows[0] || null;
+  },
+  async listMessages(reportId) {
+    return entities.SupportReportMessage.filter({ report_id: reportId }, 'created_date');
+  },
+  async sendMessage(reportId, message, senderName) {
+    return entities.SupportReportMessage.create({ report_id: reportId, message, sender_name: senderName, is_admin: false });
+  },
+  async markMessagesRead(reportId) {
+    const { error } = await supabase.rpc('mark_report_messages_read', { p_report_id: reportId });
+    if (error) throw error;
+  },
+};
+
 // Facturación electrónica con ARCA (ex AFIP) — ver supabase/migrations/0031.
 const fiscal = {
   // Guarda (o reemplaza) el certificado digital de la organización. Viaja
@@ -440,4 +467,4 @@ const fiscal = {
   },
 };
 
-export const base44 = { entities, auth, integrations, users, admin, documents, fiscal };
+export const base44 = { entities, auth, integrations, users, admin, documents, fiscal, support };
