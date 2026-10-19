@@ -22,11 +22,13 @@ export const ROLE_OPTIONS = [
 // Paths with no entry here are open to every role. Keep in sync with the
 // matrix shared with the user: Cobros/Analytics/Reportes closed to
 // Vendedor+Consulta, Equipo closed to Vendedor+Consulta, Configuración
-// admin-only.
+// admin-only. Costos muestra ganancia real y gastos — misma visibilidad
+// que Cobros/Analytics (admin+gerente), no toda la fuerza de ventas.
 const PAGE_ROLES = {
   '/cobros': ['admin', 'manager'],
   '/analytics': ['admin', 'manager'],
   '/reportes': ['admin', 'manager'],
+  '/costos': ['admin', 'manager'],
   '/equipo': ['admin', 'manager'],
   '/configuracion': ['admin'],
   '/importar': ['admin', 'manager', 'user'], // viewer never writes, same as everywhere else

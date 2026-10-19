@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, UserPlus, KanbanSquare, ShoppingCart,
   Wallet, Calendar, MessageCircle, FileText, BarChart3, Users2,
-  Settings, User, ClipboardList, Package, ShieldAlert,
+  Settings, User, ClipboardList, Package, ShieldAlert, Truck, Receipt,
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
@@ -12,11 +12,13 @@ export const NAV_ITEMS = [
   { to: '/ventas', label: 'Ventas', icon: ShoppingCart, section: 'Comercial', description: 'Registrá ventas, gestioná cuotas y hacé seguimiento de cobros pendientes.' },
   { to: '/cobros', label: 'Cobros', icon: Wallet, section: 'Comercial', description: 'Controlá pagos pendientes, vencimientos de cuotas y estado de cobranza.' },
   { to: '/productos', label: 'Productos', icon: Package, section: 'Gestión', description: 'Catálogo de productos y servicios con precios, imágenes y control de stock.' },
+  { to: '/proveedores', label: 'Proveedores', icon: Truck, section: 'Gestión', description: 'Seguimiento día a día de pedidos, pagos y envíos con cada proveedor.' },
   { to: '/reuniones', label: 'Reuniones', icon: Calendar, section: 'Gestión', description: 'Agenda y gestioná reuniones con clientes y prospectos.' },
   { to: '/comunicacion', label: 'Comunicación', icon: MessageCircle, section: 'Gestión', description: 'Plantillas de mensajes para WhatsApp y otros canales de contacto.' },
   { to: '/documentos', label: 'Documentos', icon: FileText, section: 'Gestión', description: 'Gestioná facturas, presupuestos y documentos comerciales.' },
   { to: '/analytics', label: 'Analytics', icon: BarChart3, section: 'Analytics', description: 'Análisis detallado de ventas, cobros, leads y rendimiento del equipo.' },
   { to: '/reportes', label: 'Reportes', icon: ClipboardList, section: 'Analytics', description: 'Reportes financieros exportables a Excel y PDF con filtros por comercio.' },
+  { to: '/costos', label: 'Costos', icon: Receipt, section: 'Analytics', description: 'Gastos operativos por categoría y ganancia real (ventas menos gastos).' },
   { to: '/equipo', label: 'Equipo', icon: Users2, section: 'Organización', description: 'Gestión de miembros del equipo y asignación de roles.' },
   { to: '/perfil', label: 'Perfil', icon: User, section: 'Organización', description: 'Tu información personal y preferencias de cuenta.' },
   { to: '/configuracion', label: 'Configuración', icon: Settings, section: 'Organización', description: 'Ajustes generales de la aplicación, comercios y medios de pago.' },

@@ -33,6 +33,8 @@ import SettingsPage from '@/pages/Settings';
 import Profile from '@/pages/Profile';
 import Reports from '@/pages/Reports';
 import Products from '@/pages/Products';
+import Suppliers from '@/pages/Suppliers';
+import Costs from '@/pages/Costs';
 import ReportProblem from '@/pages/ReportProblem';
 import SuperAdmin from '@/pages/SuperAdmin';
 import SuperAdminOrgDetail from '@/pages/SuperAdminOrgDetail';
@@ -79,6 +81,8 @@ const AuthenticatedApp = () => {
           <Route path="/reportar-problema" element={<ReportProblem />} />
           <Route path="/reportes" element={<Reports />} />
           <Route path="/productos" element={<Products />} />
+          <Route path="/proveedores" element={<Suppliers />} />
+          <Route path="/costos" element={<Costs />} />
           <Route path="/super-admin" element={<SuperAdmin />} />
           <Route path="/super-admin/organizaciones/:id" element={<SuperAdminOrgDetail />} />
         </Route>
