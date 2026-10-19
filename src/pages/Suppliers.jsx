@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Truck, Plus, Pencil, Trash2, Package2, Wallet, Clock, Phone, Mail, PackageCheck, PackageSearch } from 'lucide-react';
 import { useData } from '@/lib/DataContext';
 import { useEntityList, useEntityMutations } from '@/lib/useEntityQuery';
@@ -17,6 +18,7 @@ const PAYMENT_STATUS_STYLES = {
 };
 
 export default function Suppliers() {
+  const navigate = useNavigate();
   const { config } = useData();
   const currency = config?.currency || 'ARS';
   const { data: suppliers = [], isLoading: loadingSuppliers } = useEntityList('Supplier', { sort: 'name' });
@@ -148,18 +150,20 @@ export default function Suppliers() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {suppliers.map(s => (
-              <div key={s.id} className={cn('bg-card rounded-2xl border border-border card-shadow p-4', s.is_active === false && 'opacity-60')}>
+              <div key={s.id} onClick={() => navigate(`/proveedores/${s.id}`)}
+                className={cn('bg-card rounded-2xl border border-border card-shadow p-4 cursor-pointer hover:border-primary/40 transition-colors', s.is_active === false && 'opacity-60')}>
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <p className="font-semibold text-sm">{s.name}</p>
                   {s.category && <Badge variant="primary">{s.category}</Badge>}
                 </div>
+                {s.company && <p className="text-xs text-muted-foreground">{s.company}{s.tax_id ? ` · CUIT ${s.tax_id}` : ''}</p>}
                 {s.contact_name && <p className="text-xs text-muted-foreground mb-1.5">{s.contact_name}</p>}
                 <div className="space-y-0.5 mb-3">
                   {s.phone && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Phone className="w-3 h-3" /> {s.phone}</p>}
                   {s.email && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Mail className="w-3 h-3" /> {s.email}</p>}
                 </div>
                 {s.is_active === false && <Badge variant="muted" className="mb-2">Inactivo</Badge>}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                   <button onClick={() => setSupplierForm(s)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent">
                     <Pencil className="w-4 h-4 text-muted-foreground" />
                   </button>
@@ -191,10 +195,10 @@ export default function Suppliers() {
   );
 }
 
-function SupplierFormModal({ form, onClose, mutations }) {
+export function SupplierFormModal({ form, onClose, mutations }) {
   const [values, setValues] = useState({});
   React.useEffect(() => {
-    if (form) setValues({ name: '', contact_name: '', phone: '', email: '', category: '', notes: '', is_active: true, ...form });
+    if (form) setValues({ name: '', company: '', tax_id: '', contact_name: '', phone: '', email: '', category: '', notes: '', is_active: true, ...form });
   }, [form]);
   if (!form) return null;
   const isEdit = !!form.id;
@@ -215,10 +219,14 @@ function SupplierFormModal({ form, onClose, mutations }) {
       <div className="space-y-3">
         <input value={values.name || ''} onChange={e => setValues(v => ({ ...v, name: e.target.value }))} placeholder="Nombre del proveedor"
           className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+        <input value={values.company || ''} onChange={e => setValues(v => ({ ...v, company: e.target.value }))} placeholder="Razón social"
+          className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+        <input value={values.tax_id || ''} onChange={e => setValues(v => ({ ...v, tax_id: e.target.value }))} placeholder="CUIT"
+          className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
         <input value={values.contact_name || ''} onChange={e => setValues(v => ({ ...v, contact_name: e.target.value }))} placeholder="Persona de contacto"
           className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
         <div className="grid grid-cols-2 gap-2">
-          <input value={values.phone || ''} onChange={e => setValues(v => ({ ...v, phone: e.target.value }))} placeholder="Teléfono"
+          <input value={values.phone || ''} onChange={e => setValues(v => ({ ...v, phone: e.target.value }))} placeholder="Número de contacto"
             className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
           <input value={values.email || ''} onChange={e => setValues(v => ({ ...v, email: e.target.value }))} placeholder="Email"
             className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/30" />
